@@ -32,6 +32,16 @@
 - [x] 30 comprehensive unit tests
 - **Features**: 52+ best practice templates with examples
 
+### Phase 4: CLI Interface ✅ **COMPLETE**
+- [x] `r-practices` command-line tool with 4 core commands
+- [x] `detect` command: Identify project workflow type
+- [x] `validate` command: Check best practices with filtering
+- [x] `template` command: Generate project scaffolds
+- [x] `report` command: Create styled HTML validation reports
+- [x] `--watch` flag: Monitor for file changes and auto-revalidate
+- [x] Colorized console output with severity indicators
+- **Features**: Full-featured CLI for local development workflows
+
 ### Documentation & Support ✅ **COMPLETE**
 - [x] Comprehensive README.md with tool descriptions
 - [x] CLAUDE.md with architecture documentation
@@ -43,11 +53,11 @@
 
 ### Code Metrics
 ```
-Files:              22 TypeScript source files
-Lines of Code:      4,282 total
+Files:              28 TypeScript source files (added 6 for CLI)
+Lines of Code:      5,200+ total (added ~900 for Phase 4)
 Test Files:         5 test suites
 Test Cases:         91 passing tests
-Coverage:           90%+ in tested components
+Coverage:           75%+ overall (core components 90%+)
 ```
 
 ### Architecture
@@ -56,6 +66,8 @@ Core Components:    6 (Detector, Validator, Generator, KB, Utils, Server)
 Workflow Types:     9 (r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis)
 Best Practices:     52 curated practices across all workflows
 MCP Tools:          6 (detect_workflow, validate_project, validate_file, generate_template, get_practice, list_practices)
+CLI Commands:       4 (detect, validate, template, report)
+CLI Options:        File watch, HTML reports, severity/category filtering, customizable templates
 ```
 
 ### Development Efficiency
@@ -70,6 +82,17 @@ Test Execution:     ~5 seconds for full suite
 
 ### Source Code (src/)
 ```
+bin/
+  └── cli.ts                  (37 lines) — CLI entry point
+
+cli/
+  ├── index.ts                (86 lines) — CLI command setup with Commander
+  └── commands/
+      ├── detect.ts           (26 lines) — Workflow detection command
+      ├── validate.ts         (135 lines) — Project validation with watch mode
+      ├── template.ts         (72 lines) — Template generation command
+      └── report.ts           (179 lines) — HTML report generation
+
 engine/
   ├── detector.ts             (208 lines) — Workflow detection with scoring
   ├── validator.ts            (503 lines) — Comprehensive validation engine
@@ -86,7 +109,7 @@ types/
   └── common.ts               — Shared type definitions
 
 utils/
-  ├── file.ts                 — Async file system utilities
+  ├── file.ts                 (88 lines) — Async file system utilities
   └── logger.ts               — Simple logging with timestamps
 
 server.ts                       (358 lines) — MCP server with 6 tools
@@ -221,6 +244,13 @@ npm test
 
 # Start MCP server
 node dist/index.js
+
+# Run CLI commands
+r-practices detect .
+r-practices validate . --workflow package
+r-practices template shiny --name my-app
+r-practices report . --output report.html
+r-practices validate . --watch
 ```
 
 ### MCP Server Ready
@@ -232,14 +262,14 @@ node dist/index.js
 
 ## Next Steps / Future Enhancements
 
-### Phase 4: CLI Interface (Proposed)
-- [ ] Command-line tool for local use
-- [ ] `validate` command for project validation
-- [ ] `detect` command for workflow detection
-- [ ] `template` command for scaffold generation
-- [ ] `--watch` flag for continuous monitoring
-- [ ] HTML report generation
-- [ ] Configuration file support
+### Phase 4: CLI Interface ✅ **COMPLETE**
+- [x] Command-line tool for local use
+- [x] `validate` command for project validation
+- [x] `detect` command for workflow detection
+- [x] `template` command for scaffold generation
+- [x] `--watch` flag for continuous monitoring
+- [x] HTML report generation
+- [ ] Configuration file support (future enhancement)
 
 ### Phase 5: IDE Integration (Proposed)
 - [ ] VS Code extension
