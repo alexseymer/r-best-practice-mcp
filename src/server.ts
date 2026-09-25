@@ -7,6 +7,7 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { WorkflowDetector } from './engine/detector.js';
+import { Validator } from './engine/validator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
@@ -14,6 +15,7 @@ import { FileUtils } from './utils/file.js';
 export class RPracticesMCPServer {
   private server: Server;
   private detector: WorkflowDetector;
+  private validator: Validator;
 
   constructor() {
     this.server = new Server({
@@ -21,6 +23,7 @@ export class RPracticesMCPServer {
       version: '1.0.0',
     });
     this.detector = new WorkflowDetector();
+    this.validator = new Validator();
     this.setupHandlers();
   }
 
@@ -193,23 +196,28 @@ export class RPracticesMCPServer {
     const path = args.path as string;
     const specifiedWorkflow = args.workflow as string | undefined;
 
+    const exists = await FileUtils.isDirectory(path);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'PATH_NOT_FOUND',
+        message: `Directory not found: ${path}`,
+      };
+    }
+
     // Auto-detect workflow if not specified
-    let workflow = specifiedWorkflow;
-    if (!workflow) {
+    let workflow = specifiedWorkflow || 'unknown';
+    if (!specifiedWorkflow) {
       const detection = await this.detector.detect(path);
       workflow = detection.workflow;
     }
 
-    // TODO: Implement full project validation
-    // For now, return basic structure
+    // Validate project
+    const result = await this.validator.validateProject(path, workflow as any);
+
     return {
       error: false,
-      data: {
-        path,
-        workflow,
-        findings: [],
-        scanDuration: 0,
-      },
+      data: result,
       timestamp: Date.now(),
     };
   }
@@ -226,12 +234,14 @@ export class RPracticesMCPServer {
       };
     }
 
-    // TODO: Implement file validation
+    // Validate file
+    const findings = await this.validator.validateFile(path);
+
     return {
       error: false,
       data: {
         path,
-        findings: [],
+        findings,
       },
       timestamp: Date.now(),
     };
