@@ -81,7 +81,7 @@ npm test
 
 ## Usage
 
-### As an MCP Server
+### Via MCP Server (Claude & other clients)
 
 The server exposes 6 tools via the Model Context Protocol:
 
@@ -184,30 +184,52 @@ The server exposes 6 tools via the Model Context Protocol:
 r-best-practice-mcp/
 ├── src/
 │   ├── engine/
-│   │   ├── detector.ts            # Workflow detection
-│   │   ├── validator.ts           # Project validation
-│   │   └── template-generator.ts  # Template generation
+│   │   ├── detector.ts            # Workflow detection (208 lines)
+│   │   ├── validator.ts           # Project validation (503 lines)
+│   │   └── template-generator.ts  # Template generation (833 lines)
 │   ├── data/
-│   │   └── knowledge-base.ts      # 52 best practices
+│   │   └── knowledge-base.ts      # 52 best practices (592 lines)
+│   ├── analysis/                  # Phase 6: Advanced features
+│   │   ├── complexity.ts          # Complexity analysis
+│   │   ├── dependencies.ts        # Dependency tracking
+│   │   ├── performance.ts         # Performance profiling
+│   │   ├── auto-fixes.ts          # Automated fixes
+│   │   └── index.ts               # Exports
+│   ├── cli/                       # Phase 4: CLI interface
+│   │   ├── index.ts               # Command setup
+│   │   └── commands/
+│   │       ├── detect.ts          # Detect workflow
+│   │       ├── validate.ts        # Validate project
+│   │       ├── template.ts        # Generate template
+│   │       └── report.ts          # Generate report
+│   ├── config/
+│   │   └── rules-engine.ts        # Custom validation rules
 │   ├── types/
-│   │   ├── workflow.ts            # Workflow types
-│   │   ├── finding.ts             # Validation findings
-│   │   ├── practice.ts            # Best practices
-│   │   ├── template.ts            # Template structures
-│   │   └── common.ts              # Common types
+│   │   ├── workflow.ts, finding.ts, practice.ts, etc.
 │   ├── utils/
-│   │   ├── file.ts                # File system utilities
-│   │   └── logger.ts              # Logging
-│   ├── server.ts                  # MCP server
-│   └── index.ts                   # Entry point
+│   │   ├── file.ts, logger.ts
+│   ├── server.ts                  # MCP server (358 lines)
+│   └── index.ts
+├── vscode-extension/              # Phase 5: VS Code integration
+│   ├── package.json
+│   ├── src/
+│   │   ├── extension.ts           # Main extension
+│   │   ├── client.ts              # MCP communication
+│   │   ├── diagnostics.ts         # VS Code diagnostics
+│   │   └── commands.ts            # Command handlers
+├── rstudio-addin/                 # Phase 7: RStudio integration
+│   ├── DESCRIPTION, NAMESPACE
+│   ├── R/
+│   │   ├── addins.R               # 4 addin functions (337 lines)
+│   │   └── utils.R                # MCP utilities (300+ lines)
+│   ├── inst/rstudio/
+│   │   └── addins.dcf             # RStudio registration
+│   └── tests/
 ├── tests/
-│   ├── unit/                      # Unit tests (91 tests)
-│   └── fixtures/                  # Test fixtures
-├── dist/                          # Compiled output
-├── jest.config.js
-├── tsconfig.json
-├── package.json
-└── README.md
+│   ├── unit/                      # Unit tests (5 suites, 91 tests)
+│   └── fixtures/
+├── dist/, jest.config.js, tsconfig.json, package.json
+└── README.md, CLAUDE.md, CONTRIBUTING.md
 ```
 
 ## Development
@@ -327,14 +349,51 @@ mcp_tool_call "detect_workflow" '{"path": "/path/to/project"}'
 4. Run tests: `npm test`
 5. Submit a pull request
 
-## Roadmap
+## Interfaces Available
 
-- [ ] CLI interface for local use
-- [ ] VS Code extension
+### 🖥️ MCP Server
+The core MCP server exposing 6 tools for Claude and other MCP clients. Start with `node dist/index.js`.
+
+### 💻 CLI Tool (Phase 4)
+Local command-line tool for developers:
+- `detect` — Identify project workflow type
+- `validate` — Check projects against best practices
+- `template` — Generate project scaffolds
+- `report` — Create HTML validation reports
+- `--watch` mode for continuous monitoring
+
+### 📌 VS Code Extension (Phase 5)
+Real-time validation within VS Code:
+- Inline diagnostics with severity coloring
+- Quick fix suggestions
+- Workflow detection
+- HTML report generation in WebView
+- Keyboard shortcut: Shift+Alt+V
+
+### 🎨 RStudio Addin (Phase 7)
+In-IDE validation for RStudio:
+- Validate Project gadget with findings table
+- Detect Workflow dialog
+- Generate Template interactive UI
+- Show Report with statistics
+- Access via RStudio Addins menu
+
+## Advanced Features (Phase 6)
+
+- **Complexity Analysis** — Cyclomatic complexity, nesting depth, LOC metrics
+- **Dependency Tracking** — renv.lock, DESCRIPTION, library() analysis
+- **Performance Profiling** — Operation timing and optimization suggestions
+- **Automated Fixes** — roxygen2, imports, formatting, style fixes
+- **Custom Rules** — Pattern-based validation rules
+
+## Roadmap (Future Phases)
+
+- [ ] Publish VS Code extension to marketplace
+- [ ] Publish CLI tool to npm registry
+- [ ] Publish RStudio addin to CRAN
 - [ ] Web dashboard
-- [ ] Custom rules configuration
 - [ ] Additional workflows (bookdown, blogdown)
-- [ ] Performance profiling
+- [ ] Community rule library
 
 ## License
 
