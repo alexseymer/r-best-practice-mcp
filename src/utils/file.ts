@@ -75,4 +75,16 @@ export class FileUtils {
   static normalizePath(filePath: string): string {
     return path.normalize(filePath).replace(/\\/g, '/');
   }
+
+  static async getStats(filePath: string): Promise<fs.Stats | null> {
+    try {
+      return await fs.promises.stat(filePath);
+    } catch {
+      return null;
+    }
+  }
+
+  static async createDirectory(dirPath: string): Promise<void> {
+    await fs.promises.mkdir(dirPath, { recursive: true });
+  }
 }

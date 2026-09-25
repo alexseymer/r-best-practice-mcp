@@ -4,6 +4,9 @@
   "description": "MCP server for R development best practices - enforces standards across R scripts, Quarto, Shiny, packages, and more",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "r-practices": "dist/bin/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
@@ -28,7 +31,8 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.21.0",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "commander": "^11.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
