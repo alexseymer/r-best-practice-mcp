@@ -8,6 +8,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
+import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
@@ -16,6 +17,7 @@ export class RPracticesMCPServer {
   private server: Server;
   private detector: WorkflowDetector;
   private validator: Validator;
+  private templateGenerator: TemplateGenerator;
 
   constructor() {
     this.server = new Server({
@@ -24,6 +26,7 @@ export class RPracticesMCPServer {
     });
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
+    this.templateGenerator = new TemplateGenerator();
     this.setupHandlers();
   }
 
@@ -119,6 +122,33 @@ export class RPracticesMCPServer {
             },
           },
         },
+        {
+          name: 'generate_template',
+          description: 'Generate a project template for a specific R workflow',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              workflow: {
+                type: 'string',
+                description:
+                  'Workflow type (r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis)',
+              },
+              projectName: {
+                type: 'string',
+                description: 'Optional name for the project',
+              },
+              authorName: {
+                type: 'string',
+                description: 'Optional author name',
+              },
+              authorEmail: {
+                type: 'string',
+                description: 'Optional author email',
+              },
+            },
+            required: ['workflow'],
+          },
+        },
       ],
     };
   }
@@ -148,6 +178,9 @@ export class RPracticesMCPServer {
           break;
         case 'list_practices':
           result = this.listPractices(args);
+          break;
+        case 'generate_template':
+          result = await this.generateTemplate(args);
           break;
         default:
           result = {
@@ -280,6 +313,42 @@ export class RPracticesMCPServer {
       data: result,
       timestamp: Date.now(),
     };
+  }
+
+  private async generateTemplate(args: Record<string, unknown>): Promise<unknown> {
+    const workflow = args.workflow as string;
+    const projectName = args.projectName as string | undefined;
+    const authorName = args.authorName as string | undefined;
+    const authorEmail = args.authorEmail as string | undefined;
+
+    if (!workflow) {
+      return {
+        error: true,
+        code: 'MISSING_WORKFLOW',
+        message: 'workflow parameter is required',
+      };
+    }
+
+    try {
+      const result = await this.templateGenerator.generate(workflow as any, {
+        projectName,
+        authorName,
+        authorEmail,
+      });
+
+      return {
+        error: false,
+        data: result,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error generating template for ${workflow}`, error);
+      return {
+        error: true,
+        code: 'TEMPLATE_GENERATION_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 
   async start(): Promise<void> {
