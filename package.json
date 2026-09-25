@@ -1,7 +1,7 @@
 {
-  "name": "r-coding-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for R package development - CRAN integration, testing, QA, and release automation",
+  "name": "r-best-practices-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for R development best practices - enforces standards across R scripts, Quarto, Shiny, packages, and more",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -25,6 +25,7 @@
   "author": "alexseymer",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
