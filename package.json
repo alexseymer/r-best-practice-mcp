@@ -1,0 +1,38 @@
+{
+  "name": "r-coding-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for R package development - CRAN integration, testing, QA, and release automation",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "start": "node dist/index.js",
+    "dev": "npm run build && npm start",
+    "test": "jest",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "keywords": [
+    "mcp",
+    "r-programming",
+    "r-packages",
+    "cran",
+    "package-development",
+    "testing",
+    "devtools"
+  ],
+  "author": "alexseymer",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}
