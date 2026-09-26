@@ -576,6 +576,182 @@ jobs:
           docker-compose up -d
 ```
 
+## Resource Monitoring
+
+The server includes comprehensive performance metrics and monitoring endpoints.
+
+### Metrics Endpoints
+
+**Health Check with Metrics:**
+```bash
+curl http://localhost:3000/health
+```
+
+Response includes uptime, average request duration, and operation counts:
+```json
+{
+  "status": "ok",
+  "service": "r-best-practices-mcp",
+  "version": "1.0.0",
+  "timestamp": "2026-09-26T12:00:00.000Z",
+  "metrics": {
+    "uptime": 3600000,
+    "averageRequestDuration": "45.23ms",
+    "totalRequests": 1250,
+    "operationCounts": {
+      "detection": 342,
+      "validation": 450,
+      "template-generation": 28,
+      "practice-lookup": 430
+    },
+    "errorCounts": {}
+  }
+}
+```
+
+**Detailed Metrics:**
+```bash
+curl http://localhost:3000/metrics
+```
+
+Returns full metrics snapshot with request and operation history.
+
+**Export Metrics as CSV:**
+```bash
+# Export request metrics
+curl http://localhost:3000/metrics/requests.csv > requests.csv
+
+# Export operation metrics
+curl http://localhost:3000/metrics/operations.csv > operations.csv
+```
+
+### Docker Stats Monitoring
+
+**Real-time resource usage:**
+```bash
+# Monitor all containers
+docker stats
+
+# Monitor specific container
+docker stats r-practices-api
+
+# Continuous monitoring
+docker stats r-practices-api --no-stream=false
+```
+
+**Example output:**
+```
+CONTAINER ID   NAME            CPU %     MEM USAGE / LIMIT   MEM %
+abc123def      r-practices-api 0.25%     120M / 512M        23.4%
+```
+
+### Docker Compose Stats
+
+```bash
+# View all container stats
+docker-compose stats
+
+# Follow logs with timing info
+docker-compose logs -f --timestamps api
+```
+
+### Resource Limits
+
+The docker-compose.yml includes resource limits to prevent resource exhaustion:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2'           # Maximum 2 CPU cores
+      memory: 512M        # Maximum 512MB RAM
+    reservations:
+      cpus: '0.5'         # Reserved 0.5 CPU cores
+      memory: 256M        # Reserved 256MB RAM
+```
+
+**Modifying limits:**
+
+Edit `docker-compose.yml`:
+```yaml
+services:
+  api:
+    deploy:
+      resources:
+        limits:
+          cpus: '4'          # Increase CPU limit
+          memory: 1024M      # Increase memory limit
+```
+
+Then restart:
+```bash
+docker-compose down
+docker-compose up -d
+```
+
+### Performance Benchmarks
+
+Run performance tests to establish baselines:
+
+```bash
+# Run all performance tests
+npm test -- tests/performance.test.ts
+
+# Specific test categories
+npm test -- tests/performance.test.ts -t "Detection Performance"
+npm test -- tests/performance.test.ts -t "Stress Testing"
+```
+
+**Expected Performance:**
+| Operation | Typical Time | P95 | Limit |
+|-----------|-------------|-----|-------|
+| Detection | 40-80ms | <150ms | 1000ms |
+| Validation | 100-300ms | <600ms | 2000ms |
+| Template Generation | 5-20ms | <50ms | 500ms |
+| Practice Lookup | 1-5ms | <10ms | 100ms |
+
+### Monitoring Best Practices
+
+1. **Check health regularly:**
+   ```bash
+   watch -n 5 'curl -s http://localhost:3000/health | jq .metrics'
+   ```
+
+2. **Monitor resource usage:**
+   ```bash
+   watch -n 2 'docker stats r-practices-api --no-stream'
+   ```
+
+3. **Export and analyze metrics:**
+   ```bash
+   # Export metrics periodically
+   curl http://localhost:3000/metrics > metrics-$(date +%s).json
+   
+   # Store in time-series database or file
+   ```
+
+4. **Set up alerts for high resource usage:**
+   ```bash
+   # Example: Alert if memory exceeds 400MB
+   docker stats --no-stream | grep r-practices-api | awk '{print $3}' | grep -q "4[0-9][0-9]M"
+   ```
+
+### Prometheus Integration (Optional)
+
+The `/metrics` endpoint returns JSON that can be used with Prometheus:
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'r-practices-api'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+```
+
+See [Performance Documentation](/docs/performance.md) for detailed monitoring guidelines.
+
 ## Scaling
 
 For multiple instances:

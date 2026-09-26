@@ -105,6 +105,44 @@ describe('TemplateGenerator', () => {
       expect(result.directories.includes('output')).toBe(true);
     });
 
+    it('should generate Bookdown template', async () => {
+      const result = await generator.generate('bookdown', {
+        projectName: 'my-book',
+      });
+
+      expect(result.workflow).toBe('bookdown');
+      expect(result.files.some((f) => f.path === '_bookdown.yaml')).toBe(true);
+      expect(result.files.some((f) => f.path === 'index.Rmd')).toBe(true);
+      expect(result.files.some((f) => f.path.startsWith('01-chapter'))).toBe(true);
+      expect(result.directories.includes('chapters')).toBe(true);
+    });
+
+    it('should generate Blogdown template', async () => {
+      const result = await generator.generate('blogdown', {
+        projectName: 'my-blog',
+      });
+
+      expect(result.workflow).toBe('blogdown');
+      expect(result.files.some((f) => f.path === 'config.yaml')).toBe(true);
+      expect(result.files.some((f) => f.path.includes('content'))).toBe(true);
+      expect(result.files.some((f) => f.path === 'netlify.toml')).toBe(true);
+      expect(result.directories.includes('content/post')).toBe(true);
+      expect(result.directories.includes('themes')).toBe(true);
+    });
+
+    it('should generate Shinytest template', async () => {
+      const result = await generator.generate('shinytest', {
+        projectName: 'shinytest-app',
+      });
+
+      expect(result.workflow).toBe('shinytest');
+      expect(result.files.some((f) => f.path === 'app.R')).toBe(true);
+      expect(result.files.some((f) => f.path.includes('tests/shinytest'))).toBe(true);
+      expect(result.files.some((f) => f.path.includes('tests/testthat'))).toBe(true);
+      expect(result.directories.includes('tests/shinytest')).toBe(true);
+      expect(result.directories.includes('tests/testthat')).toBe(true);
+    });
+
     it('should include timestamp in result', async () => {
       const beforeTime = Date.now();
       const result = await generator.generate('r-script');

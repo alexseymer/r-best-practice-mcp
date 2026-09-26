@@ -32,6 +32,9 @@ export class WorkflowDetector {
       targets: 0,
       plumber: 0,
       analysis: 0,
+      bookdown: 0,
+      blogdown: 0,
+      shinytest: 0,
       unknown: 0,
     };
 
@@ -44,6 +47,9 @@ export class WorkflowDetector {
     scores = await this.checkTargets(dirPath, scores, indicators);
     scores = await this.checkPlumber(dirPath, scores, indicators);
     scores = await this.checkAnalysis(dirPath, scores, indicators);
+    scores = await this.checkBookdown(dirPath, scores, indicators);
+    scores = await this.checkBlogdown(dirPath, scores, indicators);
+    scores = await this.checkShinytest(dirPath, scores, indicators);
 
     // Determine winner
     const [workflow, confidence] = this.determineWorkflow(scores);
@@ -187,6 +193,95 @@ export class WorkflowDetector {
     if (count >= 2) {
       scores['analysis'] += 70 + count * 10;
       indicators.push(`Standard analysis dirs found (${count}/3)`);
+    }
+
+    return scores;
+  }
+
+  private async checkBookdown(
+    dirPath: string,
+    scores: Record<Workflow, number>,
+    indicators: string[]
+  ): Promise<Record<Workflow, number>> {
+    const bookdownYml = await FileUtils.exists(`${dirPath}/_bookdown.yml`);
+    const bookdownYaml = await FileUtils.exists(`${dirPath}/_bookdown.yaml`);
+    const indexRmd = await FileUtils.exists(`${dirPath}/index.Rmd`);
+    const chaptersDir = await FileUtils.isDirectory(`${dirPath}/chapters`);
+
+    if ((bookdownYml || bookdownYaml) && indexRmd) {
+      scores['bookdown'] += 100;
+      indicators.push('_bookdown.yml and index.Rmd found');
+    } else if (bookdownYml || bookdownYaml) {
+      scores['bookdown'] += 70;
+      indicators.push('_bookdown.yml found');
+    }
+
+    if (chaptersDir) {
+      scores['bookdown'] += 30;
+      indicators.push('chapters/ directory found');
+    }
+
+    return scores;
+  }
+
+  private async checkBlogdown(
+    dirPath: string,
+    scores: Record<Workflow, number>,
+    indicators: string[]
+  ): Promise<Record<Workflow, number>> {
+    const configToml = await FileUtils.exists(`${dirPath}/config.toml`);
+    const configYaml = await FileUtils.exists(`${dirPath}/config.yaml`);
+    const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
+    const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
+
+    if ((configToml || configYaml) && contentDir) {
+      scores['blogdown'] += 100;
+      indicators.push('config and content/ found');
+    } else if (configToml || configYaml) {
+      scores['blogdown'] += 70;
+      indicators.push('config.toml/yaml found');
+    }
+
+    if (themesDir) {
+      scores['blogdown'] += 20;
+      indicators.push('themes/ directory found');
+    }
+
+    return scores;
+  }
+
+  private async checkShinytest(
+    dirPath: string,
+    scores: Record<Workflow, number>,
+    indicators: string[]
+  ): Promise<Record<Workflow, number>> {
+    const shinytestDir = await FileUtils.isDirectory(`${dirPath}/tests/shinytest`);
+    const appR = await FileUtils.exists(`${dirPath}/app.R`);
+    const testFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+
+    // Check for shinytest-specific patterns in test files
+    let hasShinytest = false;
+    for (const file of testFiles) {
+      const content = await FileUtils.readFile(file);
+      if (/shinytest|AppDriver/.test(content)) {
+        hasShinytest = true;
+        break;
+      }
+    }
+
+    if (shinytestDir) {
+      scores['shinytest'] += 95;
+      indicators.push('tests/shinytest/ directory found');
+    }
+
+    if (hasShinytest) {
+      scores['shinytest'] += 80;
+      indicators.push('shinytest code patterns found');
+    }
+
+    if (shinytestDir && appR) {
+      scores['shinytest'] += 15;
+      indicators.push('shinytest setup with Shiny app');
     }
 
     return scores;

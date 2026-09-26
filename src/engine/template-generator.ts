@@ -41,6 +41,15 @@ export class TemplateGenerator {
       case 'analysis':
         ({ files, directories } = this.generateAnalysis(options));
         break;
+      case 'bookdown':
+        ({ files, directories } = this.generateBookdown(options));
+        break;
+      case 'blogdown':
+        ({ files, directories } = this.generateBlogdown(options));
+        break;
+      case 'shinytest':
+        ({ files, directories } = this.generateShinytest(options));
+        break;
       default:
         logger.warn(`Unknown workflow: ${workflow}`);
     }
@@ -936,6 +945,512 @@ format: html
         },
       ],
       directories: ['data', 'R', 'output'],
+    };
+  }
+
+  private generateBookdown(options: TemplateGeneratorOptions): { files: TemplateFile[]; directories: string[] } {
+    const projectName = options.projectName || 'my-book';
+
+    return {
+      files: [
+        {
+          path: '_bookdown.yaml',
+          content: `book_filename: "${projectName}"
+output_dir: "_book"
+new_session: no
+delete_merged_file: yes
+
+language:
+  ui:
+    chapter_name: "Chapter "
+`,
+        },
+        {
+          path: 'index.Rmd',
+          content: `---
+title: "${projectName}"
+author: "${options.authorName || 'Author Name'}"
+date: "\`r Sys.Date()\`"
+site: bookdown::bookdown_site
+output:
+  bookdown::gitbook: default
+  bookdown::pdf_book: default
+---
+
+# Introduction {#intro}
+
+Welcome to ${projectName}. This book was built with bookdown.
+
+## How to read this book
+
+This is a sample introduction chapter. Each chapter in this book is a \`.Rmd\` file.
+`,
+        },
+        {
+          path: '01-chapter.Rmd',
+          content: `# Chapter 1: Getting Started
+
+\`\`\`{r setup, include=FALSE}
+knitr::opts_chunk\\$set(echo = TRUE)
+\`\`\`
+
+This is the first chapter.
+
+## Section 1.1
+
+\`\`\`{r}
+# Code example
+print("Hello from Chapter 1")
+\`\`\`
+
+## Section 1.2
+
+More content here.
+`,
+        },
+        {
+          path: '02-chapter.Rmd',
+          content: `# Chapter 2: Analysis
+
+This is the second chapter.
+
+## Analysis Results
+
+\`\`\`{r}
+# Your analysis code here
+x <- 1:10
+y <- rnorm(10)
+plot(x, y)
+\`\`\`
+
+## Summary
+
+Summarize your findings.
+`,
+        },
+        {
+          path: 'README.md',
+          content: `# ${projectName}
+
+Bookdown project for creating a book.
+
+## Building the Book
+
+To build the HTML book:
+
+\`\`\`r
+bookdown::render_book("index.Rmd", "bookdown::gitbook")
+\`\`\`
+
+To build the PDF book:
+
+\`\`\`r
+bookdown::render_book("index.Rmd", "bookdown::pdf_book")
+\`\`\`
+
+## Project Structure
+
+- \`index.Rmd\` - Introduction chapter
+- \`01-chapter.Rmd\`, \`02-chapter.Rmd\`, etc. - Additional chapters
+- \`_bookdown.yaml\` - Bookdown configuration
+- \`_output.yml\` - Output format configuration (optional)
+
+## Requirements
+
+- R >= 4.0.0
+- bookdown package
+- rmarkdown package
+`,
+        },
+        {
+          path: '.gitignore',
+          content: `# Output
+_book/
+_bookdown_files/
+*.pdf
+*.html
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+`,
+        },
+      ],
+      directories: ['chapters'],
+    };
+  }
+
+  private generateBlogdown(options: TemplateGeneratorOptions): { files: TemplateFile[]; directories: string[] } {
+    const projectName = options.projectName || 'my-blog';
+
+    return {
+      files: [
+        {
+          path: 'config.yaml',
+          content: `baseURL: "https://example.com/"
+title: "${projectName}"
+theme: "hugo-academic"
+
+params:
+  author: "${options.authorName || 'Your Name'}"
+  email: "${options.authorEmail || 'email@example.com'}"
+
+menu:
+  main:
+    - name: Home
+      url: "#"
+      weight: 1
+    - name: Posts
+      url: "post/"
+      weight: 2
+    - name: About
+      url: "#about"
+      weight: 3
+`,
+        },
+        {
+          path: 'content/_index.md',
+          content: `---
+title: "${projectName}"
+---
+
+Welcome to ${projectName}! This is your home page.
+`,
+        },
+        {
+          path: 'content/post/_index.md',
+          content: `---
+title: Blog Posts
+---
+
+All blog posts are listed below.
+`,
+        },
+        {
+          path: 'content/post/first-post.md',
+          content: `---
+title: "My First Post"
+date: "${new Date().toISOString().split('T')[0]}"
+author: "${options.authorName || 'Author Name'}"
+---
+
+# Welcome to My First Blog Post
+
+This is your first blog post created with blogdown.
+
+## Content
+
+Write your blog post content here in Markdown format.
+
+\`\`\`r
+# R code examples
+print("Hello from blogdown!")
+\`\`\`
+
+## More sections
+
+Add as many sections as you need.
+`,
+        },
+        {
+          path: 'netlify.toml',
+          content: `[build]
+command = "hugo"
+publish = "public"
+
+[build.environment]
+HUGO_VERSION = "latest"
+`,
+        },
+        {
+          path: 'README.md',
+          content: `# ${projectName}
+
+Blog created with blogdown and Hugo.
+
+## Building the Blog
+
+To preview locally:
+
+\`\`\`r
+blogdown::serve_site()
+\`\`\`
+
+To build static site:
+
+\`\`\`r
+blogdown::hugo_build()
+\`\`\`
+
+## Adding New Posts
+
+\`\`\`r
+blogdown::new_post("post-title")
+\`\`\`
+
+## Project Structure
+
+- \`config.yaml\` - Site configuration
+- \`content/\` - Content (posts, pages, etc.)
+- \`themes/\` - Theme directory
+- \`static/\` - Static files (CSS, JS, images)
+- \`public/\` - Generated static site (in .gitignore)
+
+## Requirements
+
+- R >= 4.0.0
+- blogdown package
+- Hugo
+
+## Deployment
+
+Deploy to Netlify, GitHub Pages, or your own hosting.
+
+See netlify.toml for Netlify configuration.
+`,
+        },
+        {
+          path: '.gitignore',
+          content: `# Hugo
+public/
+resources/_gen/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+`,
+        },
+      ],
+      directories: ['content/post', 'themes', 'static'],
+    };
+  }
+
+  private generateShinytest(options: TemplateGeneratorOptions): { files: TemplateFile[]; directories: string[] } {
+    const projectName = options.projectName || 'shinytest-app';
+
+    return {
+      files: [
+        {
+          path: 'app.R',
+          content: `library(shiny)
+
+# ============================================================================
+# UI Definition
+# ============================================================================
+
+ui <- fluidPage(
+  titlePanel("${projectName}"),
+
+  sidebarLayout(
+    sidebarPanel(
+      h3("Test Inputs"),
+      textInput("name", "Enter your name:", ""),
+      numericInput("value", "Enter a number:", 42),
+      actionButton("submit", "Submit"),
+      id = "sidebar"
+    ),
+
+    mainPanel(
+      h3("Results"),
+      textOutput("greeting"),
+      textOutput("result"),
+      id = "main"
+    )
+  )
+)
+
+# ============================================================================
+# Server Logic
+# ============================================================================
+
+server <- function(input, output, session) {
+
+  observeEvent(input\\$submit, {
+    # Process inputs
+  })
+
+  output\\$greeting <- renderText({
+    if (nzchar(input\\$name)) {
+      paste("Hello,", input\\$name, "!")
+    } else {
+      "Please enter your name"
+    }
+  })
+
+  output\\$result <- renderText({
+    paste("You entered:", input\\$value)
+  })
+
+}
+
+# ============================================================================
+# Run the app
+# ============================================================================
+
+shinyApp(ui = ui, server = server)
+`,
+        },
+        {
+          path: 'tests/testthat/setup-shinytest.R',
+          content: `# Setup for shinytest tests
+library(shinytest)
+library(testthat)
+
+# Configure shinytest if needed
+`,
+        },
+        {
+          path: 'tests/shinytest/mytest.R',
+          content: `# Shinytest recording
+# This is a placeholder for shinytest recordings
+# Use shinytest::recordTest() to create test recordings
+
+app <- shinytest::ShinyDriver\\$new("../")
+
+# Example test steps (replace with your own):
+# app\\$setInputs(name = "Test User")
+# app\\$setInputs(value = 123)
+# app\\$setInputs(submit = 1)
+# expect_values(app)
+
+app\\$stop()
+`,
+        },
+        {
+          path: 'tests/testthat/test-app.R',
+          content: `test_that("app starts", {
+  skip_on_ci()
+
+  # Basic test to verify app initializes
+  app <- shinytest::ShinyDriver\\$new("../../")
+
+  expect_true(app\\$isRunning())
+
+  app\\$stop()
+})
+
+test_that("greeting updates on input", {
+  skip_on_ci()
+
+  app <- shinytest::ShinyDriver\\$new("../../")
+
+  # Set input and check output
+  app\\$setInputs(name = "Test")
+  app\\$setInputs(submit = 1)
+
+  # Verify the app responds to input
+  expect_true(app\\$isRunning())
+
+  app\\$stop()
+})
+`,
+        },
+        {
+          path: 'README.md',
+          content: `# ${projectName}
+
+Shiny application with shinytest testing.
+
+## Running the App
+
+\`\`\`r
+shiny::runApp()
+\`\`\`
+
+## Running Tests
+
+To run all tests:
+
+\`\`\`r
+testthat::test_dir("tests/")
+\`\`\`
+
+Or run shinytest recordings:
+
+\`\`\`r
+shinytest::testApp()
+\`\`\`
+
+## Recording New Tests
+
+Create new test recordings:
+
+\`\`\`r
+shinytest::recordTest()
+\`\`\`
+
+## Project Structure
+
+- \`app.R\` - Main Shiny application
+- \`tests/shinytest/\` - Shinytest recordings
+- \`tests/testthat/\` - Unit tests with testthat
+
+## Requirements
+
+- R >= 4.0.0
+- shiny package
+- shinytest package
+- testthat package
+
+## Testing Best Practices
+
+1. Record interactive tests with shinytest for UI workflows
+2. Write unit tests with testthat for business logic
+3. Test both happy paths and error cases
+4. Use meaningful test descriptions
+`,
+        },
+        {
+          path: '.gitignore',
+          content: `# Shinytest
+tests/shinytest/*.png
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+`,
+        },
+      ],
+      directories: ['tests/testthat', 'tests/shinytest'],
     };
   }
 }

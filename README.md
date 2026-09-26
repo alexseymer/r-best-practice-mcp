@@ -31,6 +31,9 @@ The R Best Practices MCP Server helps developers write better R code by:
 | **targets** | Pipeline projects using the targets framework |
 | **plumber** | REST APIs built with Plumber |
 | **analysis** | Data analysis projects with standard directory structure |
+| **bookdown** | Books and theses created with bookdown |
+| **blogdown** | Blogs and websites created with blogdown and Hugo |
+| **shinytest** | Shiny apps with automated testing using shinytest |
 
 ## Features
 

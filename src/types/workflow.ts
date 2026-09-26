@@ -8,6 +8,9 @@ export type Workflow =
   | 'targets'
   | 'plumber'
   | 'analysis'
+  | 'bookdown'
+  | 'blogdown'
+  | 'shinytest'
   | 'unknown';
 
 export interface DetectionResult {

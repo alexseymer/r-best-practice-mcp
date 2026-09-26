@@ -1,10 +1,16 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
+import { metricsCollector } from './utils/metrics.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class RPracticesWebServer {
   private app: Express;
@@ -28,26 +34,89 @@ export class RPracticesWebServer {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-    // Request logging
+    // Serve static files from public directory
+    const publicPath = path.join(__dirname, 'public');
+    this.app.use(express.static(publicPath));
+
+    // Request logging middleware with performance tracking
     this.app.use((req: Request, res: Response, next: NextFunction) => {
-      logger.info(`${req.method} ${req.path}`, { params: req.query, body: req.body });
+      const startTime = Date.now();
+      const startHrTime = process.hrtime();
+
+      logger.info(`${req.method} ${req.path}`, { params: req.query });
+
+      // Capture response finish to record metrics
+      res.on('finish', () => {
+        const hrTime = process.hrtime(startHrTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000; // Convert to ms
+        const statusCode = res.statusCode;
+
+        logger.debug(`${req.method} ${req.path} completed`, {
+          statusCode,
+          duration: `${duration.toFixed(2)}ms`,
+        });
+
+        // Record metrics
+        metricsCollector.recordRequest(req.path, req.method, statusCode, duration);
+      });
+
       next();
     });
 
-    // Health check
+    // Health check with metrics
     this.app.get('/health', (req: Request, res: Response) => {
+      const metrics = metricsCollector.getSnapshot();
+
       res.json({
         status: 'ok',
         service: 'r-best-practices-mcp',
         version: '1.0.0',
         timestamp: new Date().toISOString(),
+        metrics: {
+          uptime: metrics.uptime,
+          averageRequestDuration: `${metrics.averageRequestDuration.toFixed(2)}ms`,
+          totalRequests: metrics.requests.length,
+          operationCounts: metrics.operationCounts,
+          errorCounts: metrics.errorCounts,
+        },
       });
+    });
+
+    // Metrics endpoint
+    this.app.get('/metrics', (req: Request, res: Response) => {
+      const metrics = metricsCollector.getSnapshot();
+      res.json(metrics);
+    });
+
+    // Metrics export endpoints
+    this.app.get('/metrics/requests.csv', (req: Request, res: Response) => {
+      const csv = metricsCollector.exportRequestsCSV();
+      res.type('text/csv');
+      res.send(csv);
+    });
+
+    this.app.get('/metrics/operations.csv', (req: Request, res: Response) => {
+      const csv = metricsCollector.exportOperationsCSV();
+      res.type('text/csv');
+      res.send(csv);
+    });
+
+    // Dashboard route
+    this.app.get('/dashboard', (req: Request, res: Response) => {
+      const dashboardPath = path.join(__dirname, 'public', 'dashboard.html');
+      res.sendFile(dashboardPath);
+    });
+
+    // Index route redirects to dashboard
+    this.app.get('/', (req: Request, res: Response) => {
+      res.redirect('/dashboard');
     });
   }
 
   private setupRoutes(): void {
     // Detect workflow
     this.app.post('/api/detect-workflow', async (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { path } = req.body;
         if (!path) {
@@ -59,12 +128,25 @@ export class RPracticesWebServer {
         }
 
         const result = await this.detector.detect(path);
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('detection', duration, true);
+
         res.json({
           error: false,
           data: result,
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'detection',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in detect-workflow', error);
         res.status(500).json({
           error: true,
@@ -76,6 +158,7 @@ export class RPracticesWebServer {
 
     // Validate project
     this.app.post('/api/validate-project', async (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { path, workflow } = req.body;
         if (!path) {
@@ -103,6 +186,9 @@ export class RPracticesWebServer {
         }
 
         const result = await this.validator.validateProject(path, detectedWorkflow as any);
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('validation', duration, true);
 
         res.json({
           error: false,
@@ -110,6 +196,15 @@ export class RPracticesWebServer {
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'validation',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in validate-project', error);
         res.status(500).json({
           error: true,
@@ -121,6 +216,7 @@ export class RPracticesWebServer {
 
     // Validate file
     this.app.post('/api/validate-file', async (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { path } = req.body;
         if (!path) {
@@ -141,6 +237,9 @@ export class RPracticesWebServer {
         }
 
         const findings = await this.validator.validateFile(path);
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('validation', duration, true);
 
         res.json({
           error: false,
@@ -151,6 +250,15 @@ export class RPracticesWebServer {
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'validation',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in validate-file', error);
         res.status(500).json({
           error: true,
@@ -162,9 +270,13 @@ export class RPracticesWebServer {
 
     // Get practice
     this.app.get('/api/practice/:id', (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { id } = req.params;
         const practice = kb.getPractice(id);
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('practice-lookup', duration, !!practice);
 
         if (!practice) {
           return res.status(404).json({
@@ -180,6 +292,15 @@ export class RPracticesWebServer {
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'practice-lookup',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in get-practice', error);
         res.status(500).json({
           error: true,
@@ -191,6 +312,7 @@ export class RPracticesWebServer {
 
     // List practices
     this.app.get('/api/practices', (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { workflow, category } = req.query;
 
@@ -199,12 +321,25 @@ export class RPracticesWebServer {
           category: category as any,
         });
 
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('practice-lookup', duration, true);
+
         res.json({
           error: false,
           data: result,
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'practice-lookup',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in list-practices', error);
         res.status(500).json({
           error: true,
@@ -216,6 +351,7 @@ export class RPracticesWebServer {
 
     // Generate template
     this.app.post('/api/generate-template', async (req: Request, res: Response) => {
+      const startTime = process.hrtime();
       try {
         const { workflow, projectName, authorName, authorEmail } = req.body;
 
@@ -233,12 +369,25 @@ export class RPracticesWebServer {
           authorEmail,
         });
 
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation('template-generation', duration, true);
+
         res.json({
           error: false,
           data: result,
           timestamp: Date.now(),
         });
       } catch (error) {
+        const hrTime = process.hrtime(startTime);
+        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+        metricsCollector.recordOperation(
+          'template-generation',
+          duration,
+          false,
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
         logger.error('Error in generate-template', error);
         res.status(500).json({
           error: true,
@@ -343,8 +492,10 @@ export class RPracticesWebServer {
     return new Promise((resolve) => {
       this.app.listen(this.port, '0.0.0.0', () => {
         logger.info(`R Best Practices Web Server running on port ${this.port}`);
+        logger.info(`Dashboard available at http://localhost:${this.port}/dashboard`);
         logger.info(`API documentation available at http://localhost:${this.port}/api/tools`);
         logger.info(`Health check available at http://localhost:${this.port}/health`);
+        logger.info(`Metrics available at http://localhost:${this.port}/metrics`);
         resolve();
       });
     });
