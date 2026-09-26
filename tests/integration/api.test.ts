@@ -1,8 +1,5 @@
-import { RPracticesWebServer } from '../../src/web-server.js';
+import { RPracticesWebServer } from '../../src/web-server';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('API Integration Tests', () => {
   let server: RPracticesWebServer;
@@ -59,7 +56,7 @@ describe('API Integration Tests', () => {
 
   describe('Detect Workflow Endpoint', () => {
     it('should detect package workflow', async () => {
-      const examplePath = path.resolve(__dirname, '../../examples/example-package');
+      const examplePath = path.resolve(process.cwd(), 'examples/example-package');
       const response = await fetch(`${baseUrl}/api/detect-workflow`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +116,7 @@ describe('API Integration Tests', () => {
 
   describe('Validate Project Endpoint', () => {
     it('should validate package project', async () => {
-      const examplePath = path.resolve(__dirname, '../../examples/example-package');
+      const examplePath = path.resolve(process.cwd(), 'examples/example-package');
       const response = await fetch(`${baseUrl}/api/validate-project`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +132,7 @@ describe('API Integration Tests', () => {
     });
 
     it('should validate with explicit workflow type', async () => {
-      const examplePath = path.resolve(__dirname, '../../examples/example-package');
+      const examplePath = path.resolve(process.cwd(), 'examples/example-package');
       const response = await fetch(`${baseUrl}/api/validate-project`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
