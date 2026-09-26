@@ -1,322 +1,573 @@
-# GitHub Repository Configuration Guide
+# GitHub Setup and Configuration - Detailed Guide
 
-This document describes the GitHub repository setup for the R Best Practices MCP project, including branch protection rules, required status checks, and automation configuration.
+This guide provides step-by-step instructions for setting up the R Best Practices MCP GitHub repository with branch protection rules, status checks, and automated workflows.
+
+## Overview
+
+The R Best Practices MCP uses GitHub Actions for continuous integration and GitHub branch protection to enforce code quality standards. This guide walks through:
+
+1. Setting up branch protection rules
+2. Configuring required status checks
+3. Adding repository secrets
+4. Understanding the automation workflows
+5. Troubleshooting common issues
 
 ## Table of Contents
 
-1. [Branch Protection Rules](#branch-protection-rules)
-2. [Required Status Checks](#required-status-checks)
-3. [Pull Request Settings](#pull-request-settings)
-4. [Secrets and Configuration](#secrets-and-configuration)
-5. [Troubleshooting](#troubleshooting)
+1. [Branch Protection Setup](#branch-protection-setup)
+2. [Status Checks Matrix](#status-checks-matrix)
+3. [Workflow Configuration](#workflow-configuration)
+4. [Repository Secrets](#repository-secrets)
+5. [Pull Request Workflow](#pull-request-workflow)
+6. [Debugging and Troubleshooting](#debugging-and-troubleshooting)
 
-## Branch Protection Rules
+## Branch Protection Setup
 
-### Purpose
+### Step-by-Step: Enable Main Branch Protection
 
-Branch protection rules enforce code quality and review standards on the main branch, ensuring that all changes are properly tested and reviewed before merging.
+#### 1. Navigate to Branch Settings
 
-### Main Branch Protection Settings
+1. Go to your GitHub repository homepage
+2. Click **Settings** (gear icon in the top right)
+3. In the left sidebar, click **Branches**
+4. You should see "Branch protection rules" section
 
-The following settings should be enabled for the `main` branch:
+#### 2. Add Branch Protection Rule
 
-| Setting | Value | Purpose |
-|---------|-------|---------|
-| Require pull request reviews before merging | 1 approval | Ensures code review |
-| Require status checks to pass | All (see below) | Ensures all tests/checks pass |
-| Dismiss stale pull request approvals | Enabled | Ensures reviews are based on latest code |
-| Require branches to be up to date | Enabled | Ensures branch is synced with main |
-| Include administrators in restrictions | Enabled | Applies rules to everyone |
-| Require commit signatures | Optional | Enhanced security if needed |
-| Require linear history | Optional | Clean Git history |
+1. Click **Add rule**
+2. In the "Branch name pattern" field, enter: `main`
+3. Scroll down to configure the following settings
 
-### How to Enable Branch Protection
+#### 3. Configure Protection Settings
 
-**Via GitHub Web Interface:**
-
-1. Navigate to your repository settings
-2. Go to **Settings** → **Branches**
-3. Under "Branch protection rules," click **Add rule**
-4. Enter `main` as the branch name pattern
-5. Check the following boxes:
-   - ✅ Require a pull request before merging
-   - ✅ Require approvals (set to 1)
-   - ✅ Dismiss stale pull request approvals when new commits are pushed
-   - ✅ Require status checks to pass before merging
-   - ✅ Require branches to be up to date before merging
-   - ✅ Include administrators
-6. Under "Require status checks to pass before merging," add the following checks:
-   - `test` (from test.yml workflow)
-   - `docker` (from docker.yml workflow)
-   - `release` (from release.yml workflow)
-7. Click **Create** to save the rule
-
-**Important:** The status check names must match exactly the job IDs in the GitHub Actions workflows.
-
-### Development Branch Strategy
-
-For development work, use the `claude/development-assistance-*` branch (or branches named `feature/*`, `fix/*`, etc.):
-- No branch protection rules
-- Can be force-pushed for rebasing/cleanup
-- Must go through PR process to merge to `main`
-
-## Required Status Checks
-
-### GitHub Actions Workflows
-
-The repository uses GitHub Actions for continuous integration. All the following must pass before merging to main:
-
-#### 1. Test Workflow (`.github/workflows/test.yml`)
-- **Job ID:** `test`
-- **Purpose:** Run unit tests and check code coverage
-- **Requirements:**
-  - Node.js 20+
-  - npm 10+
-  - All Jest tests pass
-  - Code coverage meets thresholds (70%)
-- **On:** Push to main, Pull requests, on schedule
-
-#### 2. Docker Workflow (`.github/workflows/docker.yml`)
-- **Job ID:** `docker`
-- **Purpose:** Build and verify Docker image
-- **Requirements:**
-  - Dockerfile builds successfully
-  - Image layers are cached appropriately
-  - Image tags are correct
-- **On:** Push to main, Pull requests
-
-#### 3. Release Workflow (`.github/workflows/release.yml`)
-- **Job ID:** `release`
-- **Purpose:** Verify release process readiness
-- **Requirements:**
-  - Version numbers are valid
-  - Changelog is updated
-  - Package.json is consistent
-  - Assets are prepared (builds, archives)
-- **On:** Push to main (for releases), Manual workflow dispatch
-
-#### 4. Publish Workflow (`.github/workflows/publish.yml`)
-- **Purpose:** Publish to npm and Docker registries (runs after release)
-- **Requires:** npm and Docker credentials
-- **On:** Release creation
-
-### Status Check Matrix
-
-| Workflow | Trigger | Required for Main | Notes |
-|----------|---------|-------------------|-------|
-| test.yml | push, PR | Yes | Runs on every change |
-| docker.yml | push, PR | Yes | Verifies Docker build |
-| release.yml | manual, schedule | Yes | Ensures release readiness |
-| publish.yml | release | No* | Only runs for releases |
-
-*Publish only runs after a release is created, so it's not in the protection rules but should pass if release passes.
-
-### Checking Status Checks
-
-**On Pull Requests:**
-- GitHub automatically runs all enabled workflows
-- Status appears as green checkmark (pass) or red X (fail)
-- Cannot merge until all required checks pass (if branch protection is enabled)
-
-**Locally (before pushing):**
-```bash
-# Run all tests
-npm test
-
-# Build the project
-npm run build
-
-# Run linter
-npm run lint
-```
-
-## Pull Request Settings
-
-### PR Templates
-
-The repository includes a pull request template (`.github/pull_request_template.md`) that provides:
-
-- Clear sections for description, type of change, testing
-- Checklist of items to verify before submitting
-- Links to contributing guidelines
-- Reminder to run tests locally
-
-### Auto-Merge (Optional)
-
-Auto-merge can be enabled to automatically merge a PR when all required checks pass and approvals are met.
-
-**To enable auto-merge on a PR:**
-1. Go to the PR page
-2. Look for "Auto-merge" button at the bottom
-3. Select merge strategy (Squash, Merge, Rebase)
-4. PR will merge automatically once requirements are met
-
-### Suggested Merge Settings
-
-- **Default strategy:** Squash and merge (keeps history clean)
-- **Auto-delete head branches:** Enabled (cleans up feature branches)
-- **Require branches to be up to date:** Enabled (prevents stale merges)
-
-## Secrets and Configuration
-
-### Repository Secrets
-
-Required secrets for publishing and deployment:
-
-#### NPM Publishing (`.github/workflows/publish.yml`)
-```
-NPM_TOKEN         # npm personal access token
-  Scope: publish:automation (write-access)
-  Created: https://www.npmjs.com/settings/YOUR_USER/tokens
-```
-
-#### Docker Registry (`.github/workflows/publish.yml`)
-```
-DOCKER_USERNAME   # Docker Hub username
-DOCKER_PASSWORD   # Docker Hub personal access token
-  Created: https://hub.docker.com/settings/security
-```
-
-#### GitHub Actions (built-in)
-```
-GITHUB_TOKEN      # Automatically available, no setup needed
-```
-
-### Configuring Secrets
-
-**Via GitHub Web Interface:**
-
-1. Go to **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Enter the secret name (e.g., `NPM_TOKEN`)
-4. Paste the secret value
-5. Click **Add secret**
-
-**Important Security Notes:**
-- Never commit secrets to the repository
-- Use environment-scoped secrets when possible
-- Rotate tokens regularly
-- Review secret usage in workflows
-
-## Automation Configuration
-
-### Issue Labels
-
-Auto-configured labels help organize issues:
-
-- `bug` — Bug reports
-- `enhancement` — Feature requests
-- `documentation` — Documentation issues
-- `help wanted` — Good issues for contributors
-- `wontfix` — Will not be fixed
-- `duplicate` — Duplicate issue
-
-### Code Owners
-
-Optional: Configure code owners in `.github/CODEOWNERS`:
+**Enable These Required Protections:**
 
 ```
-# This file identifies code owners for automatic PR assignments
+☑ Require a pull request before merging
+  ☑ Require approvals (set to: 1)
+  ☑ Dismiss stale pull request approvals when new commits are pushed
+  ☑ Require approval of the most recent reviewable push
 
-# Default owners for everything
-* @owner-username
+☑ Require status checks to pass before merging
+  ☑ Require branches to be up to date before merging
+  ☐ Require code to pass a specified status check
+     (Add the following checks):
+     - test
+     - docker
+     - release
 
-# TypeScript/Engine
-/src/engine/** @owner-username
-/tests/unit/** @owner-username
-
-# Documentation
-/docs/** @owner-username
-*.md @owner-username
+☑ Include administrators
 ```
 
-### Branch Naming Convention
+**Optional Settings** (can be enabled for enhanced security):
 
-Recommended branch naming for clarity:
+```
+☐ Restrict who can push to matching branches
+☐ Require conversation resolution before merging
+☐ Require commit signatures
+☐ Require linear history
+☐ Require deployments to succeed before merging
+```
 
-- `feature/description` — New features
-- `fix/description` — Bug fixes
-- `docs/description` — Documentation changes
-- `test/description` — Test additions
-- `refactor/description` — Code refactoring
-- `perf/description` — Performance improvements
+#### 4. Save the Rule
 
-## Troubleshooting
+Click **Create** to save the branch protection rule.
 
-### Common Issues
+### Understanding the Settings
 
-#### Status Check Not Appearing
+| Setting | Purpose | Recommended |
+|---------|---------|-------------|
+| Require pull request reviews | Ensures code is reviewed before merging | Yes (1 approval) |
+| Dismiss stale approvals | Ensures reviews are current with latest code | Yes |
+| Require status checks | Ensures all tests and builds pass | Yes |
+| Require up to date | Prevents merging out-of-sync branches | Yes |
+| Include administrators | Rules apply to everyone, including admins | Yes |
+| Commit signatures | Requires cryptographic signing of commits | Optional |
+| Linear history | Requires rebasing/squashing (no merge commits) | Optional |
 
-**Problem:** A required status check doesn't appear on PRs.
+### Verification
 
-**Solutions:**
-1. Verify the workflow file is in `.github/workflows/` and valid YAML
-2. Check that the job ID matches the required check name exactly
-3. Confirm the workflow has the correct trigger (`on: pull_request`)
-4. Re-run the workflow if it hasn't run yet
+To verify branch protection is working:
 
-#### Status Check Failing
+1. Go to a pull request to main
+2. You should see "1 approved" required in the merge section
+3. You should see required status checks (test, docker, release)
+4. The merge button should be disabled until all checks pass and approval is given
 
-**Problem:** A status check keeps failing on PRs.
+## Status Checks Matrix
 
-**Common Causes:**
-- Tests failing locally: Run `npm test` locally to debug
-- Build errors: Run `npm run build` to check TypeScript errors
-- Coverage below threshold: Add tests to bring coverage above 70%
-- Docker build issues: Run `docker build -f Dockerfile .` locally
+### Workflow Jobs and Status Checks
 
-**Debugging:**
-1. Check the workflow's detailed output on GitHub Actions
-2. Look at the error logs from the failing job
-3. Reproduce the failure locally
-4. Fix and push a new commit
+The following GitHub Actions workflows provide required status checks:
 
-#### Cannot Merge Despite Passing Checks
+#### Test Workflow
 
-**Problem:** All checks are green but merge button is grayed out.
+**File:** `.github/workflows/test.yml`
 
-**Possible Reasons:**
-- Branch is not up to date with main
-- Pending review is required
-- An administrator hasn't approved yet
-- The branch protection rule requires additional conditions
+```yaml
+name: Test
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * *'  # Daily
 
-**Solution:**
-1. Click "Update branch" to sync with latest main
-2. Request reviews if needed
-3. Wait for required approvals
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+```
 
-#### Stale Approval Warning
+**Required Check Name:** `test`
 
-**Problem:** Approval shows "stale" after new commits.
+**What It Tests:**
+- Unit tests (Jest)
+- Code coverage (must be 70%+)
+- TypeScript compilation
+- Build process
 
-**Explanation:** This is intentional! The branch protection rule "Dismiss stale pull request approvals" ensures reviews are based on the latest code.
+**Runs On:** Every push to main, every PR, daily at midnight
 
-**Solution:** Reviewers need to re-review and approve after new commits.
+#### Docker Workflow
 
-### Accessing Workflow Runs
+**File:** `.github/workflows/docker.yml`
 
-View and debug workflow runs:
+```yaml
+name: Docker
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-1. Go to **Actions** tab in repository
+jobs:
+  docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          cache-from: type=registry
+          cache-to: type=inline
+```
+
+**Required Check Name:** `docker`
+
+**What It Tests:**
+- Docker image builds successfully
+- All dependencies are available in the image
+- Image structure is correct
+
+**Runs On:** Every push to main, every PR
+
+#### Release Workflow
+
+**File:** `.github/workflows/release.yml`
+
+```yaml
+name: Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      # Create release if version changed
+```
+
+**Required Check Name:** `release`
+
+**What It Tests:**
+- Release readiness (version, changelog, etc.)
+- All builds succeed
+- Package metadata is correct
+
+**Runs On:** Push to main, manual trigger
+
+### Status Check Dependency Chain
+
+```
+PR Created
+    ↓
+Trigger: push to PR branch
+    ↓
+├─→ test workflow (npm test, npm build)
+├─→ docker workflow (docker build)
+└─→ Other checks
+    ↓
+All Pass? ✓
+    ↓
+Merge allowed (with approval)
+    ↓
+PR Merged to main
+```
+
+## Workflow Configuration
+
+### Adding a New Status Check
+
+If you need to add another required status check:
+
+1. Create a new workflow file in `.github/workflows/`
+2. Make sure it has a `jobs` section with a job ID (e.g., `lint`)
+3. Add the workflow to the branch protection rule:
+   - Go to Settings → Branches → Edit branch protection rule
+   - Under "Require status checks to pass," add the new job ID
+4. Commit and test on a PR
+
+### Viewing Workflow Runs
+
+**From the Repository:**
+
+1. Click **Actions** tab
 2. Select a workflow (e.g., "Test")
 3. Click a run to see details
-4. Expand job steps to see logs
+4. Click a job to see full logs
 
-### Secrets Management
+**Key Information:**
+- Run time and status
+- Triggered by (push, PR, schedule)
+- Which commit/branch
+- Detailed logs for each step
 
-**Issue:** Workflow fails with "secret is not defined"
+### Re-Running a Failed Workflow
+
+If a workflow fails and you fix the issue:
+
+1. Go to the failed run
+2. Click **Re-run failed jobs** or **Re-run all jobs**
+3. The workflow will run again with the same commit
+
+## Repository Secrets
+
+### What Secrets Are Needed?
+
+| Secret | Purpose | How to Get |
+|--------|---------|-----------|
+| NPM_TOKEN | Publish to npm registry | npm.com account settings |
+| DOCKER_USERNAME | Docker Hub login | Docker Hub account |
+| DOCKER_PASSWORD | Docker Hub access token | Docker Hub account settings |
+| GITHUB_TOKEN | Built-in, no setup needed | Automatic |
+
+### Setting Up NPM_TOKEN
+
+**Prerequisites:** npm account with publish permissions
+
+**Steps:**
+
+1. Go to [https://www.npmjs.com/settings/YOUR_USERNAME/tokens](https://www.npmjs.com/settings/YOUR_USERNAME/tokens)
+2. Click **Generate New Token**
+3. Choose **Automation** token type
+4. Select scope: **publish:automation**
+5. Click **Generate token**
+6. Copy the token (you won't see it again!)
+7. Go to GitHub repo Settings → Secrets and variables → Actions
+8. Click **New repository secret**
+9. Name: `NPM_TOKEN`
+10. Value: Paste the token
+11. Click **Add secret**
+
+### Setting Up Docker Credentials
+
+**Prerequisites:** Docker Hub account
+
+**Steps:**
+
+1. Go to [https://hub.docker.com/settings/security](https://hub.docker.com/settings/security)
+2. Click **New Access Token**
+3. Enter a description (e.g., "GitHub Actions - r-best-practice-mcp")
+4. Select access permissions: **Read, Write** (for push)
+5. Click **Generate**
+6. Copy the token
+7. Go to GitHub repo Settings → Secrets and variables → Actions
+8. Add two secrets:
+   - `DOCKER_USERNAME`: Your Docker Hub username
+   - `DOCKER_PASSWORD`: The access token from step 6
+
+### Verification
+
+After adding secrets:
+
+1. Go to Settings → Secrets and variables → Actions
+2. You should see the secrets listed (values are masked)
+3. Run a workflow that uses the secrets
+4. Check the workflow logs (secrets won't be printed)
+
+## Pull Request Workflow
+
+### From Developer Perspective
+
+#### 1. Create Feature Branch
+
+```bash
+git checkout -b feature/my-feature
+```
+
+#### 2. Make Changes and Commit
+
+```bash
+# Make changes to files
+git add .
+git commit -m "feat: Add new feature"
+# Follow commit message format from CONTRIBUTING.md
+```
+
+#### 3. Push Branch
+
+```bash
+git push origin feature/my-feature
+```
+
+#### 4. Create Pull Request
+
+1. Go to repository on GitHub
+2. Click **Compare & pull request** button
+3. Fill in PR template:
+   - Description
+   - Type of change
+   - Testing
+   - Checklist
+4. Click **Create pull request**
+
+#### 5. Wait for Status Checks
+
+The PR page will show:
+- Status checks running (⏳ in progress)
+- Status checks passed (✓ green)
+- Status checks failed (✗ red)
+
+Do NOT merge until all checks pass (unless you're bypassing branch protection).
+
+#### 6. Request Review
+
+1. On the PR page, click **Reviewers**
+2. Select one or more reviewers
+3. Reviewers get notified
+
+#### 7. Address Feedback
+
+1. Review comments on the PR
+2. Make changes locally
+3. Commit and push
+
+```bash
+git add .
+git commit -m "fix: Address feedback"
+git push origin feature/my-feature
+```
+
+Status checks re-run automatically. Previous approvals become "stale" and reviewers need to re-approve.
+
+#### 8. Merge
+
+Once all checks pass and at least 1 approval is received:
+1. Click **Merge pull request**
+2. Select merge strategy (squash recommended)
+3. Click **Confirm merge**
+4. Click **Delete branch** (optional but recommended)
+
+### Automated Merge (Optional)
+
+Enable auto-merge to merge automatically when requirements are met:
+
+1. On PR page, scroll down
+2. Click **Auto-merge** → Select strategy (Squash)
+3. Dismiss any conflicts if necessary
+4. PR merges automatically when all checks pass
+
+## Debugging and Troubleshooting
+
+### Workflow Debugging
+
+#### Check Workflow Status
+
+On a PR, scroll to the bottom to see all status checks:
+
+```
+✓ test (passing)
+✓ docker (passing)
+○ release (waiting to run)
+```
+
+Click any check to see details.
+
+#### View Detailed Logs
+
+1. Click on a failed check
+2. You're taken to the GitHub Actions workflow page
+3. Click the failed job to expand it
+4. See all steps and their output
+5. Look for error messages
+
+Example error locations:
+- `npm test` failures → Look for test output and assertions
+- Build failures → TypeScript errors or missing dependencies
+- Docker build → Missing files or invalid Dockerfile syntax
+
+#### Re-run Failed Workflows
+
+If the failure is transient (e.g., temporary network issue):
+
+1. Go to Actions tab
+2. Find the failed run
+3. Click **Re-run failed jobs** or **Re-run all jobs**
+
+### Common Issues and Solutions
+
+#### Issue: "Status check 'test' is not passing"
+
+**Cause:** Tests are failing
 
 **Solution:**
-1. Verify secret name is exactly correct (case-sensitive)
-2. Check secret is in the correct repository
-3. Confirm secret value is not empty
-4. For new secrets, re-run the workflow after adding
+```bash
+# Run tests locally
+npm test
 
-## Further Reading
+# View the failing test
+npm test -- --verbose
 
-- [GitHub Branch Protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches)
+# Fix the issue
+# ... edit files ...
+
+# Verify it passes
+npm test
+
+# Commit and push
+git add .
+git commit -m "fix: Fix failing tests"
+git push
+```
+
+#### Issue: "Status check 'docker' is not passing"
+
+**Cause:** Docker image won't build
+
+**Solution:**
+```bash
+# Build Docker image locally
+docker build -f Dockerfile .
+
+# Look for error messages
+# Common issues:
+#   - Missing files referenced in Dockerfile
+#   - Wrong file paths
+#   - npm install failures
+
+# Fix the issue and retry
+docker build -f Dockerfile .
+
+# Push the fix
+git commit -m "fix: Fix Docker build"
+git push
+```
+
+#### Issue: "The merge button is disabled"
+
+**Possible Causes:**
+
+1. **Not all status checks have passed**
+   - Wait for checks to complete
+   - If they fail, fix and push again
+
+2. **No approval**
+   - Request a review from a colleague
+   - Wait for them to approve
+
+3. **Branch is out of date with main**
+   - Click **Update branch** button
+   - Conflicts? Resolve them locally:
+   ```bash
+   git fetch origin
+   git merge origin/main
+   # Resolve conflicts
+   git add .
+   git commit -m "Merge main into feature branch"
+   git push
+   ```
+
+4. **Waiting for required status checks**
+   - Some checks might be pending
+   - Look at the PR status section
+   - If stuck, try re-running the workflow
+
+#### Issue: "Approval has become stale"
+
+**Explanation:** This is intentional—new commits invalidate previous approvals to ensure reviewers approve the latest code.
+
+**Solution:**
+1. Go to PR
+2. Request review again from the same reviewer
+3. They review the new changes
+4. They approve again
+
+### Checking Workflow YAML Syntax
+
+If a workflow isn't running at all, the YAML might be invalid:
+
+1. Go to `.github/workflows/` in the repository
+2. Click the workflow file
+3. GitHub shows a checkmark (valid) or error (invalid)
+4. Look at `.github/workflows/` in Actions tab for parsing errors
+
+To validate locally:
+
+```bash
+# Install yamllint (optional)
+npm install -D yamllint
+
+# Validate
+yamllint .github/workflows/*.yml
+```
+
+### Getting Help
+
+1. Check [GitHub Actions Troubleshooting](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows)
+2. Read the specific workflow's logs
+3. Search [GitHub Discussions](https://github.com/r-best-practices/r-best-practice-mcp/discussions)
+4. Check the [CONTRIBUTING.md](../CONTRIBUTING.md) guide
+
+## Next Steps
+
+After setting up branch protection:
+
+1. ✅ Verify branch protection is enabled
+2. ✅ Test by creating a PR without passing checks
+3. ✅ Confirm merge is blocked
+4. ✅ Fix issues and verify merge is allowed
+5. ✅ Review [CONTRIBUTING.md](../CONTRIBUTING.md) for development workflow
+6. ✅ Share this guide with team members
+
+## References
+
+- [Branch Protection Rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [GitHub Secrets Documentation](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Project Documentation](./docs/)
+- [Encrypted Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
+- [Workflow Syntax](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
+- [Contributing Guide](../CONTRIBUTING.md)
+- [GitHub Setup Summary](../GITHUB_SETUP.md)
