@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R Best Practices - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --color-bg-primary: #ffffff;
+            --color-bg-secondary: #f5f7fa;
+            --color-text-primary: #1a202c;
+            --color-text-secondary: #4a5568;
+            --color-border: #e2e8f0;
+            --color-accent: #3182ce;
+            --color-accent-hover: #2c5aa0;
+            --color-critical: #e53e3e;
+            --color-important: #ed8936;
+            --color-recommended: #ecc94b;
+            --color-info: #4299e1;
+            --color-success: #38a169;
+            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg-primary: #1a202c;
+                --color-bg-secondary: #2d3748;
+                --color-text-primary: #f7fafc;
+                --color-text-secondary: #cbd5e0;
+                --color-border: #4a5568;
+                --color-accent: #63b3ed;
+                --color-accent-hover: #4299e1;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            line-height: 1.6;
+        }
+
+        .header {
+            background-color: var(--color-bg-primary);
+            border-bottom: 1px solid var(--color-border);
+            padding: 1.5rem 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 1.875rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .header p {
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-3 { grid-template-columns: repeat(2, 1fr); }
+            .grid-2 { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .grid-3, .grid-2, .grid-4 { grid-template-columns: 1fr; }
+            .container { padding: 1rem; }
+        }
+
+        .card {
+            background-color: var(--color-bg-primary);
+            border-radius: 0.5rem;
+            border: 1px solid var(--color-border);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--color-text-primary);
+        }
+
+        .card-subtitle {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--color-text-primary);
+        }
+
+        input[type="text"],
+        input[type="email"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--color-border);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            background-color: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            border: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--color-accent);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--color-accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--color-border);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-box.critical .stat-number { color: var(--color-critical); }
+        .stat-box.important .stat-number { color: var(--color-important); }
+        .stat-box.recommended .stat-number { color: var(--color-recommended); }
+        .stat-box.info .stat-number { color: var(--color-info); }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 1.5rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--color-border);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .alert.error {
+            background-color: #fed7d7;
+            border-left: 4px solid var(--color-critical);
+            color: #742a2a;
+        }
+
+        .alert.success {
+            background-color: #c6f6d5;
+            border-left: 4px solid var(--color-success);
+            color: #22543d;
+        }
+
+        .alert.info {
+            background-color: #bee3f8;
+            border-left: 4px solid var(--color-info);
+            color: #2c5282;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .alert.error {
+                background-color: #462828;
+                color: #fbd38d;
+            }
+            .alert.success {
+                background-color: #22543d;
+                color: #9ae6b4;
+            }
+            .alert.info {
+                background-color: #2c5282;
+                color: #bee3f8;
+            }
+        }
+
+        .findings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+        }
+
+        .findings-table thead {
+            background-color: var(--color-bg-secondary);
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .findings-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--color-text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .findings-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 0.875rem;
+        }
+
+        .findings-table tbody tr:hover {
+            background-color: var(--color-bg-secondary);
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .severity-critical {
+            background-color: #fed7d7;
+            color: #742a2a;
+        }
+
+        .severity-important {
+            background-color: #feebc8;
+            color: #7c2d12;
+        }
+
+        .severity-recommended {
+            background-color: #fef3c7;
+            color: #78350f;
+        }
+
+        .severity-info {
+            background-color: #bee3f8;
+            color: #2c5282;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .severity-critical {
+                background-color: #742a2a;
+                color: #fed7d7;
+            }
+            .severity-important {
+                background-color: #7c2d12;
+                color: #feebc8;
+            }
+            .severity-recommended {
+                background-color: #78350f;
+                color: #fef3c7;
+            }
+            .severity-info {
+                background-color: #2c5282;
+                color: #bee3f8;
+            }
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            background-color: var(--color-bg-secondary);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+        }
+
+        .finding-details {
+            font-size: 0.8125rem;
+            color: var(--color-text-secondary);
+            margin-top: 0.5rem;
+            max-width: 600px;
+        }
+
+        .suggestion-list {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 0.5rem;
+        }
+
+        .suggestion-list li {
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.8125rem;
+            color: var(--color-text-secondary);
+        }
+
+        .suggestion-list li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--color-accent);
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 1.5rem;
+            gap: 1rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--color-text-secondary);
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: var(--color-accent);
+            border-bottom-color: var(--color-accent);
+        }
+
+        .tab:hover {
+            color: var(--color-text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .detection-result {
+            background-color: var(--color-bg-secondary);
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-top: 1rem;
+        }
+
+        .detection-confidence {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 0.5rem;
+            background-color: var(--color-border);
+            border-radius: 0.25rem;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background-color: var(--color-success);
+            transition: width 0.3s ease;
+        }
+
+        .confidence-text {
+            font-weight: 600;
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .indicators-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .indicators-list li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            font-size: 0.875rem;
+        }
+
+        .indicators-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        .file-tree {
+            background-color: var(--color-bg-secondary);
+            padding: 1rem;
+            border-radius: 0.375rem;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.8125rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .file-tree-item {
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .file-tree-item.dir:before {
+            content: "📁";
+            position: absolute;
+            left: 0;
+        }
+
+        .file-tree-item.file:before {
+            content: "📄";
+            position: absolute;
+            left: 0;
+        }
+
+        .template-preview {
+            background-color: var(--color-bg-secondary);
+            padding: 1rem;
+            border-radius: 0.375rem;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .template-file {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .template-file:last-child {
+            border-bottom: none;
+        }
+
+        .template-file-path {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--color-accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .template-file-content {
+            background-color: var(--color-bg-primary);
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--color-border);
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.75rem;
+            overflow-x: auto;
+            color: var(--color-text-secondary);
+            line-height: 1.4;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .sort-select {
+            min-width: 150px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--color-text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background-color: var(--color-border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-accent), var(--color-info));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .workflow-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .workflow-option {
+            padding: 1rem;
+            border: 2px solid var(--color-border);
+            border-radius: 0.375rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: var(--color-bg-primary);
+        }
+
+        .workflow-option:hover {
+            border-color: var(--color-accent);
+        }
+
+        .workflow-option.selected {
+            border-color: var(--color-accent);
+            background-color: var(--color-bg-secondary);
+            font-weight: 600;
+        }
+
+        .workflow-option-label {
+            font-size: 0.75rem;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .workflow-option-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .icon {
+            display: inline-block;
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>R Best Practices Dashboard</h1>
+        <p>Validate your R projects, detect workflows, and generate templates</p>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" data-tab="validate">Validate</div>
+            <div class="tab" data-tab="detect">Detect</div>
+            <div class="tab" data-tab="generate">Generate</div>
+            <div class="tab" data-tab="practices">Practices</div>
+        </div>
+
+        <!-- Validate Tab -->
+        <div id="validate" class="tab-content active">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">Validate Project</div>
+                    <div class="card-subtitle">Analyze your R project against best practices</div>
+
+                    <div class="input-group">
+                        <label for="validate-project-path">Project Path</label>
+                        <input type="text" id="validate-project-path" placeholder="/path/to/your/project">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="validate-project-workflow">Workflow Type (Optional)</label>
+                        <select id="validate-project-workflow">
+                            <option value="">Auto-detect</option>
+                            <option value="r-script">R Script</option>
+                            <option value="quarto">Quarto</option>
+                            <option value="shiny">Shiny</option>
+                            <option value="package">Package</option>
+                            <option value="rmarkdown">R Markdown</option>
+                            <option value="renv">Renv</option>
+                            <option value="targets">Targets</option>
+                            <option value="plumber">Plumber</option>
+                            <option value="analysis">Analysis</option>
+                        </select>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-primary" id="validate-project-btn">Validate Project</button>
+                    </div>
+
+                    <div id="validate-project-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Validate File</div>
+                    <div class="card-subtitle">Analyze a single R or Quarto file</div>
+
+                    <div class="input-group">
+                        <label for="validate-file-path">File Path</label>
+                        <input type="text" id="validate-file-path" placeholder="/path/to/your/file.R">
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-primary" id="validate-file-btn">Validate File</button>
+                    </div>
+
+                    <div id="validate-file-progress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="validate-results" style="display: none;">
+                <div class="grid-4" id="validate-stats"></div>
+
+                <div class="card">
+                    <div class="card-title">Findings</div>
+
+                    <div class="sort-controls">
+                        <input type="text" class="filter-input" id="validate-filter" placeholder="Filter findings...">
+                        <select class="sort-select" id="validate-sort">
+                            <option value="severity">Sort by Severity</option>
+                            <option value="category">Sort by Category</option>
+                            <option value="file">Sort by File</option>
+                        </select>
+                    </div>
+
+                    <div id="validate-table-container"></div>
+                    <div id="validate-empty-state" class="empty-state" style="display: none;">
+                        <div class="empty-state-icon">✓</div>
+                        <p>No findings detected! Your project looks great.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="validate-error" style="display: none;"></div>
+        </div>
+
+        <!-- Detect Tab -->
+        <div id="detect" class="tab-content">
+            <div class="card">
+                <div class="card-title">Workflow Detection</div>
+                <div class="card-subtitle">Automatically detect R project workflow type</div>
+
+                <div class="input-group">
+                    <label for="detect-path">Project Path</label>
+                    <input type="text" id="detect-path" placeholder="/path/to/your/project">
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" id="detect-btn">Detect Workflow</button>
+                </div>
+
+                <div id="detect-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div id="detect-result" style="display: none;">
+                    <div class="detection-result">
+                        <div style="margin-bottom: 1.5rem;">
+                            <h3 style="margin-bottom: 0.5rem;">Detected Workflow</h3>
+                            <div style="font-size: 1.25rem; font-weight: 600; color: var(--color-accent);">
+                                <span id="detect-workflow"></span>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <h3 style="margin-bottom: 0.5rem;">Confidence</h3>
+                            <div class="detection-confidence">
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" id="detect-confidence-bar"></div>
+                                </div>
+                                <div class="confidence-text" id="detect-confidence-text">0%</div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style="margin-bottom: 0.75rem;">Detected Indicators</h3>
+                            <ul class="indicators-list" id="detect-indicators"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="detect-error" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Generate Tab -->
+        <div id="generate" class="tab-content">
+            <div class="card">
+                <div class="card-title">Generate Template</div>
+                <div class="card-subtitle">Create a scaffold project for any R workflow</div>
+
+                <div class="input-group">
+                    <label>Workflow Type</label>
+                    <div class="workflow-selector" id="workflow-selector"></div>
+                </div>
+
+                <div class="input-group">
+                    <label for="generate-project-name">Project Name</label>
+                    <input type="text" id="generate-project-name" placeholder="my-awesome-project">
+                </div>
+
+                <div class="input-group">
+                    <label for="generate-author-name">Author Name</label>
+                    <input type="text" id="generate-author-name" placeholder="Your Name">
+                </div>
+
+                <div class="input-group">
+                    <label for="generate-author-email">Author Email</label>
+                    <input type="email" id="generate-author-email" placeholder="you@example.com">
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" id="generate-btn">Generate Template</button>
+                    <button class="btn-secondary" id="download-btn" style="display: none;">Download Template</button>
+                </div>
+
+                <div id="generate-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div id="generate-result" style="display: none;">
+                    <div class="alert success">
+                        <span>✓ Template generated successfully</span>
+                    </div>
+                    <div class="template-preview" id="template-preview"></div>
+                </div>
+
+                <div id="generate-error" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Practices Tab -->
+        <div id="practices" class="tab-content">
+            <div class="card">
+                <div class="card-title">Best Practices</div>
+                <div class="card-subtitle">Browse R best practices by workflow and category</div>
+
+                <div class="grid-2">
+                    <div class="input-group">
+                        <label for="practices-workflow">Filter by Workflow</label>
+                        <select id="practices-workflow">
+                            <option value="">All Workflows</option>
+                            <option value="r-script">R Script</option>
+                            <option value="quarto">Quarto</option>
+                            <option value="shiny">Shiny</option>
+                            <option value="package">Package</option>
+                            <option value="rmarkdown">R Markdown</option>
+                            <option value="renv">Renv</option>
+                            <option value="targets">Targets</option>
+                            <option value="plumber">Plumber</option>
+                            <option value="analysis">Analysis</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="practices-category">Filter by Category</label>
+                        <select id="practices-category">
+                            <option value="">All Categories</option>
+                            <option value="structure">Structure</option>
+                            <option value="naming">Naming</option>
+                            <option value="documentation">Documentation</option>
+                            <option value="performance">Performance</option>
+                            <option value="security">Security</option>
+                            <option value="testing">Testing</option>
+                            <option value="dependency">Dependency</option>
+                            <option value="style">Style</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-primary" id="practices-load-btn">Load Practices</button>
+                </div>
+
+                <div id="practices-results" style="display: none; margin-top: 1.5rem;">
+                    <div id="practices-list"></div>
+                </div>
+
+                <div id="practices-empty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">📚</div>
+                    <p>Click "Load Practices" to view best practices</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        // ========================
+        // Utility Functions
+        // ========================
+
+        function showAlert(message, type = 'info') {
+            const alertHtml = `<div class="alert ${type}"><span>${message}</span></div>`;
+            return alertHtml;
+        }
+
+        function formatDuration(ms) {
+            if (ms < 1000) return `${ms}ms`;
+            return `${(ms / 1000).toFixed(1)}s`;
+        }
+
+        function getSeverityColor(severity) {
+            const colors = {
+                critical: '#e53e3e',
+                important: '#ed8936',
+                recommended: '#ecc94b',
+                info: '#4299e1',
+            };
+            return colors[severity] || '#4299e1';
+        }
+
+        // ========================
+        // Tab Switching
+        // ========================
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        // ========================
+        // Validate Tab
+        // ========================
+
+        document.getElementById('validate-project-btn').addEventListener('click', async () => {
+            const path = document.getElementById('validate-project-path').value.trim();
+            const workflow = document.getElementById('validate-project-workflow').value;
+
+            if (!path) {
+                showValidateError('Please enter a project path');
+                return;
+            }
+
+            await validateProject(path, workflow);
+        });
+
+        document.getElementById('validate-file-btn').addEventListener('click', async () => {
+            const path = document.getElementById('validate-file-path').value.trim();
+
+            if (!path) {
+                showValidateError('Please enter a file path');
+                return;
+            }
+
+            await validateFile(path);
+        });
+
+        async function validateProject(path, workflow) {
+            showValidateProgress(true);
+            clearValidateResults();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/validate-project`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, workflow: workflow || undefined }),
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showValidateError(data.message || 'Validation failed');
+                    return;
+                }
+
+                displayValidationResults(data.data);
+            } catch (error) {
+                showValidateError(error.message);
+            } finally {
+                showValidateProgress(false);
+            }
+        }
+
+        async function validateFile(path) {
+            showValidateProgress(true, 'file');
+            clearValidateResults();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/validate-file`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path }),
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showValidateError(data.message || 'Validation failed');
+                    return;
+                }
+
+                displayValidationResults({
+                    filePath: path,
+                    workflow: 'file',
+                    findings: data.data.findings,
+                    timestamp: data.timestamp,
+                    duration: 0,
+                });
+            } catch (error) {
+                showValidateError(error.message);
+            } finally {
+                showValidateProgress(false, 'file');
+            }
+        }
+
+        function displayValidationResults(result) {
+            const findings = result.findings || [];
+
+            // Calculate statistics
+            const stats = {
+                critical: findings.filter(f => f.severity === 'critical').length,
+                important: findings.filter(f => f.severity === 'important').length,
+                recommended: findings.filter(f => f.severity === 'recommended').length,
+                info: findings.filter(f => f.severity === 'info').length,
+                total: findings.length,
+            };
+
+            // Display stats
+            const statsHtml = `
+                <div class="card stat-box critical">
+                    <div class="stat-number">${stats.critical}</div>
+                    <div class="stat-label">Critical</div>
+                </div>
+                <div class="card stat-box important">
+                    <div class="stat-number">${stats.important}</div>
+                    <div class="stat-label">Important</div>
+                </div>
+                <div class="card stat-box recommended">
+                    <div class="stat-number">${stats.recommended}</div>
+                    <div class="stat-label">Recommended</div>
+                </div>
+                <div class="card stat-box info">
+                    <div class="stat-number">${stats.info}</div>
+                    <div class="stat-label">Info</div>
+                </div>
+            `;
+            document.getElementById('validate-stats').innerHTML = statsHtml;
+
+            // Display findings table or empty state
+            if (findings.length === 0) {
+                document.getElementById('validate-empty-state').style.display = 'block';
+                document.getElementById('validate-table-container').innerHTML = '';
+            } else {
+                document.getElementById('validate-empty-state').style.display = 'none';
+                displayFindingsTable(findings);
+            }
+
+            document.getElementById('validate-results').style.display = 'block';
+            clearValidateError();
+        }
+
+        function displayFindingsTable(findings) {
+            let html = `
+                <table class="findings-table">
+                    <thead>
+                        <tr>
+                            <th>Severity</th>
+                            <th>Category</th>
+                            <th>Message</th>
+                            <th>File</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            findings.forEach(finding => {
+                const file = finding.file ? `<code>${finding.file}${finding.line ? `:${finding.line}` : ''}</code>` : '-';
+                const suggestions = finding.suggestions ? `
+                    <ul class="suggestion-list">
+                        ${finding.suggestions.map(s => `<li>${s}</li>`).join('')}
+                    </ul>
+                ` : '';
+
+                html += `
+                    <tr>
+                        <td>
+                            <span class="severity-badge severity-${finding.severity}">
+                                ${finding.severity}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="category-badge">${finding.category}</span>
+                        </td>
+                        <td>
+                            <div>${finding.message}</div>
+                            <div class="finding-details">${finding.details || ''}</div>
+                            ${suggestions}
+                        </td>
+                        <td>${file}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            document.getElementById('validate-table-container').innerHTML = html;
+        }
+
+        function showValidateProgress(show, type = 'project') {
+            const id = type === 'file' ? 'validate-file-progress' : 'validate-project-progress';
+            document.getElementById(id).style.display = show ? 'block' : 'none';
+        }
+
+        function showValidateError(message) {
+            const html = showAlert(message, 'error');
+            document.getElementById('validate-error').innerHTML = html;
+            document.getElementById('validate-error').style.display = 'block';
+        }
+
+        function clearValidateError() {
+            document.getElementById('validate-error').style.display = 'none';
+            document.getElementById('validate-error').innerHTML = '';
+        }
+
+        function clearValidateResults() {
+            document.getElementById('validate-results').style.display = 'none';
+            document.getElementById('validate-stats').innerHTML = '';
+            document.getElementById('validate-table-container').innerHTML = '';
+        }
+
+        // ========================
+        // Detect Tab
+        // ========================
+
+        document.getElementById('detect-btn').addEventListener('click', async () => {
+            const path = document.getElementById('detect-path').value.trim();
+
+            if (!path) {
+                showDetectError('Please enter a project path');
+                return;
+            }
+
+            await detectWorkflow(path);
+        });
+
+        async function detectWorkflow(path) {
+            document.getElementById('detect-progress').style.display = 'block';
+            document.getElementById('detect-result').style.display = 'none';
+            clearDetectError();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/detect-workflow`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path }),
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showDetectError(data.message || 'Detection failed');
+                    return;
+                }
+
+                displayDetectionResult(data.data);
+            } catch (error) {
+                showDetectError(error.message);
+            } finally {
+                document.getElementById('detect-progress').style.display = 'none';
+            }
+        }
+
+        function displayDetectionResult(result) {
+            const confidence = Math.round(result.confidence);
+
+            document.getElementById('detect-workflow').textContent = result.workflow;
+            document.getElementById('detect-confidence-text').textContent = `${confidence}%`;
+
+            const bar = document.getElementById('detect-confidence-bar');
+            bar.style.width = `${confidence}%`;
+            bar.style.backgroundColor = confidence >= 80 ? '#38a169' : confidence >= 50 ? '#ecc94b' : '#ed8936';
+
+            const indicatorsList = result.indicators.map(ind =>
+                `<li>${ind}</li>`
+            ).join('');
+            document.getElementById('detect-indicators').innerHTML = indicatorsList;
+
+            document.getElementById('detect-result').style.display = 'block';
+            clearDetectError();
+        }
+
+        function showDetectError(message) {
+            const html = showAlert(message, 'error');
+            document.getElementById('detect-error').innerHTML = html;
+            document.getElementById('detect-error').style.display = 'block';
+        }
+
+        function clearDetectError() {
+            document.getElementById('detect-error').style.display = 'none';
+            document.getElementById('detect-error').innerHTML = '';
+        }
+
+        // ========================
+        // Generate Tab
+        // ========================
+
+        let selectedWorkflow = null;
+        let generatedTemplate = null;
+
+        // Populate workflow selector
+        const workflows = [
+            { id: 'r-script', name: 'R Script', icon: '📝' },
+            { id: 'quarto', name: 'Quarto', icon: '📘' },
+            { id: 'shiny', name: 'Shiny', icon: '🎨' },
+            { id: 'package', name: 'Package', icon: '📦' },
+            { id: 'rmarkdown', name: 'R Markdown', icon: '📙' },
+            { id: 'renv', name: 'Renv', icon: '🔒' },
+            { id: 'targets', name: 'Targets', icon: '🎯' },
+            { id: 'plumber', name: 'Plumber', icon: '⚡' },
+            { id: 'analysis', name: 'Analysis', icon: '📊' },
+        ];
+
+        const selectorHtml = workflows.map(w => `
+            <div class="workflow-option" data-workflow="${w.id}">
+                <div class="icon">${w.icon}</div>
+                <div class="workflow-option-name">${w.name}</div>
+            </div>
+        `).join('');
+        document.getElementById('workflow-selector').innerHTML = selectorHtml;
+
+        document.querySelectorAll('.workflow-option').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.workflow-option').forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedWorkflow = option.getAttribute('data-workflow');
+            });
+        });
+
+        document.getElementById('generate-btn').addEventListener('click', async () => {
+            if (!selectedWorkflow) {
+                showGenerateError('Please select a workflow type');
+                return;
+            }
+
+            const projectName = document.getElementById('generate-project-name').value.trim();
+            const authorName = document.getElementById('generate-author-name').value.trim();
+            const authorEmail = document.getElementById('generate-author-email').value.trim();
+
+            await generateTemplate(selectedWorkflow, projectName, authorName, authorEmail);
+        });
+
+        async function generateTemplate(workflow, projectName, authorName, authorEmail) {
+            document.getElementById('generate-progress').style.display = 'block';
+            document.getElementById('generate-result').style.display = 'none';
+            clearGenerateError();
+
+            try {
+                const response = await fetch(`${API_BASE}/api/generate-template`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        workflow,
+                        projectName: projectName || `my-${workflow}-project`,
+                        authorName: authorName || 'Your Name',
+                        authorEmail: authorEmail || 'you@example.com',
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    showGenerateError(data.message || 'Template generation failed');
+                    return;
+                }
+
+                displayGeneratedTemplate(data.data);
+            } catch (error) {
+                showGenerateError(error.message);
+            } finally {
+                document.getElementById('generate-progress').style.display = 'none';
+            }
+        }
+
+        function displayGeneratedTemplate(template) {
+            generatedTemplate = template;
+
+            const filesHtml = template.files.map(file => `
+                <div class="template-file">
+                    <div class="template-file-path">${file.path}</div>
+                    <div class="template-file-content"><pre>${escapeHtml(file.content.substring(0, 500))}${file.content.length > 500 ? '\n... (truncated)' : ''}</pre></div>
+                </div>
+            `).join('');
+
+            document.getElementById('template-preview').innerHTML = filesHtml;
+            document.getElementById('generate-result').style.display = 'block';
+            document.getElementById('download-btn').style.display = 'inline-block';
+            clearGenerateError();
+        }
+
+        document.getElementById('download-btn').addEventListener('click', () => {
+            if (!generatedTemplate) return;
+
+            const content = JSON.stringify(generatedTemplate, null, 2);
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `template-${selectedWorkflow}-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        function showGenerateError(message) {
+            const html = showAlert(message, 'error');
+            document.getElementById('generate-error').innerHTML = html;
+            document.getElementById('generate-error').style.display = 'block';
+        }
+
+        function clearGenerateError() {
+            document.getElementById('generate-error').style.display = 'none';
+            document.getElementById('generate-error').innerHTML = '';
+        }
+
+        // ========================
+        // Practices Tab
+        // ========================
+
+        document.getElementById('practices-load-btn').addEventListener('click', async () => {
+            const workflow = document.getElementById('practices-workflow').value;
+            const category = document.getElementById('practices-category').value;
+
+            await loadPractices(workflow, category);
+        });
+
+        async function loadPractices(workflow, category) {
+            try {
+                const params = new URLSearchParams();
+                if (workflow) params.append('workflow', workflow);
+                if (category) params.append('category', category);
+
+                const response = await fetch(`${API_BASE}/api/practices?${params.toString()}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showPracticesError(data.message || 'Failed to load practices');
+                    return;
+                }
+
+                displayPractices(data.data.practices || []);
+            } catch (error) {
+                showPracticesError(error.message);
+            }
+        }
+
+        function displayPractices(practices) {
+            if (practices.length === 0) {
+                document.getElementById('practices-list').innerHTML = '';
+                document.getElementById('practices-empty').style.display = 'block';
+                document.getElementById('practices-results').style.display = 'none';
+                return;
+            }
+
+            const html = practices.map(practice => `
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                        <div>
+                            <h3 style="margin-bottom: 0.5rem;">${practice.title}</h3>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <span class="severity-badge severity-${practice.severity}">${practice.severity}</span>
+                                <span class="category-badge">${practice.category}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="color: var(--color-text-secondary); margin-bottom: 1rem;">${practice.description}</div>
+                    ${practice.examples && practice.examples.length > 0 ? `
+                        <div style="margin-top: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600;">Examples:</h4>
+                            <div style="background-color: var(--color-bg-secondary); padding: 0.75rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.75rem; overflow-x: auto;">
+                                ${practice.examples.map(e => `<div style="margin-bottom: 0.5rem;">${escapeHtml(e)}</div>`).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            document.getElementById('practices-list').innerHTML = html;
+            document.getElementById('practices-results').style.display = 'block';
+            document.getElementById('practices-empty').style.display = 'none';
+        }
+
+        function showPracticesError(message) {
+            const html = showAlert(message, 'error');
+            document.getElementById('practices-list').innerHTML = html;
+            document.getElementById('practices-results').style.display = 'block';
+        }
+
+        // ========================
+        // Helper Functions
+        // ========================
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Initialize
+        document.getElementById('practices-empty').style.display = 'block';
+    </script>
+</body>
+</html>

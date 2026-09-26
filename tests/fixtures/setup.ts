@@ -71,3 +71,22 @@ export const createPlumberFixture = (dir: string): void => {
     '#* @get /hello\nfunction() {\n  list(message = "Hello")\n}'
   );
 };
+
+export const createBookdownFixture = (dir: string): void => {
+  createFile(dir, '_bookdown.yaml', 'book_filename: "my-book"\noutput_dir: "_book"');
+  createFile(dir, 'index.Rmd', '---\ntitle: "My Book"\n---\n\n# Introduction\n\nWelcome to my book.');
+  createDir(dir, 'chapters');
+};
+
+export const createBlogdownFixture = (dir: string): void => {
+  createFile(dir, 'config.toml', 'baseURL = "https://example.com/"\ntitle = "My Blog"\ntheme = "hugo-academic"');
+  createDir(dir, 'content');
+  createDir(dir, 'themes');
+  createFile(dir, 'content/post/_index.md', '---\ntitle: "Blog Posts"\n---\n\nAll blog posts.');
+};
+
+export const createShinytestFixture = (dir: string): void => {
+  createFile(dir, 'app.R', 'library(shiny)\nui <- fluidPage()\nserver <- function(input, output) {}\nshinyApp(ui, server)');
+  createDir(dir, 'tests/shinytest');
+  createFile(dir, 'tests/shinytest/mytest.R', '# Shinytest recording');
+};

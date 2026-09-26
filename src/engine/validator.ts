@@ -49,6 +49,15 @@ export class Validator {
         case 'analysis':
           findings.push(...(await this.validateAnalysis(dirPath)));
           break;
+        case 'bookdown':
+          findings.push(...(await this.validateBookdown(dirPath)));
+          break;
+        case 'blogdown':
+          findings.push(...(await this.validateBlogdown(dirPath)));
+          break;
+        case 'shinytest':
+          findings.push(...(await this.validateShinytest(dirPath)));
+          break;
       }
 
       // Filter findings
@@ -483,6 +492,136 @@ export class Validator {
         file: filePath,
         line: 1,
         message: 'R Markdown should have YAML header',
+      });
+    }
+
+    return findings;
+  }
+
+  // ============== BOOKDOWN VALIDATORS ==============
+  private async validateBookdown(dirPath: string): Promise<Finding[]> {
+    const findings: Finding[] = [];
+
+    // Check for _bookdown.yml or _bookdown.yaml
+    const bookdownYml = await FileUtils.exists(`${dirPath}/_bookdown.yml`);
+    const bookdownYaml = await FileUtils.exists(`${dirPath}/_bookdown.yaml`);
+
+    if (!bookdownYml && !bookdownYaml) {
+      findings.push({
+        id: 'bookdown-config',
+        severity: 'critical',
+        category: 'structure',
+        message: 'Bookdown project must have _bookdown.yml or _bookdown.yaml',
+        suggestions: ['Create _bookdown.yaml with book configuration'],
+      });
+    }
+
+    // Check for index.Rmd
+    const indexRmd = await FileUtils.exists(`${dirPath}/index.Rmd`);
+    if (!indexRmd) {
+      findings.push({
+        id: 'bookdown-index',
+        severity: 'critical',
+        category: 'structure',
+        message: 'Bookdown book must have index.Rmd',
+      });
+    }
+
+    // Check for README
+    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
+    if (!readmeExists) {
+      findings.push({
+        id: 'bookdown-readme',
+        severity: 'recommended',
+        category: 'documentation',
+        message: 'Add README.md to document the book',
+      });
+    }
+
+    return findings;
+  }
+
+  // ============== BLOGDOWN VALIDATORS ==============
+  private async validateBlogdown(dirPath: string): Promise<Finding[]> {
+    const findings: Finding[] = [];
+
+    // Check for config file
+    const configToml = await FileUtils.exists(`${dirPath}/config.toml`);
+    const configYaml = await FileUtils.exists(`${dirPath}/config.yaml`);
+
+    if (!configToml && !configYaml) {
+      findings.push({
+        id: 'blogdown-config',
+        severity: 'critical',
+        category: 'structure',
+        message: 'Blogdown site must have config.toml or config.yaml',
+        suggestions: ['Create config.toml with site configuration'],
+      });
+    }
+
+    // Check for content directory
+    const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
+    if (!contentDir) {
+      findings.push({
+        id: 'blogdown-content',
+        severity: 'important',
+        category: 'structure',
+        message: 'Blogdown site should have content/ directory',
+      });
+    }
+
+    // Check for themes directory
+    const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
+    if (!themesDir) {
+      findings.push({
+        id: 'blogdown-themes',
+        severity: 'recommended',
+        category: 'structure',
+        message: 'Blogdown site should have themes/ directory for custom theme',
+      });
+    }
+
+    return findings;
+  }
+
+  // ============== SHINYTEST VALIDATORS ==============
+  private async validateShinytest(dirPath: string): Promise<Finding[]> {
+    const findings: Finding[] = [];
+
+    // Check for test directory
+    const shinytestDir = await FileUtils.isDirectory(`${dirPath}/tests/shinytest`);
+    if (!shinytestDir) {
+      findings.push({
+        id: 'shinytest-structure',
+        severity: 'important',
+        category: 'structure',
+        message: 'Shinytest project should have tests/shinytest/ directory',
+        suggestions: ['Create tests/shinytest/ directory for test recordings'],
+      });
+    }
+
+    // Check for app.R
+    const appR = await FileUtils.exists(`${dirPath}/app.R`);
+    if (!appR) {
+      findings.push({
+        id: 'shinytest-app',
+        severity: 'important',
+        category: 'structure',
+        message: 'Shinytest requires Shiny app.R or ui.R/server.R',
+      });
+    }
+
+    // Check for test setup file
+    const testSetup = await FileUtils.exists(`${dirPath}/tests/testthat/setup-shinytest.R`) ||
+                      await FileUtils.exists(`${dirPath}/tests/setup.R`) ||
+                      await FileUtils.exists(`${dirPath}/tests/shinytest/setup.R`);
+
+    if (!testSetup && shinytestDir) {
+      findings.push({
+        id: 'shinytest-setup',
+        severity: 'recommended',
+        category: 'structure',
+        message: 'Shinytest project should have test setup configuration',
       });
     }
 

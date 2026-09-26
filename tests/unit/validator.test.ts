@@ -7,6 +7,9 @@ import {
   createPackageFixture,
   createRenvFixture,
   createShinyFixture,
+  createBookdownFixture,
+  createBlogdownFixture,
+  createShinytestFixture,
 } from '../fixtures/setup';
 
 describe('Validator', () => {
@@ -149,6 +152,54 @@ describe('Validator', () => {
       const result = await validator.validateProject(tempDir, 'analysis');
       const structureErrors = result.findings.filter((f) => f.id === 'analysis-structure');
       expect(structureErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should validate bookdown structure', async () => {
+      createBookdownFixture(tempDir);
+      const result = await validator.validateProject(tempDir, 'bookdown');
+
+      expect(result.findings).toBeDefined();
+      expect(result.workflow).toBe('bookdown');
+    });
+
+    it('should detect missing _bookdown.yaml in bookdown', async () => {
+      const result = await validator.validateProject(tempDir, 'bookdown');
+      const configError = result.findings.find((f) => f.id === 'bookdown-config');
+
+      expect(configError).toBeDefined();
+      expect(configError?.severity).toBe('critical');
+    });
+
+    it('should validate blogdown site', async () => {
+      createBlogdownFixture(tempDir);
+      const result = await validator.validateProject(tempDir, 'blogdown');
+
+      expect(result.findings).toBeDefined();
+      expect(result.workflow).toBe('blogdown');
+    });
+
+    it('should detect missing config in blogdown', async () => {
+      const result = await validator.validateProject(tempDir, 'blogdown');
+      const configError = result.findings.find((f) => f.id === 'blogdown-config');
+
+      expect(configError).toBeDefined();
+      expect(configError?.severity).toBe('critical');
+    });
+
+    it('should validate shinytest structure', async () => {
+      createShinytestFixture(tempDir);
+      const result = await validator.validateProject(tempDir, 'shinytest');
+
+      expect(result.findings).toBeDefined();
+      expect(result.workflow).toBe('shinytest');
+    });
+
+    it('should detect missing tests/shinytest in shinytest', async () => {
+      const result = await validator.validateProject(tempDir, 'shinytest');
+      const testError = result.findings.find((f) => f.id === 'shinytest-structure');
+
+      expect(testError).toBeDefined();
+      expect(testError?.severity).toBe('important');
     });
   });
 

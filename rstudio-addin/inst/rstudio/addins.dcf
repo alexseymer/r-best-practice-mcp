@@ -1,0 +1,19 @@
+Name: Validate Project
+Description: Validate R project against 52+ best practices using R Best Practices MCP server
+Binding: validate_project_addin
+Interactive: true
+
+Name: Detect Workflow
+Description: Automatically detect the workflow type of your R project
+Binding: detect_workflow_addin
+Interactive: true
+
+Name: Generate Template
+Description: Generate a new R project template for your workflow
+Binding: generate_template_addin
+Interactive: true
+
+Name: Show Report
+Description: Display a comprehensive R best practices validation report
+Binding: show_report_addin
+Interactive: true

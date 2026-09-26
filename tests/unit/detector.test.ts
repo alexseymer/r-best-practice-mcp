@@ -9,6 +9,9 @@ import {
   createRenvFixture,
   createTargetsFixture,
   createPlumberFixture,
+  createBookdownFixture,
+  createBlogdownFixture,
+  createShinytestFixture,
 } from '../fixtures/setup';
 
 describe('WorkflowDetector', () => {
@@ -72,6 +75,30 @@ describe('WorkflowDetector', () => {
       const result = await detector.detect(tempDir);
 
       expect(result.workflow).toBe('plumber');
+      expect(result.confidence).toBeGreaterThan(50);
+    });
+
+    it('should detect Bookdown projects', async () => {
+      createBookdownFixture(tempDir);
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('bookdown');
+      expect(result.confidence).toBeGreaterThan(50);
+    });
+
+    it('should detect Blogdown sites', async () => {
+      createBlogdownFixture(tempDir);
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('blogdown');
+      expect(result.confidence).toBeGreaterThan(50);
+    });
+
+    it('should detect Shinytest projects', async () => {
+      createShinytestFixture(tempDir);
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('shinytest');
       expect(result.confidence).toBeGreaterThan(50);
     });
 

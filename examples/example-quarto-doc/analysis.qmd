@@ -1,0 +1,97 @@
+---
+title: "Example Analysis Report"
+author: "Example Analyst"
+date: today
+format: html
+toc: true
+code-fold: true
+cache: true
+---
+
+## Introduction
+
+This is an example Quarto document demonstrating best practices for reproducible analysis including proper YAML configuration, code chunks with labels, and organized sections.
+
+## Data Setup
+
+Load required libraries and prepare data:
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+
+library(tidyverse)
+
+# Set random seed for reproducibility
+set.seed(42)
+
+# Generate sample data
+data <- tibble(
+  id = 1:100,
+  group = rep(c("A", "B", "C"), length.out = 100),
+  value = rnorm(100, mean = 100, sd = 15)
+)
+
+head(data)
+```
+
+## Exploratory Analysis
+
+### Summary Statistics
+
+```{r}
+#| label: summary-stats
+
+data %>%
+  group_by(group) %>%
+  summarize(
+    n = n(),
+    mean = mean(value),
+    median = median(value),
+    sd = sd(value),
+    .groups = "drop"
+  )
+```
+
+### Distribution Visualization
+
+```{r}
+#| label: distribution-plot
+#| fig-cap: "Distribution of values by group"
+
+ggplot(data, aes(x = value, fill = group)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~group) +
+  theme_minimal() +
+  labs(
+    title = "Value Distribution by Group",
+    x = "Value",
+    y = "Density",
+    fill = "Group"
+  )
+```
+
+## Statistical Analysis
+
+```{r}
+#| label: statistical-test
+
+# ANOVA to test for differences between groups
+fit <- aov(value ~ group, data = data)
+summary(fit)
+```
+
+## Conclusions
+
+- Group differences are statistically significant (p < 0.05)
+- Group A shows the highest mean value
+- Results suggest practical importance for downstream analysis
+
+## Session Information
+
+```{r}
+#| label: session-info
+
+sessionInfo()
+```
