@@ -122,7 +122,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Example Data Analysis', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-data-analysis');
+    const projectPath = path.resolve(process.cwd(), 'examples/example-data-analysis');
 
     it('should detect as analysis workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -151,7 +151,7 @@ describe('Example Projects Validation', () => {
 
     examples.forEach(({ name, path: projectDir, expectedWorkflow }) => {
       it(`should detect ${name} as ${expectedWorkflow}`, async () => {
-        const projectPath = path.resolve(__dirname, `../examples/${projectDir}`);
+        const projectPath = path.resolve(process.cwd(), `examples/${projectDir}`);
         const result = await detector.detect(projectPath);
 
         // Allow for some detection flexibility (e.g., analysis might be detected as rmarkdown)
@@ -165,7 +165,7 @@ describe('Example Projects Validation', () => {
       });
 
       it(`should have findings for ${name} project`, async () => {
-        const projectPath = path.resolve(__dirname, `../examples/${projectDir}`);
+        const projectPath = path.resolve(process.cwd(), `examples/${projectDir}`);
         const detectionResult = await detector.detect(projectPath);
         const validationResult = await validator.validateProject(
           projectPath,
