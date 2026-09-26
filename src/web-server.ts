@@ -35,7 +35,8 @@ export class RPracticesWebServer {
     this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
     // Serve static files from public directory
-    const publicPath = path.join(__dirname, 'public');
+    // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
+    const publicPath = path.join(__dirname, '..', 'src', 'public');
     this.app.use(express.static(publicPath));
 
     // Request logging middleware with performance tracking
@@ -103,7 +104,7 @@ export class RPracticesWebServer {
 
     // Dashboard route
     this.app.get('/dashboard', (req: Request, res: Response) => {
-      const dashboardPath = path.join(__dirname, 'public', 'dashboard.html');
+      const dashboardPath = path.join(__dirname, '..', 'src', 'public', 'dashboard.html');
       res.sendFile(dashboardPath);
     });
 
