@@ -1,5 +1,12 @@
 # R Best Practices MCP Server
 
+[![Test & Lint](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml)
+[![Docker Build & Test](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/docker.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/docker.yml)
+[![Release](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/alexseymer/r-best-practice-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/alexseymer/r-best-practice-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
+
 An **MCP (Model Context Protocol) server** that enforces best practices across all standard R development workflows. Provides workflow detection, project validation, and template generation for R scripts, Quarto documents, Shiny applications, R packages, and more.
 
 ## Overview
@@ -307,6 +314,37 @@ r-best-practice-mcp/
 ├── dist/, jest.config.js, tsconfig.json, package.json
 └── README.md, CLAUDE.md, CONTRIBUTING.md
 ```
+
+## CI/CD Pipeline
+
+This project uses **GitHub Actions** for automated testing, building, and releasing:
+
+- **Test Workflow** — Runs on every push and PR
+  - ESLint linting
+  - TypeScript building
+  - Jest unit tests with coverage
+  - Type checking
+  - Matrix testing on Node 18.x and 20.x
+
+- **Docker Workflow** — Validates containerized deployment
+  - Docker image building with layer caching
+  - Container health check testing
+  - Security scanning with Trivy
+  - Docker Compose multi-container testing
+
+- **Release Workflow** — Triggered by git tags (v*.*.*)
+  - Automated changelog generation
+  - GitHub Release creation with artifacts
+  - Docker image tagging and versioning
+  - Artifact bundling (tar.gz, zip)
+
+**Branch Protection Rules** enforce quality standards:
+- Required status checks must pass before merging
+- Code review approval required
+- Automatic dismissal of stale reviews
+- Conversation resolution required
+
+For detailed CI/CD setup and configuration instructions, see [CICD_SETUP.md](./CICD_SETUP.md).
 
 ## Development
 
