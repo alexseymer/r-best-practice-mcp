@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Main R Best Practices API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: r-practices-api
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - LOG_LEVEL=info
+    volumes:
+      # Mount user's project directory for validation
+      # Adjust path as needed for your projects
+      - /projects:/projects:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Nginx reverse proxy for SSL/production deployment
+  nginx:
+    image: nginx:alpine
+    container_name: r-practices-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment for SSL certificates
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    profiles:
+      - with-proxy
+
+volumes:
+  # Optional: persistent data volume if needed
+  api-data:
