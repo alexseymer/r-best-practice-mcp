@@ -293,6 +293,7 @@ node --expose-gc node_modules/.bin/jest --forceExit
 - **Code examples**: Look at existing tests and implementations
 - **GitHub Issues**: Search for related discussions
 - **Discussions**: Start a GitHub Discussion for questions
+- **GitHub Setup**: See [GITHUB_SETUP.md](./docs/GITHUB_SETUP.md) for branch protection and CI/CD details
 
 ## Project Structure Reference
 

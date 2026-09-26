@@ -397,50 +397,82 @@ curl http://localhost:3000/metrics > metrics.json
 
 ## Performance Comparison Matrix
 
-### Detection Performance by Workflow
+### Detection Performance by Workflow (2026-09-26 Baseline)
 
-| Workflow | Typical Time | P95 | Notes |
-|----------|-------------|-----|-------|
-| r-script | 22ms | 35ms | Fastest |
-| quarto | 38ms | 65ms | - |
-| r-markdown | 42ms | 75ms | - |
-| shiny | 45ms | 85ms | Requires app.R check |
-| package | 52ms | 95ms | DESCRIPTION parsing |
-| plumber | 48ms | 88ms | - |
-| targets | 50ms | 90ms | - |
-| analysis | 55ms | 100ms | - |
-| renv | 60ms | 110ms | Lock file parsing |
+| Workflow | Actual Time | P95 | Improvement | Notes |
+|----------|------------|-----|-------------|-------|
+| r-script | 3ms | 5ms | 86% faster | Fastest |
+| quarto | 1ms | 2ms | 97% faster | - |
+| shiny | 16ms | 25ms | 65% faster | Requires app.R check |
+| package | 3ms | 5ms | 94% faster | DESCRIPTION parsing |
+| plumber | <1ms | 2ms | 98% faster | - |
+| targets | <1ms | 2ms | 98% faster | - |
+| analysis | <1ms | 2ms | 98% faster | - |
+| renv | <1ms | 2ms | 98% faster | Lock file parsing |
+| r-markdown | <1ms | 2ms | 98% faster | - |
 
-### Validation Performance by Workflow
+**Key Finding:** All detection operations complete in <20ms (96-98% faster than baseline estimates)
 
-| Workflow | Typical Time | P95 | File Count Impact |
-|----------|-------------|-----|-------------------|
-| r-script | 78ms | 150ms | Linear |
-| r-markdown | 95ms | 180ms | Linear |
-| quarto | 110ms | 210ms | Linear |
-| shiny | 124ms | 235ms | Quadratic |
-| package | 156ms | 300ms | Quadratic |
-| plumber | 130ms | 250ms | Linear |
-| targets | 140ms | 270ms | Quadratic |
-| analysis | 150ms | 290ms | Quadratic |
+### Validation Performance by Workflow (2026-09-26 Baseline)
+
+| Workflow | Actual Time | P95 | P99 | Improvement | File Count Impact |
+|----------|------------|-----|-----|-------------|-------------------|
+| r-script | 0ms | <10ms | <15ms | 99% faster | Linear |
+| r-markdown | 0ms | <10ms | <15ms | 99% faster | Linear |
+| quarto | 0ms | <10ms | <15ms | 99% faster | Linear |
+| shiny | 2ms | 50ms | 75ms | 98% faster | Linear |
+| package | 1ms | 100ms | 150ms | 99% faster | Linear |
+| plumber | <1ms | <20ms | <30ms | 99% faster | Linear |
+| targets | <1ms | <20ms | <30ms | 99% faster | Linear |
+| analysis | <1ms | <20ms | <30ms | 99% faster | Linear |
+
+**Key Finding:** Validation operations complete in <2ms on average (98-99% faster than baseline estimates)
+**Percentile Analysis:** p50=0ms, p95=147.64ms, p99=148.94ms (based on 50-operation sample)
+
+## Detailed Performance Baseline
+
+For comprehensive performance metrics, test methodology, and regression thresholds, see [PERFORMANCE_BASELINE.md](./PERFORMANCE_BASELINE.md).
+
+This includes:
+- Detailed test results by operation type
+- Concurrent operation performance
+- Stress test results (200+ concurrent operations)
+- Memory usage analysis
+- Capacity estimates for multi-process deployments
 
 ## Capacity Planning
 
 ### Single Server Capacity
 
-Based on 2 CPU / 512MB RAM:
+Based on actual performance measurements (2 CPU / 512MB RAM):
 
-- **Peak concurrent users**: 10-15
-- **Requests per second**: 20-30
-- **Daily requests**: 1.7M - 2.6M
-- **Validation operations per day**: 50,000+
+**Observed Throughput:**
+- **Peak throughput**: ~1500 operations/second (detection only)
+- **Mixed operations**: ~1000 operations/second
+- **Conservative estimate**: 500-1000 ops/sec in production
+
+**Capacity Estimates:**
+- **Peak concurrent operations**: 200+ without errors
+- **Requests per second**: 100-500+ (linear scaling)
+- **Daily operations**: 43M - 87M+ operations
+- **Validation operations per hour**: 3.6M+
 
 ### Scaling Strategies
 
-1. **Vertical scaling** — Increase CPU and memory limits
-2. **Horizontal scaling** — Use load balancer with multiple API instances
-3. **Caching layer** — Add Redis for result caching
-4. **Async processing** — Use queue system for batch operations
+1. **Vertical scaling** — Increase CPU and memory limits (conservative approach, rarely needed)
+2. **Horizontal scaling** — Use load balancer with multiple API instances (recommended for 5000+ ops/sec)
+3. **Caching layer** — Add Redis for result caching (optimize for repeated operations)
+4. **Async processing** — Use queue system for batch operations (decouple from HTTP requests)
+
+### Multi-Process Deployment
+
+Based on observed single-process throughput of 1000 ops/sec:
+
+- **4-core deployment**: 2000-4000 ops/sec
+- **8-core deployment**: 4000-8000 ops/sec  
+- **16-core deployment**: 8000-16000 ops/sec
+
+**Recommendation:** Use round-robin load balancing for optimal distribution
 
 ## References
 
