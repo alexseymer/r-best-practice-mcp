@@ -79,6 +79,38 @@ npm run build
 npm test
 ```
 
+### Docker Deployment
+
+Run the server in a containerized environment with automatic dependency management:
+
+```bash
+# Clone and deploy with Docker Compose
+git clone https://github.com/alexseymer/r-best-practice-mcp.git
+cd r-best-practice-mcp
+
+# Start the API server
+docker-compose up -d
+
+# Verify it's running
+curl http://localhost:3000/health
+```
+
+**Features:**
+- 🐳 Container-based deployment for any system
+- 🔄 Auto-restart on failure
+- 📊 Health checks configured
+- 🔒 Security hardened (non-root user)
+- 🌐 Optional Nginx reverse proxy with SSL support
+- 📦 Volumes for mounting R projects
+
+**For complete Docker documentation**, see [DOCKER.md](./DOCKER.md):
+- Configuration options
+- SSL/TLS setup
+- Production deployment
+- Troubleshooting
+- Performance tuning
+- Security best practices
+
 ## Usage
 
 ### Via MCP Server (Claude & other clients)
@@ -177,6 +209,50 @@ The server exposes 6 tools via the Model Context Protocol:
   "total": 52
 }
 ```
+
+### Via REST API (HTTP)
+
+When running with Docker or the web server, access the same functionality via HTTP:
+
+```bash
+# Check server health
+curl http://localhost:3000/health
+
+# Detect workflow
+curl -X POST http://localhost:3000/api/detect-workflow \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/path/to/project"}'
+
+# Validate project
+curl -X POST http://localhost:3000/api/validate-project \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/path/to/project", "workflow": "package"}'
+
+# Validate file
+curl -X POST http://localhost:3000/api/validate-file \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/path/to/file.R"}'
+
+# Get practice details
+curl http://localhost:3000/api/practice/package-roxygen2
+
+# List practices
+curl "http://localhost:3000/api/practices?workflow=package&category=documentation"
+
+# Generate template
+curl -X POST http://localhost:3000/api/generate-template \
+  -H "Content-Type: application/json" \
+  -d '{"workflow": "package", "projectName": "mypackage"}'
+
+# View all available endpoints
+curl http://localhost:3000/api/tools
+```
+
+**See [DOCKER.md](./DOCKER.md) for complete API documentation**, including:
+- Request/response schemas
+- Query parameters
+- Error handling
+- Configuration options
 
 ## Project Structure
 
@@ -350,6 +426,16 @@ mcp_tool_call "detect_workflow" '{"path": "/path/to/project"}'
 5. Submit a pull request
 
 ## Interfaces Available
+
+### 🌐 REST API (HTTP)
+Deploy as a web service with Docker for easy integration:
+- Express.js HTTP server on port 3000
+- All 6 tools available via REST endpoints
+- Health checks and API introspection
+- Optional Nginx reverse proxy with SSL/TLS
+- Perfect for self-hosted VPS deployment
+- Start with `docker-compose up` or `node dist/web-server-entry.js`
+- [See Docker documentation](./DOCKER.md)
 
 ### 🖥️ MCP Server
 The core MCP server exposing 6 tools for Claude and other MCP clients. Start with `node dist/index.js`.
