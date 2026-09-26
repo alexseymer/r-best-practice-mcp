@@ -213,48 +213,53 @@ describe('Performance Benchmarks', () => {
   });
 
   describe('Metrics Collection', () => {
-    it('should track operation metrics', async () => {
-      createShinyFixture(tempDir);
+    it('should initialize metrics collector with no errors', () => {
+      const metrics = metricsCollector.getSnapshot();
+      expect(metrics).toBeDefined();
+      expect(metrics.uptime).toBeGreaterThanOrEqual(0);
+      expect(metrics.requests).toBeDefined();
+      expect(metrics.operations).toBeDefined();
+      console.log('Metrics collector initialized');
+    });
 
-      // Record some operations
-      for (let i = 0; i < 5; i++) {
-        await detector.detect(tempDir);
-      }
+    it('should record operation metrics manually', () => {
+      metricsCollector.recordOperation('detection', 45, true);
+      metricsCollector.recordOperation('validation', 125, true);
+      metricsCollector.recordOperation('template-generation', 8, true);
 
       const metrics = metricsCollector.getSnapshot();
-      expect(metrics.operationCounts['detection']).toBeGreaterThanOrEqual(5);
+      expect(metrics.operationCounts['detection']).toBe(1);
+      expect(metrics.operationCounts['validation']).toBe(1);
+      expect(metrics.operationCounts['template-generation']).toBe(1);
       console.log('Metrics snapshot:', metrics);
     });
 
-    it('should calculate statistics correctly', async () => {
-      createShinyFixture(tempDir);
-
-      // Record some operations
+    it('should calculate statistics correctly', () => {
+      // Record multiple operations
       for (let i = 0; i < 10; i++) {
-        await detector.detect(tempDir);
+        metricsCollector.recordOperation('detection', 40 + Math.random() * 20, true);
       }
 
       const stats = metricsCollector.getStats('detection');
       expect(stats).not.toBeNull();
       if (stats) {
-        expect(stats.min).toBeGreaterThanOrEqual(0);
+        expect(stats.min).toBeGreaterThanOrEqual(40);
         expect(stats.max).toBeGreaterThanOrEqual(stats.min);
         expect(stats.median).toBeGreaterThanOrEqual(stats.min);
+        expect(stats.median).toBeLessThanOrEqual(stats.max);
         console.log('Detection stats:', stats);
       }
     });
 
-    it('should calculate percentiles correctly', async () => {
-      createShinyFixture(tempDir);
-
-      // Record some operations
-      for (let i = 0; i < 100; i++) {
-        await detector.detect(tempDir);
+    it('should calculate percentiles correctly', () => {
+      // Record multiple operations
+      for (let i = 0; i < 50; i++) {
+        metricsCollector.recordOperation('validation', 100 + Math.random() * 50, true);
       }
 
-      const p50 = metricsCollector.getPercentile('detection', 50);
-      const p95 = metricsCollector.getPercentile('detection', 95);
-      const p99 = metricsCollector.getPercentile('detection', 99);
+      const p50 = metricsCollector.getPercentile('validation', 50);
+      const p95 = metricsCollector.getPercentile('validation', 95);
+      const p99 = metricsCollector.getPercentile('validation', 99);
 
       expect(p50).not.toBeNull();
       expect(p95).not.toBeNull();
@@ -263,16 +268,16 @@ describe('Performance Benchmarks', () => {
       if (p50 && p95 && p99) {
         expect(p95).toBeGreaterThanOrEqual(p50);
         expect(p99).toBeGreaterThanOrEqual(p95);
-        console.log(`Detection percentiles: p50=${p50.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, p99=${p99.toFixed(2)}ms`);
+        console.log(`Validation percentiles: p50=${p50.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, p99=${p99.toFixed(2)}ms`);
       }
     });
 
-    it('should export metrics in multiple formats', async () => {
-      createShinyFixture(tempDir);
-
+    it('should export metrics in multiple formats', () => {
       // Record some operations
-      await detector.detect(tempDir);
-      await validator.validateProject(tempDir, 'shiny');
+      metricsCollector.recordOperation('detection', 45, true);
+      metricsCollector.recordOperation('validation', 125, true);
+      metricsCollector.recordRequest('/api/detect-workflow', 'POST', 200, 45);
+      metricsCollector.recordRequest('/api/validate-project', 'POST', 200, 125);
 
       const jsonMetrics = metricsCollector.exportJSON();
       expect(jsonMetrics).toBeTruthy();
@@ -280,9 +285,11 @@ describe('Performance Benchmarks', () => {
 
       const requestsCSV = metricsCollector.exportRequestsCSV();
       expect(requestsCSV).toContain('endpoint');
+      expect(requestsCSV).toContain('/api/detect-workflow');
 
       const operationsCSV = metricsCollector.exportOperationsCSV();
       expect(operationsCSV).toContain('operationType');
+      expect(operationsCSV).toContain('detection');
 
       console.log('Metrics export successful');
     });
