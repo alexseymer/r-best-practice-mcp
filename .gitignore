@@ -17,3 +17,9 @@ yarn-error.log*
 *~
 .coverage/
 coverage/
+
+# Temporary test files
+tests/.temp/
+tests/.tmp/
+*.tmp
+
