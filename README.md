@@ -1,11 +1,11 @@
 # R Best Practices MCP Server
 
-[![Test & Lint](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml)
-[![Docker Build & Test](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/docker.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/docker.yml)
-[![Release](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/release.yml)
-[![codecov](https://codecov.io/gh/alexseymer/r-best-practice-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/alexseymer/r-best-practice-mcp)
+[![Build](https://github.com/alexseymer/r-coding-mcp/actions/workflows/build.yaml/badge.svg)](https://github.com/alexseymer/r-coding-mcp/actions/workflows/build.yaml)
+[![Publish](https://github.com/alexseymer/r-coding-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/alexseymer/r-coding-mcp/actions/workflows/publish.yml)
+[![npm](https://img.shields.io/npm/v/r-best-practices-mcp.svg)](https://www.npmjs.com/package/r-best-practices-mcp)
+[![Docker Pulls](https://img.shields.io/docker/pulls/alexseymer/r-best-practices-mcp.svg)](https://hub.docker.com/r/alexseymer/r-best-practices-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
 An **MCP (Model Context Protocol) server** that enforces best practices across all standard R development workflows. Provides workflow detection, project validation, and template generation for R scripts, Quarto documents, Shiny applications, R packages, and more.
 
@@ -69,15 +69,25 @@ Access to 52 best practices:
 ## Installation
 
 ### Prerequisites
-- Node.js >= 20.0.0
-- npm >= 10.0.0
+- Node.js >= 18.0.0
+- npm >= 9.0.0
 
-### Setup
+### From npm Registry (Recommended)
+
+```bash
+# Install the published package
+npm install r-best-practices-mcp
+
+# Or install globally for CLI usage
+npm install -g r-best-practices-mcp
+```
+
+### From Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/alexseymer/r-best-practice-mcp.git
-cd r-best-practice-mcp
+git clone https://github.com/alexseymer/r-coding-mcp.git
+cd r-coding-mcp
 
 # Install dependencies
 npm install
@@ -93,10 +103,44 @@ npm test
 
 Run the server in a containerized environment with automatic dependency management:
 
+#### Using Docker Hub (Recommended)
+
+```bash
+# Pull the latest image from Docker Hub
+docker pull alexseymer/r-best-practices-mcp:latest
+
+# Or use a specific version
+docker pull alexseymer/r-best-practices-mcp:1.0.0
+
+# Run the container
+docker run -d \
+  --name r-practices \
+  -p 3000:3000 \
+  alexseymer/r-best-practices-mcp:latest
+
+# Verify it's running
+curl http://localhost:3000/health
+```
+
+#### Using GitHub Packages
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/alexseymer/r-best-practices-mcp:latest
+
+# Run the container
+docker run -d \
+  --name r-practices \
+  -p 3000:3000 \
+  ghcr.io/alexseymer/r-best-practices-mcp:latest
+```
+
+#### Using Docker Compose
+
 ```bash
 # Clone and deploy with Docker Compose
-git clone https://github.com/alexseymer/r-best-practice-mcp.git
-cd r-best-practice-mcp
+git clone https://github.com/alexseymer/r-coding-mcp.git
+cd r-coding-mcp
 
 # Start the API server
 docker-compose up -d
@@ -258,6 +302,8 @@ curl -X POST http://localhost:3000/api/generate-template \
 curl http://localhost:3000/api/tools
 ```
 
+**Docker Hub:** Pull pre-built images from [Docker Hub](https://hub.docker.com/r/alexseymer/r-best-practices-mcp)
+
 **See [DOCKER.md](./DOCKER.md) for complete API documentation**, including:
 - Request/response schemas
 - Query parameters
@@ -322,32 +368,28 @@ r-best-practice-mcp/
 
 This project uses **GitHub Actions** for automated testing, building, and releasing:
 
-- **Test Workflow** — Runs on every push and PR
+- **Build Workflow** — Runs on every push and PR
   - ESLint linting
   - TypeScript building
   - Jest unit tests with coverage
   - Type checking
   - Matrix testing on Node 18.x and 20.x
 
-- **Docker Workflow** — Validates containerized deployment
-  - Docker image building with layer caching
-  - Container health check testing
-  - Security scanning with Trivy
-  - Docker Compose multi-container testing
+- **Publish Workflow** — Triggered by version tags (v*.*.*)
+  - Runs full test suite
+  - Publishes to npm registry
+  - Builds and pushes Docker images to:
+    - Docker Hub (`alexseymer/r-best-practices-mcp`)
+    - GitHub Packages (`ghcr.io/alexseymer/r-best-practices-mcp`)
+  - Creates GitHub Release with installation instructions
+  - Uses semantic versioning for tags
 
-- **Release Workflow** — Triggered by git tags (v*.*.*)
-  - Automated changelog generation
-  - GitHub Release creation with artifacts
-  - Docker image tagging and versioning
-  - Artifact bundling (tar.gz, zip)
+**Publishing** is fully automated via GitHub Actions:
+1. Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+2. The workflow automatically publishes to npm and Docker registries
+3. GitHub Release is created with release notes
 
-**Branch Protection Rules** enforce quality standards:
-- Required status checks must pass before merging
-- Code review approval required
-- Automatic dismissal of stale reviews
-- Conversation resolution required
-
-For detailed CI/CD setup and configuration instructions, see [CICD_SETUP.md](./CICD_SETUP.md).
+For detailed publishing instructions, see [PUBLISH.md](./PUBLISH.md) and [docs/versioning.md](./docs/versioning.md).
 
 ## Development
 
@@ -528,5 +570,7 @@ MIT License
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
-- **Questions**: [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
+- **Issues**: [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
+- **Questions**: [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
+- **Publishing**: [PUBLISH.md](./PUBLISH.md)
+- **Versioning**: [docs/versioning.md](./docs/versioning.md)
