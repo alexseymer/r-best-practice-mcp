@@ -1,16 +1,14 @@
-import { WorkflowDetector } from '../src/engine/detector.js';
-import { Validator } from '../src/engine/validator.js';
+import { WorkflowDetector } from '../src/engine/detector';
+import { Validator } from '../src/engine/validator';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('Example Projects Validation', () => {
   const detector = new WorkflowDetector();
   const validator = new Validator();
+  const baseDir = process.cwd();
 
   describe('Example Package', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-package');
+    const projectPath = path.join(baseDir, 'examples/example-package');
 
     it('should detect as package workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -48,7 +46,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Example Shiny App', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-shiny-app');
+    const projectPath = path.join(baseDir, 'examples/example-shiny-app');
 
     it('should detect as shiny workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -77,7 +75,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Example R Script', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-r-script');
+    const projectPath = path.join(baseDir, 'examples/example-r-script');
 
     it('should detect as r-script workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -100,7 +98,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Example Quarto Document', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-quarto-doc');
+    const projectPath = path.join(baseDir, 'examples/example-quarto-doc');
 
     it('should detect as quarto workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -122,7 +120,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Example Data Analysis', () => {
-    const projectPath = path.resolve(process.cwd(), 'examples/example-data-analysis');
+    const projectPath = path.join(baseDir, 'examples/example-data-analysis');
 
     it('should detect as analysis workflow', async () => {
       const result = await detector.detect(projectPath);
@@ -151,7 +149,7 @@ describe('Example Projects Validation', () => {
 
     examples.forEach(({ name, path: projectDir, expectedWorkflow }) => {
       it(`should detect ${name} as ${expectedWorkflow}`, async () => {
-        const projectPath = path.resolve(process.cwd(), `examples/${projectDir}`);
+        const projectPath = path.join(baseDir, `examples/${projectDir}`);
         const result = await detector.detect(projectPath);
 
         // Allow for some detection flexibility (e.g., analysis might be detected as rmarkdown)
@@ -165,7 +163,7 @@ describe('Example Projects Validation', () => {
       });
 
       it(`should have findings for ${name} project`, async () => {
-        const projectPath = path.resolve(process.cwd(), `examples/${projectDir}`);
+        const projectPath = path.join(baseDir, `examples/${projectDir}`);
         const detectionResult = await detector.detect(projectPath);
         const validationResult = await validator.validateProject(
           projectPath,
@@ -181,21 +179,21 @@ describe('Example Projects Validation', () => {
 
   describe('File Validation for Example Projects', () => {
     it('should validate package R file', async () => {
-      const filePath = path.resolve(__dirname, '../examples/example-package/R/statistics.R');
+      const filePath = path.join(baseDir, 'examples/example-package/R/statistics.R');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
     });
 
     it('should validate quarto file', async () => {
-      const filePath = path.resolve(__dirname, '../examples/example-quarto-doc/analysis.qmd');
+      const filePath = path.join(baseDir, 'examples/example-quarto-doc/analysis.qmd');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
     });
 
     it('should validate r script file', async () => {
-      const filePath = path.resolve(__dirname, '../examples/example-r-script/analysis.R');
+      const filePath = path.join(baseDir, 'examples/example-r-script/analysis.R');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
@@ -203,7 +201,7 @@ describe('Example Projects Validation', () => {
   });
 
   describe('Validation Result Structure', () => {
-    const projectPath = path.resolve(__dirname, '../examples/example-package');
+    const projectPath = path.join(baseDir, 'examples/example-package');
 
     it('should return proper Finding structure', async () => {
       const result = await validator.validateProject(projectPath, 'package');
