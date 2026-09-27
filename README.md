@@ -66,6 +66,50 @@ Access to 52 best practices:
 - Searchable and filterable
 - Includes examples and references
 
+### 🔐 Security & Rate Limiting
+Production-ready security features:
+- **Path traversal protection** — Prevents directory traversal attacks
+- **Input sanitization** — Removes shell metacharacters and validates paths
+- **Rate limiting** — 100 requests per 60 seconds per IP address
+- **Request size limits** — 50MB maximum request body
+- **HTTPS/TLS support** — Full SSL configuration with reverse proxy
+- See [SECURITY.md](./SECURITY.md) for comprehensive security documentation
+
+### 📊 API Documentation & Versioning
+Professional API standards:
+- **OpenAPI 3.0 specification** — Access at `/openapi.json`
+- **Swagger UI** — Interactive API explorer at `/api-docs`
+- **Pagination support** — Offset-based pagination with metadata
+- **Dual versioning** — `/api/` (v0 - backward compatible) and `/api/v1/` (current - recommended)
+- **Enhanced rate limit headers** — `X-RateLimit-*` and `X-Pagination-*` headers
+- See [API_VERSIONING.md](./API_VERSIONING.md) for migration guides
+
+## Phase 3: Production Hardening (v0.3.0)
+
+This release includes comprehensive security, standards compliance, and deployment improvements:
+
+### Phase 3A: Security Hardening
+- ✅ Path traversal protection with canonical path validation
+- ✅ Input sanitization removing shell metacharacters
+- ✅ In-memory rate limiting (100 req/60s per IP)
+- ✅ Request body size limits (50MB default)
+- ✅ Client IP extraction from proxy headers
+- ✅ Comprehensive test coverage (30 tests, 100% coverage)
+
+### Phase 3B: API Standards & Versioning
+- ✅ OpenAPI 3.0 specification generation
+- ✅ Swagger UI interactive documentation at `/api-docs`
+- ✅ Offset-based pagination with metadata
+- ✅ Dual versioning (v0 backward compatible, v1 current)
+- ✅ Rate limit and pagination response headers
+- ✅ 100+ total test cases (61 new tests for Phase 3)
+
+### Phase 3C: Documentation
+- ✅ [SECURITY.md](./SECURITY.md) — Comprehensive security best practices
+- ✅ [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) — Production deployment guide
+- ✅ [API_VERSIONING.md](./API_VERSIONING.md) — Versioning strategy and migration guides
+- ✅ Updated README with new features and examples
+
 ## Installation
 
 ### Prerequisites
@@ -268,47 +312,68 @@ The server exposes 6 tools via the Model Context Protocol:
 
 When running with Docker or the web server, access the same functionality via HTTP:
 
+#### Recommended: v1 Endpoints (with pagination & enhanced features)
+
 ```bash
 # Check server health
 curl http://localhost:3000/health
 
-# Detect workflow
-curl -X POST http://localhost:3000/api/detect-workflow \
+# Detect workflow (v1)
+curl -X POST http://localhost:3000/api/v1/detect-workflow \
   -H "Content-Type: application/json" \
   -d '{"path": "/path/to/project"}'
 
-# Validate project
-curl -X POST http://localhost:3000/api/validate-project \
+# Validate project (v1)
+curl -X POST http://localhost:3000/api/v1/validate-project \
   -H "Content-Type: application/json" \
   -d '{"path": "/path/to/project", "workflow": "package"}'
 
-# Validate file
-curl -X POST http://localhost:3000/api/validate-file \
-  -H "Content-Type: application/json" \
-  -d '{"path": "/path/to/file.R"}'
+# List practices with pagination (v1)
+curl "http://localhost:3000/api/v1/practices?limit=50&offset=0&workflow=package"
 
-# Get practice details
-curl http://localhost:3000/api/practice/package-roxygen2
+# Get practice details (v1)
+curl http://localhost:3000/api/v1/practice/package-roxygen2
 
-# List practices
-curl "http://localhost:3000/api/practices?workflow=package&category=documentation"
-
-# Generate template
-curl -X POST http://localhost:3000/api/generate-template \
+# Generate template (v1)
+curl -X POST http://localhost:3000/api/v1/generate-template \
   -H "Content-Type: application/json" \
   -d '{"workflow": "package", "projectName": "mypackage"}'
-
-# View all available endpoints
-curl http://localhost:3000/api/tools
 ```
+
+#### API Documentation
+
+```bash
+# View OpenAPI 3.0 specification
+curl http://localhost:3000/openapi.json
+
+# Access interactive Swagger UI
+open http://localhost:3000/api-docs
+
+# Check rate limit metrics
+curl http://localhost:3000/metrics/rate-limit
+```
+
+#### Legacy: v0 Endpoints (backward compatible)
+
+v0 endpoints are still available for backward compatibility (no pagination, legacy format):
+
+```bash
+# v0 endpoints (deprecated for new code)
+curl http://localhost:3000/api/detect-workflow
+curl http://localhost:3000/api/practices
+curl http://localhost:3000/api/practice/practice-id
+```
+
+See [API_VERSIONING.md](./API_VERSIONING.md) for migration guides from v0 to v1.
 
 **Docker Hub:** Pull pre-built images from [Docker Hub](https://hub.docker.com/r/alexseymer/r-best-practices-mcp)
 
 **See [DOCKER.md](./DOCKER.md) for complete API documentation**, including:
 - Request/response schemas
-- Query parameters
+- Query parameters and pagination
+- Rate limiting configuration
 - Error handling
-- Configuration options
+- Security configuration
 
 ## Project Structure
 
@@ -340,7 +405,12 @@ r-best-practice-mcp/
 │   │   ├── workflow.ts, finding.ts, practice.ts, etc.
 │   ├── utils/
 │   │   ├── file.ts, logger.ts
+│   │   ├── security.ts            # Path validation, input sanitization (Phase 3A)
+│   │   ├── rate-limiter.ts        # Rate limiting middleware (Phase 3A)
+│   │   ├── pagination.ts          # Pagination utilities (Phase 3B)
+│   │   └── openapi.ts             # OpenAPI spec generation (Phase 3B)
 │   ├── server.ts                  # MCP server (358 lines)
+│   ├── web-server.ts              # Express web server with security (Phase 3A/3B)
 │   └── index.ts
 ├── vscode-extension/              # Phase 5: VS Code integration
 │   ├── package.json
@@ -358,10 +428,23 @@ r-best-practice-mcp/
 │   │   └── addins.dcf             # RStudio registration
 │   └── tests/
 ├── tests/
-│   ├── unit/                      # Unit tests (5 suites, 91 tests)
+│   ├── unit/                      # Unit tests (100+ tests)
+│   │   ├── detector.test.ts
+│   │   ├── validator.test.ts
+│   │   ├── template-generator.test.ts
+│   │   ├── knowledge-base.test.ts
+│   │   ├── security.test.ts       # Phase 3A: 30 tests
+│   │   ├── rate-limiter.test.ts   # Phase 3A: 10 tests
+│   │   └── pagination.test.ts     # Phase 3B: 21 tests
 │   └── fixtures/
 ├── dist/, jest.config.js, tsconfig.json, package.json
-└── README.md, CLAUDE.md, CONTRIBUTING.md
+├── CLAUDE.md                      # Architecture & development guide
+├── SECURITY.md                    # Security best practices (Phase 3C)
+├── DEPLOYMENT_CHECKLIST.md        # Production deployment guide (Phase 3C)
+├── API_VERSIONING.md              # API versioning strategy (Phase 3C)
+├── DOCKER.md                      # Docker deployment guide
+├── CONTRIBUTING.md
+└── README.md
 ```
 
 ## CI/CD Pipeline
@@ -568,9 +651,19 @@ In-IDE validation for RStudio:
 
 MIT License
 
+## Documentation
+
+- **[CLAUDE.md](./CLAUDE.md)** — Architecture, design decisions, development workflow
+- **[SECURITY.md](./SECURITY.md)** — Security best practices, configuration, hardening
+- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** — Production deployment guide with Docker & K8s
+- **[API_VERSIONING.md](./API_VERSIONING.md)** — API versioning strategy and migration guides
+- **[DOCKER.md](./DOCKER.md)** — Docker deployment, SSL/TLS, production configuration
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — Contributing guidelines
+
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
 - **Questions**: [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
+- **Security**: Email alexseymer@gmail.com with security concerns
 - **Publishing**: [PUBLISH.md](./PUBLISH.md)
 - **Versioning**: [docs/versioning.md](./docs/versioning.md)
