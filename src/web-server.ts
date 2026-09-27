@@ -8,6 +8,8 @@ import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
 import { metricsCollector } from './utils/metrics.js';
+import { SecurityUtils } from './utils/security.js';
+import { RateLimiter } from './utils/rate-limiter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +20,7 @@ export class RPracticesWebServer {
   private detector: WorkflowDetector;
   private validator: Validator;
   private templateGenerator: TemplateGenerator;
+  private rateLimiter: RateLimiter;
 
   constructor(port: number = 3000) {
     this.port = port;
@@ -25,6 +28,7 @@ export class RPracticesWebServer {
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
+    this.rateLimiter = new RateLimiter(60000, 100); // 100 requests per 60 seconds per IP
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -33,6 +37,22 @@ export class RPracticesWebServer {
   private setupMiddleware(): void {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+    // Rate limiting middleware - apply to all routes
+    this.app.use(this.rateLimiter.middleware());
+
+    // Request size validation
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
+      const contentLength = req.headers['content-length'];
+      if (contentLength && !SecurityUtils.validateBodySize(parseInt(contentLength))) {
+        return res.status(413).json({
+          error: true,
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Request body exceeds maximum allowed size (50MB)',
+        });
+      }
+      next();
+    });
 
     // Serve static files from public directory
     // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
@@ -89,6 +109,19 @@ export class RPracticesWebServer {
       res.json(metrics);
     });
 
+    // Rate limit stats endpoint
+    this.app.get('/metrics/rate-limit', (req: Request, res: Response) => {
+      const stats = this.rateLimiter.getStats();
+      res.json({
+        status: 'ok',
+        rateLimit: {
+          window: '60 seconds',
+          maxRequests: 100,
+          ...stats,
+        },
+      });
+    });
+
     // Metrics export endpoints
     this.app.get('/metrics/requests.csv', (req: Request, res: Response) => {
       const csv = metricsCollector.exportRequestsCSV();
@@ -119,8 +152,8 @@ export class RPracticesWebServer {
     this.app.post('/api/detect-workflow', async (req: Request, res: Response) => {
       const startTime = process.hrtime();
       try {
-        const { path } = req.body;
-        if (!path) {
+        const { path: inputPath } = req.body;
+        if (!inputPath) {
           return res.status(400).json({
             error: true,
             code: 'MISSING_PARAMETER',
@@ -128,7 +161,15 @@ export class RPracticesWebServer {
           });
         }
 
-        const result = await this.detector.detect(path);
+        if (!SecurityUtils.isValidFilePath(inputPath)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_PATH',
+            message: 'Invalid path format',
+          });
+        }
+
+        const result = await this.detector.detect(inputPath);
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('detection', duration, true);
@@ -161,8 +202,8 @@ export class RPracticesWebServer {
     this.app.post('/api/validate-project', async (req: Request, res: Response) => {
       const startTime = process.hrtime();
       try {
-        const { path, workflow } = req.body;
-        if (!path) {
+        const { path: inputPath, workflow } = req.body;
+        if (!inputPath) {
           return res.status(400).json({
             error: true,
             code: 'MISSING_PARAMETER',
@@ -170,23 +211,39 @@ export class RPracticesWebServer {
           });
         }
 
-        const exists = await FileUtils.isDirectory(path);
+        if (!SecurityUtils.isValidFilePath(inputPath)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_PATH',
+            message: 'Invalid path format',
+          });
+        }
+
+        if (workflow && !SecurityUtils.isValidWorkflow(workflow)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_WORKFLOW',
+            message: `Invalid workflow type: ${workflow}`,
+          });
+        }
+
+        const exists = await FileUtils.isDirectory(inputPath);
         if (!exists) {
           return res.status(404).json({
             error: true,
             code: 'PATH_NOT_FOUND',
-            message: `Directory not found: ${path}`,
+            message: `Directory not found: ${inputPath}`,
           });
         }
 
         // Auto-detect workflow if not specified
         let detectedWorkflow = workflow || 'unknown';
         if (!workflow) {
-          const detection = await this.detector.detect(path);
+          const detection = await this.detector.detect(inputPath);
           detectedWorkflow = detection.workflow;
         }
 
-        const result = await this.validator.validateProject(path, detectedWorkflow as any);
+        const result = await this.validator.validateProject(inputPath, detectedWorkflow as any);
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('validation', duration, true);
@@ -219,8 +276,8 @@ export class RPracticesWebServer {
     this.app.post('/api/validate-file', async (req: Request, res: Response) => {
       const startTime = process.hrtime();
       try {
-        const { path } = req.body;
-        if (!path) {
+        const { path: inputPath } = req.body;
+        if (!inputPath) {
           return res.status(400).json({
             error: true,
             code: 'MISSING_PARAMETER',
@@ -228,16 +285,24 @@ export class RPracticesWebServer {
           });
         }
 
-        const exists = await FileUtils.exists(path);
+        if (!SecurityUtils.isValidFilePath(inputPath)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_PATH',
+            message: 'Invalid path format',
+          });
+        }
+
+        const exists = await FileUtils.exists(inputPath);
         if (!exists) {
           return res.status(404).json({
             error: true,
             code: 'FILE_NOT_FOUND',
-            message: `File not found: ${path}`,
+            message: `File not found: ${inputPath}`,
           });
         }
 
-        const findings = await this.validator.validateFile(path);
+        const findings = await this.validator.validateFile(inputPath);
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('validation', duration, true);
@@ -315,7 +380,21 @@ export class RPracticesWebServer {
     this.app.get('/api/practices', (req: Request, res: Response) => {
       const startTime = process.hrtime();
       try {
-        const { workflow, category } = req.query;
+        let { workflow, category } = req.query;
+
+        // Validate workflow if provided
+        if (workflow && !SecurityUtils.isValidWorkflow(workflow as string)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_WORKFLOW',
+            message: `Invalid workflow type: ${workflow}`,
+          });
+        }
+
+        // Sanitize category if provided
+        if (category && typeof category === 'string') {
+          category = SecurityUtils.sanitizeInput(category);
+        }
 
         const result = kb.listPractices({
           workflow: workflow as any,
@@ -364,10 +443,23 @@ export class RPracticesWebServer {
           });
         }
 
+        if (!SecurityUtils.isValidWorkflow(workflow)) {
+          return res.status(400).json({
+            error: true,
+            code: 'INVALID_WORKFLOW',
+            message: `Invalid workflow type: ${workflow}`,
+          });
+        }
+
+        // Sanitize optional string inputs
+        const sanitizedProjectName = projectName ? SecurityUtils.sanitizeInput(projectName) : undefined;
+        const sanitizedAuthorName = authorName ? SecurityUtils.sanitizeInput(authorName) : undefined;
+        const sanitizedAuthorEmail = authorEmail ? SecurityUtils.sanitizeInput(authorEmail) : undefined;
+
         const result = await this.templateGenerator.generate(workflow as any, {
-          projectName,
-          authorName,
-          authorEmail,
+          projectName: sanitizedProjectName,
+          authorName: sanitizedAuthorName,
+          authorEmail: sanitizedAuthorEmail,
         });
 
         const hrTime = process.hrtime(startTime);
