@@ -1,180 +1,258 @@
-import { Validator } from '../../engine/validator.js';
-import { WorkflowDetector } from '../../engine/detector.js';
-import { logger } from '../../utils/logger.js';
-import { FileUtils } from '../../utils/file.js';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
-import type { Workflow } from '../../types/workflow.js';
-import type { Severity } from '../../types/finding.js';
+import { Validator } from '../../engine/validator';
+import { WorkflowDetector } from '../../engine/detector';
+import { FileUtils } from '../../utils/file';
+import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
 
-interface ReportOptions {
-  workflow?: string;
-  output?: string;
+export async function reportCommand(args: string[], options: CLIOptions): Promise<void> {
+  const projectPath = getProjectPath(args[0]);
+  const outputPath = options.output ? getProjectPath(options.output as string) : projectPath;
+
+  if (!options.quiet) {
+    CLIFormatter.info(`Generating report for: ${projectPath}`);
+  }
+
+  const exists = await FileUtils.isDirectory(projectPath);
+  if (!exists) {
+    CLIFormatter.error(`Directory not found: ${projectPath}`);
+    process.exit(1);
+  }
+
+  try {
+    const detector = new WorkflowDetector();
+    const validation = new Validator();
+
+    const detectionResult = await detector.detect(projectPath);
+    const validationResult = await validation.validateProject(projectPath, detectionResult.workflow);
+
+    const html = generateHTMLReport(
+      projectPath,
+      detectionResult,
+      validationResult,
+    );
+
+    const reportPath = path.join(outputPath, 'validation-report.html');
+    fs.writeFileSync(reportPath, html);
+
+    if (options.format === 'json') {
+      console.log(JSON.stringify({ reportPath, findings: validationResult.data.findings.length }, null, 2));
+    } else {
+      CLIFormatter.success(`Report generated: ${reportPath}`);
+      if (!options.quiet) {
+        CLIFormatter.info('Open in browser to view interactive report');
+      }
+    }
+  } catch (error) {
+    CLIFormatter.error(`Report generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
 }
 
-function generateHTML(
+function generateHTMLReport(
   projectPath: string,
-  workflow: Workflow,
-  findings: any[],
-  duration: number
+  detection: any,
+  validation: any,
 ): string {
-  const severityColors: Record<Severity, string> = {
-    critical: '#dc2626',
-    important: '#ea580c',
-    recommended: '#eab308',
-    info: '#2563eb',
+  const findings = validation.data.findings;
+  const bySeverity: Record<string, any[]> = {
+    critical: [],
+    important: [],
+    recommended: [],
+    info: [],
   };
 
-  const severityBackgrounds: Record<Severity, string> = {
-    critical: '#fee2e2',
-    important: '#ffedd5',
-    recommended: '#fef3c7',
-    info: '#dbeafe',
-  };
+  findings.forEach((finding: any) => {
+    bySeverity[finding.severity] = bySeverity[finding.severity] || [];
+    bySeverity[finding.severity].push(finding);
+  });
 
-  const countBySeverity = findings.reduce(
-    (acc, f) => {
-      acc[f.severity] = (acc[f.severity] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  const findingsHTML = findings
-    .map(
-      (finding) => `
-    <div style="margin-bottom: 20px; padding: 15px; background-color: ${severityBackgrounds[finding.severity as Severity]}; border-left: 4px solid ${severityColors[finding.severity as Severity]}; border-radius: 4px;">
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-        <span style="font-weight: 600; color: ${severityColors[finding.severity as Severity]};">${finding.severity.toUpperCase()}</span>
-        <span style="background-color: #e5e7eb; padding: 2px 8px; border-radius: 3px; font-size: 12px;">${finding.category}</span>
-      </div>
-      <p style="margin: 0; font-size: 14px; font-weight: 500; color: #1f2937;">${finding.message}</p>
-      ${finding.suggestions && finding.suggestions.length > 0 ? `<p style="margin: 8px 0 0 0; font-size: 13px; color: #4b5563;">💡 ${finding.suggestions[0]}</p>` : ''}
-      ${finding.file ? `<p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">📄 ${finding.file}</p>` : ''}
-    </div>
-  `
-    )
-    .join('');
-
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>R Best Practices - Validation Report</title>
+  <title>R Best Practices Validation Report</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f9fafb; }
-    .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-    header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 8px; margin-bottom: 30px; }
-    header h1 { font-size: 32px; margin-bottom: 10px; }
-    header p { opacity: 0.9; }
-    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-    .summary-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .summary-card h3 { font-size: 14px; color: #6b7280; margin-bottom: 10px; text-transform: uppercase; }
-    .summary-card .value { font-size: 28px; font-weight: 700; }
-    .summary-card.critical .value { color: #dc2626; }
-    .summary-card.important .value { color: #ea580c; }
-    .summary-card.recommended .value { color: #eab308; }
-    .summary-card.info .value { color: #2563eb; }
-    .findings-section { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .findings-section h2 { font-size: 20px; margin-bottom: 20px; }
-    .empty-state { text-align: center; padding: 40px; color: #6b7280; }
-    .empty-state h3 { font-size: 18px; margin-bottom: 10px; }
-    .metadata { font-size: 12px; color: #9ca3af; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #f5f5f5;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px 20px;
+      margin: -20px -20px 40px -20px;
+      text-align: center;
+    }
+    header h1 { font-size: 2em; margin-bottom: 10px; }
+    .metadata {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card h3 { font-size: 0.9em; color: #666; text-transform: uppercase; margin-bottom: 10px; }
+    .card p { font-size: 1.4em; font-weight: bold; color: #667eea; }
+    .findings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .finding-count {
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+      color: white;
+      font-weight: bold;
+    }
+    .critical { background: #ef5350; }
+    .important { background: #ffa726; }
+    .recommended { background: #42a5f5; }
+    .info { background: #66bb6a; }
+    .findings-section {
+      margin-top: 40px;
+    }
+    .findings-section h2 {
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+      margin-bottom: 20px;
+    }
+    .finding {
+      background: white;
+      padding: 20px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+    .finding.critical { border-left-color: #ef5350; }
+    .finding.important { border-left-color: #ffa726; }
+    .finding.recommended { border-left-color: #42a5f5; }
+    .finding.info { border-left-color: #66bb6a; }
+    .finding-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.8em;
+      font-weight: bold;
+      color: white;
+    }
+    .badge.critical { background: #ef5350; }
+    .badge.important { background: #ffa726; }
+    .badge.recommended { background: #42a5f5; }
+    .badge.info { background: #66bb6a; }
+    .suggestions {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+    .suggestions li {
+      list-style: none;
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    .suggestions li:before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #667eea;
+    }
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      text-align: center;
+      color: #666;
+      font-size: 0.9em;
+    }
   </style>
 </head>
 <body>
+  <header>
+    <h1>R Best Practices Validation Report</h1>
+    <p>${projectPath}</p>
+  </header>
+  
   <div class="container">
-    <header>
-      <h1>R Best Practices Validation Report</h1>
-      <p>Comprehensive analysis of your R project</p>
-    </header>
-
-    <div class="summary">
-      <div class="summary-card">
-        <h3>Total Findings</h3>
-        <div class="value">${findings.length}</div>
-      </div>
-      ${
-        countBySeverity['critical']
-          ? `<div class="summary-card critical"><h3>Critical</h3><div class="value">${countBySeverity['critical']}</div></div>`
-          : ''
-      }
-      ${
-        countBySeverity['important']
-          ? `<div class="summary-card important"><h3>Important</h3><div class="value">${countBySeverity['important']}</div></div>`
-          : ''
-      }
-      ${
-        countBySeverity['recommended']
-          ? `<div class="summary-card recommended"><h3>Recommended</h3><div class="value">${countBySeverity['recommended']}</div></div>`
-          : ''
-      }
-      ${
-        countBySeverity['info']
-          ? `<div class="summary-card info"><h3>Info</h3><div class="value">${countBySeverity['info']}</div></div>`
-          : ''
-      }
-    </div>
-
-    <div class="findings-section">
-      <h2>Findings</h2>
-      ${
-        findings.length === 0
-          ? '<div class="empty-state"><h3>✅ All Clear!</h3><p>No issues found in this project</p></div>'
-          : findingsHTML
-      }
-    </div>
-
     <div class="metadata">
-      <strong>Report Details</strong><br>
-      Project: ${projectPath}<br>
-      Workflow: ${workflow}<br>
-      Validation Time: ${duration}ms<br>
-      Generated: ${new Date().toLocaleString()}
+      <div class="card">
+        <h3>Workflow Type</h3>
+        <p>${detection.workflow}</p>
+      </div>
+      <div class="card">
+        <h3>Confidence</h3>
+        <p>${detection.confidence}%</p>
+      </div>
+      <div class="card">
+        <h3>Total Findings</h3>
+        <p>${findings.length}</p>
+      </div>
+      <div class="card">
+        <h3>Analysis Duration</h3>
+        <p>${validation.data.duration}ms</p>
+      </div>
     </div>
+    
+    <div class="findings-grid">
+      <div class="finding-count critical">Critical: ${bySeverity.critical.length}</div>
+      <div class="finding-count important">Important: ${bySeverity.important.length}</div>
+      <div class="finding-count recommended">Recommended: ${bySeverity.recommended.length}</div>
+      <div class="finding-count info">Info: ${bySeverity.info.length}</div>
+    </div>
+    
+    ${['critical', 'important', 'recommended', 'info']
+      .filter((severity) => bySeverity[severity].length > 0)
+      .map(
+        (severity) => `
+    <div class="findings-section">
+      <h2>${severity.toUpperCase()} (${bySeverity[severity].length})</h2>
+      ${bySeverity[severity]
+        .map(
+          (finding) => `
+      <div class="finding ${severity}">
+        <div class="finding-title">
+          <span>${finding.message}</span>
+          <span class="badge ${severity}">${finding.category}</span>
+        </div>
+        ${
+          finding.suggestions && finding.suggestions.length > 0
+            ? `<ul class="suggestions">${finding.suggestions
+                .map((s: string) => `<li>${s}</li>`)
+                .join('')}</ul>`
+            : ''
+        }
+      </div>
+      `,
+        )
+        .join('')}
+    </div>
+    `,
+      )
+      .join('')}
+    
+    <footer>
+      <p>Generated by R Best Practices MCP Server</p>
+      <p>${new Date().toISOString()}</p>
+    </footer>
   </div>
 </body>
-</html>
-  `;
-}
-
-export async function reportCommand(path: string, options: ReportOptions): Promise<void> {
-  const exists = await FileUtils.isDirectory(path);
-  if (!exists) {
-    logger.error(`Directory not found: ${path}`);
-    process.exit(1);
-  }
-
-  // Auto-detect workflow if not specified
-  let workflow = options.workflow as Workflow;
-  if (!workflow) {
-    const detector = new WorkflowDetector();
-    const detection = await detector.detect(path);
-    workflow = detection.workflow;
-  }
-
-  logger.info(`Generating report for: ${path} (workflow: ${workflow})`);
-
-  // Validate project
-  const validator = new Validator();
-  const result = await validator.validateProject(path, workflow);
-
-  // Generate HTML
-  const html = generateHTML(path, workflow, result.findings, result.duration);
-
-  // Determine output file path
-  const outputFile = options.output || `r-practices-report-${Date.now()}.html`;
-
-  // Write HTML file
-  await fs.writeFile(outputFile, html, 'utf-8');
-
-  console.log('\n📊 Report Generated Successfully');
-  console.log('═════════════════════════════════');
-  console.log(`Output:   ${outputFile}`);
-  console.log(`Findings: ${result.findings.length}`);
-  console.log(`Duration: ${result.duration}ms`);
-  console.log('\n✅ Open the HTML file in a browser to view the report\n');
+</html>`;
 }

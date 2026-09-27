@@ -1,87 +1,142 @@
-import { Command } from 'commander';
-import { logger } from '../utils/logger.js';
-import { detectCommand } from './commands/detect.js';
-import { validateCommand } from './commands/validate.js';
-import { templateCommand } from './commands/template.js';
-import { reportCommand } from './commands/report.js';
+import { detectCommand } from './commands/detect';
+import { validateCommand } from './commands/validate';
+import { templateCommand } from './commands/template';
+import { reportCommand } from './commands/report';
+import { CLIFormatter, CLIOptions, ConfigLoader, FileWatcher, parseArgs } from './utils';
 
-export async function createCLI(): Promise<Command> {
-  const program = new Command();
+const HELP_TEXT = `
+R Best Practices CLI
 
-  program
-    .name('r-practices')
-    .description('R Best Practices CLI Tool - Validate and scaffold R projects')
-    .version('1.0.0');
+Usage: r-best-practices <command> [options] [args]
 
-  // Detect command
-  program
-    .command('detect <path>')
-    .description('Detect the R workflow type for a project directory')
-    .option('-j, --json', 'Output as JSON')
-    .action(async (path, options) => {
-      try {
-        await detectCommand(path, options);
-      } catch (error) {
-        logger.error('Error in detect command', error);
+Commands:
+  detect <path>              Detect workflow type for a project
+  validate <path> [workflow] Validate project against best practices
+  template <workflow> [name] Generate a new project scaffold
+  report <path>              Generate HTML validation report
+  help                       Show this help message
+  version                    Show version information
+
+Options:
+  --watch                    Watch for changes and re-validate
+  --output <path>            Output directory for generated files
+  --format <format>          Output format: json, text, html (default: text)
+  --verbose                  Show detailed output
+  --quiet                    Suppress non-essential output
+  --force                    Overwrite existing files
+
+Examples:
+  # Detect workflow type
+  r-best-practices detect /path/to/project
+
+  # Validate project
+  r-best-practices validate /path/to/project package
+
+  # Generate template
+  r-best-practices template shiny my-app --output ~/projects
+
+  # Generate report
+  r-best-practices report /path/to/project --output .
+
+  # Watch mode
+  r-best-practices validate /path/to/project --watch
+`;
+
+export async function run(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0) {
+    console.log(HELP_TEXT);
+    process.exit(0);
+  }
+
+  const { command, args: cmdArgs, options } = parseArgs(args);
+
+  const config = ConfigLoader.loadConfig();
+  const cliOptions: CLIOptions = {
+    watch: options.watch || config.watch,
+    output: options.output || config.output,
+    format: options.format || config.format || 'text',
+    verbose: options.verbose || config.verbose || false,
+    quiet: options.quiet || config.quiet || false,
+  };
+
+  try {
+    switch (command) {
+      case 'detect':
+        await detectCommand(cmdArgs, cliOptions);
+        break;
+
+      case 'validate':
+        await handleValidateCommand(cmdArgs, cliOptions, options.watch);
+        break;
+
+      case 'template':
+        options.name = cmdArgs[1];
+        options.author = options.author || options.a;
+        options.email = options.email || options.e;
+        options.force = options.force || options.f;
+        await templateCommand(cmdArgs, { ...cliOptions, ...options });
+        break;
+
+      case 'report':
+        await reportCommand(cmdArgs, cliOptions);
+        break;
+
+      case 'help':
+        console.log(HELP_TEXT);
+        break;
+
+      case 'version':
+        const pkg = require('../../package.json');
+        console.log(`r-best-practices version ${pkg.version}`);
+        break;
+
+      default:
+        CLIFormatter.error(`Unknown command: ${command}`);
+        console.log(HELP_TEXT);
         process.exit(1);
-      }
-    });
-
-  // Validate command
-  program
-    .command('validate <path>')
-    .description('Validate an R project against best practices')
-    .option('-w, --workflow <type>', 'Specify workflow type (auto-detect if omitted)')
-    .option('-s, --severity <levels>', 'Filter by severity levels (comma-separated)')
-    .option('-c, --category <categories>', 'Filter by categories (comma-separated)')
-    .option('-l, --limit <number>', 'Limit number of findings', '0')
-    .option('-j, --json', 'Output as JSON')
-    .option('--watch', 'Watch for file changes and re-validate')
-    .action(async (path, options) => {
-      try {
-        await validateCommand(path, options);
-      } catch (error) {
-        logger.error('Error in validate command', error);
-        process.exit(1);
-      }
-    });
-
-  // Template command
-  program
-    .command('template <workflow>')
-    .description('Generate a project template for a specific R workflow')
-    .option('-n, --name <name>', 'Project name')
-    .option('-a, --author <name>', 'Author name')
-    .option('-e, --email <email>', 'Author email')
-    .option('-o, --output <dir>', 'Output directory for generated files')
-    .action(async (workflow, options) => {
-      try {
-        await templateCommand(workflow, options);
-      } catch (error) {
-        logger.error('Error in template command', error);
-        process.exit(1);
-      }
-    });
-
-  // Report command
-  program
-    .command('report <path>')
-    .description('Generate an HTML report of project validation')
-    .option('-w, --workflow <type>', 'Specify workflow type (auto-detect if omitted)')
-    .option('-o, --output <file>', 'Output HTML file path')
-    .action(async (path, options) => {
-      try {
-        await reportCommand(path, options);
-      } catch (error) {
-        logger.error('Error in report command', error);
-        process.exit(1);
-      }
-    });
-
-  return program;
+    }
+  } catch (error) {
+    CLIFormatter.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
 }
 
-export async function runCLI(argv: string[]): Promise<void> {
-  const program = await createCLI();
-  await program.parseAsync(argv);
+async function handleValidateCommand(
+  args: string[],
+  options: CLIOptions,
+  watch: boolean = false,
+): Promise<void> {
+  if (watch) {
+    const { FileWatcher } = await import('./utils');
+    const watcher = new FileWatcher();
+    const projectPath = args[0];
+
+    if (!options.quiet) {
+      CLIFormatter.info(`Watching ${projectPath} for changes...`);
+      CLIFormatter.warn('Press Ctrl+C to stop');
+    }
+
+    let isValidating = false;
+
+    watcher.watch(projectPath, async (filePath) => {
+      if (isValidating) return;
+      isValidating = true;
+
+      try {
+        if (!options.quiet) {
+          console.log(`\n${CLIFormatter.colorize(`[${new Date().toLocaleTimeString()}]`, 'gray')} File changed: ${filePath}`);
+        }
+        await validateCommand(args, options);
+      } finally {
+        isValidating = false;
+      }
+    });
+
+    await validateCommand(args, options);
+    await new Promise(() => {});
+  } else {
+    await validateCommand(args, options);
+  }
 }

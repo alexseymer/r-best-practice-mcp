@@ -1,74 +1,83 @@
-import { TemplateGenerator } from '../../engine/template-generator.js';
-import { FileUtils } from '../../utils/file.js';
-import { logger } from '../../utils/logger.js';
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
-import type { Workflow } from '../../types/workflow.js';
+import { TemplateGenerator } from '../../engine/template-generator';
+import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
 
-interface TemplateOptions {
-  name?: string;
-  author?: string;
-  email?: string;
-  output?: string;
-}
+export async function templateCommand(args: string[], options: CLIOptions): Promise<void> {
+  const workflow = args[0];
+  const projectName = args[1] || options.name || 'my-project';
+  const outputPath = options.output ? getProjectPath(options.output as string) : process.cwd();
 
-export async function templateCommand(workflow: string, options: TemplateOptions): Promise<void> {
-  const generator = new TemplateGenerator();
-  const projectName = options.name || 'my-project';
-  const outputDir = options.output || projectName;
-
-  logger.info(`Generating template for ${workflow}: ${projectName}`);
-
-  try {
-    const template = await generator.generate(workflow as Workflow, {
-      projectName,
-      authorName: options.author,
-      authorEmail: options.email,
-    });
-
-    // Create output directory
-    const fullOutputPath = path.resolve(outputDir);
-    await FileUtils.createDirectory(fullOutputPath);
-
-    // Create directory structure
-    for (const dir of template.directories) {
-      const dirPath = path.join(fullOutputPath, dir);
-      await FileUtils.createDirectory(dirPath);
-    }
-
-    // Write files
-    let fileCount = 0;
-    for (const file of template.files) {
-      const filePath = path.join(fullOutputPath, file.path);
-      const fileDir = path.dirname(filePath);
-
-      // Ensure parent directory exists
-      await FileUtils.createDirectory(fileDir);
-
-      // Write file
-      await fs.writeFile(filePath, file.content, 'utf-8');
-      fileCount++;
-    }
-
-    console.log('\n🎯 Template Generated Successfully');
-    console.log('═════════════════════════════════════');
-    console.log(`Workflow:    ${template.workflow}`);
-    console.log(`Output:      ${fullOutputPath}`);
-    console.log(`Files:       ${fileCount}`);
-    console.log(`Directories: ${template.directories.length}`);
-    console.log('\n📂 Project structure created. Next steps:');
-    console.log(`  cd ${projectName}`);
-    if (template.workflow === 'package') {
-      console.log('  devtools::load_all()  # Load package');
-      console.log('  devtools::test()      # Run tests');
-    } else if (template.workflow === 'shiny') {
-      console.log('  shiny::runApp()       # Run Shiny app');
-    } else if (template.workflow === 'quarto') {
-      console.log('  quarto render [file]  # Render document');
-    }
-    console.log('');
-  } catch (error) {
-    logger.error(`Error generating template: ${error}`);
+  if (!workflow) {
+    CLIFormatter.error('Workflow type is required');
+    console.log('Usage: r-best-practices template <workflow> [projectName]');
+    console.log('Workflows: r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis');
     process.exit(1);
   }
+
+  if (!options.quiet) {
+    CLIFormatter.info(`Generating ${workflow} template: ${projectName}`);
+  }
+
+  try {
+    const generator = new TemplateGenerator();
+    const template = await generator.generate(workflow, {
+      projectName,
+      authorName: options.author as string,
+      authorEmail: options.email as string,
+    });
+
+    const projectDir = path.join(outputPath, projectName);
+
+    if (fs.existsSync(projectDir) && !options.force) {
+      CLIFormatter.error(`Directory already exists: ${projectDir}`);
+      CLIFormatter.warn('Use --force to overwrite');
+      process.exit(1);
+    }
+
+    if (!fs.existsSync(projectDir)) {
+      fs.mkdirSync(projectDir, { recursive: true });
+    }
+
+    template.directories.forEach((dir) => {
+      const dirPath = path.join(projectDir, dir);
+      fs.mkdirSync(dirPath, { recursive: true });
+    });
+
+    template.files.forEach((file) => {
+      const filePath = path.join(projectDir, file.path);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, file.content);
+    });
+
+    if (options.format === 'json') {
+      console.log(JSON.stringify({ projectDir, filesCount: template.files.length }, null, 2));
+    } else {
+      displayTemplateResult(projectDir, template);
+    }
+  } catch (error) {
+    CLIFormatter.error(`Template generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+function displayTemplateResult(
+  projectDir: string,
+  template: {
+    files: Array<{ path: string; content: string }>;
+    directories: string[];
+  },
+): void {
+  CLIFormatter.header('Template Generated Successfully');
+
+  console.log(`Location:  ${CLIFormatter.colorize(projectDir, 'cyan')}`);
+  console.log(`Files:     ${template.files.length}`);
+  console.log(`Directories: ${template.directories.length}`);
+
+  CLIFormatter.section('Next Steps');
+  console.log(`  cd ${path.basename(projectDir)}`);
+  console.log(`  # Edit files as needed`);
+  console.log(`  git init`);
+  console.log(`  git add .`);
+  console.log(`  git commit -m "Initial commit"`);
 }
