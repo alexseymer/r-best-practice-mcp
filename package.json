@@ -1,7 +1,7 @@
 {
   "name": "r-best-practices-mcp",
   "version": "1.0.0",
-  "description": "MCP server for R development best practices - enforces standards across R scripts, Quarto, Shiny, packages, and more",
+  "description": "Advanced MCP server for R development best practices - code analysis, performance profiling, dependency management, and automated fixes",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -38,7 +38,12 @@
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "prepublishOnly": "npm run build && npm run test && npm run lint",
-    "version": "npm run format && git add -A"
+    "version": "npm run format && git add -A",
+    "publish:npm": "npm publish --access public",
+    "publish:dry": "npm publish --dry-run",
+    "docker:build": "docker build -t r-best-practices-mcp:latest .",
+    "docker:test": "docker run --rm r-best-practices-mcp:latest npm test",
+    "docker:push": "docker push r-best-practices-mcp:latest"
   },
   "keywords": [
     "mcp",
