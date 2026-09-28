@@ -1,114 +1,77 @@
 import * as vscode from 'vscode';
+import { MCPClient, Finding } from './mcp-client';
 
-interface Finding {
-  id: string;
-  severity: 'critical' | 'important' | 'recommended' | 'info';
-  category: string;
-  message: string;
-  suggestions?: string[];
-  file?: string;
-  line?: number;
-}
-
-export class DiagnosticsManager {
+export class DiagnosticsProvider implements vscode.DiagnosticProvider {
   private diagnosticCollection: vscode.DiagnosticCollection;
-  private diagnosticMap: Map<string, vscode.Diagnostic[]> = new Map();
+  private client: MCPClient;
+  private outputChannel: vscode.OutputChannel;
 
-  constructor() {
-    this.diagnosticCollection = vscode.languages.createDiagnosticCollection('r-practices');
+  constructor(client: MCPClient, outputChannel: vscode.OutputChannel) {
+    this.client = client;
+    this.outputChannel = outputChannel;
+    this.diagnosticCollection = vscode.languages.createDiagnosticCollection('r-best-practices');
   }
 
-  setDiagnostics(uri: vscode.Uri, findings: Finding[]): void {
-    const diagnostics = this.convertFindingsToDiagnostics(findings, uri);
-    this.diagnosticCollection.set(uri, diagnostics);
-    this.diagnosticMap.set(uri.fsPath, diagnostics);
-  }
+  async provideDiagnostics(document: vscode.TextDocument): Promise<void> {
+    try {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+      if (!workspaceFolder) return;
 
-  setProjectDiagnostics(uri: vscode.Uri, findings: Finding[]): void {
-    const fileGrouped = new Map<string, Finding[]>();
+      const validation = await this.client.validateProject(workspaceFolder.uri.fsPath);
+      const diagnostics = this.findingsToDiagnostics(validation.data.findings);
 
-    // Group findings by file
-    for (const finding of findings) {
-      const filePath = finding.file || uri.fsPath;
-      if (!fileGrouped.has(filePath)) {
-        fileGrouped.set(filePath, []);
-      }
-      fileGrouped.get(filePath)!.push(finding);
-    }
-
-    // Set diagnostics for each file
-    for (const [filePath, fileFindings] of fileGrouped) {
-      try {
-        const fileUri = vscode.Uri.file(filePath);
-        const diagnostics = this.convertFindingsToDiagnostics(fileFindings, fileUri);
-        this.diagnosticCollection.set(fileUri, diagnostics);
-        this.diagnosticMap.set(filePath, diagnostics);
-      } catch (error) {
-        console.error(`Failed to set diagnostics for ${filePath}:`, error);
-      }
+      this.diagnosticCollection.set(document.uri, diagnostics);
+    } catch (error) {
+      this.outputChannel.appendLine(`Diagnostics error: ${error}`);
     }
   }
 
-  clear(): void {
+  private findingsToDiagnostics(findings: Finding[]): vscode.Diagnostic[] {
+    const config = vscode.workspace.getConfiguration('r-best-practices');
+    const minSeverity = config.get<string>('severity') || 'recommended';
+    const categories = config.get<string[]>('categories') || [];
+
+    const severityOrder = { critical: 0, important: 1, recommended: 2, info: 3 };
+    const minSeverityLevel = severityOrder[minSeverity as keyof typeof severityOrder] || 2;
+
+    return findings
+      .filter((finding) => {
+        const findingSeverityLevel = severityOrder[finding.severity];
+        const categoryMatch = categories.length === 0 || categories.includes(finding.category);
+        return findingSeverityLevel <= minSeverityLevel && categoryMatch;
+      })
+      .map((finding) => {
+        const range = new vscode.Range(0, 0, 0, 1);
+        const severity = this.mapSeverity(finding.severity);
+        const message = `${finding.message}${finding.suggestions ? '\n' + finding.suggestions.map((s) => `→ ${s}`).join('\n') : ''}`;
+
+        const diagnostic = new vscode.Diagnostic(range, message, severity);
+        diagnostic.code = finding.id;
+        diagnostic.source = 'R Best Practices';
+        diagnostic.tags = finding.severity === 'critical' ? [vscode.DiagnosticTag.Unnecessary] : [];
+
+        return diagnostic;
+      });
+  }
+
+  private mapSeverity(severity: string): vscode.DiagnosticSeverity {
+    const severityMap: Record<string, vscode.DiagnosticSeverity> = {
+      critical: vscode.DiagnosticSeverity.Error,
+      important: vscode.DiagnosticSeverity.Warning,
+      recommended: vscode.DiagnosticSeverity.Information,
+      info: vscode.DiagnosticSeverity.Hint,
+    };
+    return severityMap[severity] || vscode.DiagnosticSeverity.Information;
+  }
+
+  refresh(): void {
     this.diagnosticCollection.clear();
-    this.diagnosticMap.clear();
-  }
-
-  clearFile(uri: vscode.Uri): void {
-    this.diagnosticCollection.delete(uri);
-    this.diagnosticMap.delete(uri.fsPath);
-  }
-
-  getDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
-    return this.diagnosticMap.get(uri.fsPath) || [];
-  }
-
-  private convertFindingsToDiagnostics(findings: Finding[], uri: vscode.Uri): vscode.Diagnostic[] {
-    return findings.map((finding) => {
-      const severity = this.getSeverity(finding.severity);
-      const line = finding.line ? finding.line - 1 : 0;
-      const range = new vscode.Range(line, 0, line, Number.MAX_VALUE);
-
-      const diagnostic = new vscode.Diagnostic(range, finding.message, severity);
-      diagnostic.code = finding.id;
-      diagnostic.source = 'R Best Practices';
-      diagnostic.tags = this.getTags(finding.severity);
-
-      if (finding.suggestions && finding.suggestions.length > 0) {
-        const codeAction = new vscode.CodeAction(finding.suggestions[0], vscode.CodeActionKind.QuickFix);
-        codeAction.diagnostics = [diagnostic];
-        diagnostic.relatedInformation = [
-          new vscode.DiagnosticRelatedInformation(
-            new vscode.Location(uri, range),
-            finding.suggestions[0]
-          ),
-        ];
-      }
-
-      return diagnostic;
+    const editors = vscode.window.visibleTextEditors;
+    editors.forEach((editor) => {
+      this.provideDiagnostics(editor.document).catch((error) => {
+        this.outputChannel.appendLine(`Refresh error: ${error}`);
+      });
     });
-  }
-
-  private getSeverity(severity: string): vscode.DiagnosticSeverity {
-    switch (severity) {
-      case 'critical':
-        return vscode.DiagnosticSeverity.Error;
-      case 'important':
-        return vscode.DiagnosticSeverity.Warning;
-      case 'recommended':
-        return vscode.DiagnosticSeverity.Information;
-      case 'info':
-        return vscode.DiagnosticSeverity.Hint;
-      default:
-        return vscode.DiagnosticSeverity.Information;
-    }
-  }
-
-  private getTags(severity: string): vscode.DiagnosticTag[] {
-    if (severity === 'critical') {
-      return [vscode.DiagnosticTag.Unnecessary];
-    }
-    return [];
   }
 
   dispose(): void {

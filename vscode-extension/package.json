@@ -1,125 +1,170 @@
 {
-  "name": "r-practices",
+  "name": "r-best-practices",
   "displayName": "R Best Practices",
-  "description": "Real-time R development best practices validation and assistance",
-  "version": "0.1.0",
+  "description": "Real-time validation and best practices for R projects",
+  "version": "0.3.0",
   "publisher": "alexseymer",
-  "repository": "https://github.com/alexseymer/r-best-practice-mcp",
+  "license": "MIT",
+  "author": {
+    "name": "Alex Seymer",
+    "email": "alexseymer@gmail.com"
+  },
+  "homepage": "https://github.com/alexseymer/r-best-practices-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexseymer/r-best-practices-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alexseymer/r-best-practices-mcp/issues"
+  },
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.70.0",
+    "node": ">=18.0.0"
   },
   "categories": [
     "Linters",
-    "Snippets"
+    "Formatters",
+    "Other"
   ],
   "keywords": [
     "r",
-    "r-programming",
-    "best-practices",
+    "rstats",
     "validation",
-    "linting"
+    "best-practices",
+    "linter",
+    "workflow"
   ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#667eea",
+    "theme": "dark"
+  },
   "activationEvents": [
     "workspaceContains:**/*.R",
+    "workspaceContains:**/*.r",
     "workspaceContains:**/*.Rmd",
     "workspaceContains:**/*.qmd",
-    "workspaceContains:DESCRIPTION"
+    "workspaceContains:DESCRIPTION",
+    "onLanguage:r",
+    "onCommand:r-best-practices.detect",
+    "onCommand:r-best-practices.validate",
+    "onCommand:r-best-practices.generateTemplate",
+    "onCommand:r-best-practices.showReport"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "r-practices.validate",
-        "title": "R Practices: Validate Project"
+        "command": "r-best-practices.detect",
+        "title": "R Best Practices: Detect Workflow",
+        "description": "Detect the R workflow type for current project"
       },
       {
-        "command": "r-practices.detectWorkflow",
-        "title": "R Practices: Detect Workflow Type"
+        "command": "r-best-practices.validate",
+        "title": "R Best Practices: Validate Project",
+        "description": "Validate current project against best practices"
       },
       {
-        "command": "r-practices.generateTemplate",
-        "title": "R Practices: Generate Template"
+        "command": "r-best-practices.validateFile",
+        "title": "R Best Practices: Validate File",
+        "description": "Validate current file against best practices"
       },
       {
-        "command": "r-practices.showReport",
-        "title": "R Practices: Show Report"
+        "command": "r-best-practices.generateTemplate",
+        "title": "R Best Practices: Generate Template",
+        "description": "Generate a new R project scaffold"
       },
       {
-        "command": "r-practices.fixIssue",
-        "title": "R Practices: Quick Fix"
+        "command": "r-best-practices.showReport",
+        "title": "R Best Practices: Show Report",
+        "description": "Show validation report for current project"
+      },
+      {
+        "command": "r-best-practices.toggleAutoValidation",
+        "title": "R Best Practices: Toggle Auto-Validation",
+        "description": "Toggle automatic validation on file save"
       }
     ],
-    "configuration": {
-      "title": "R Best Practices",
-      "properties": {
-        "r-practices.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable R Best Practices validation"
-        },
-        "r-practices.validateOnSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Validate project on file save"
-        },
-        "r-practices.validateOnOpen": {
-          "type": "boolean",
-          "default": false,
-          "description": "Validate project when workspace is opened"
-        },
-        "r-practices.minSeverity": {
-          "type": "string",
-          "enum": [
-            "critical",
-            "important",
-            "recommended",
-            "info"
-          ],
-          "default": "recommended",
-          "description": "Minimum severity level to show"
-        },
-        "r-practices.maxFindings": {
-          "type": "integer",
-          "default": 50,
-          "minimum": 1,
-          "description": "Maximum number of findings to display"
-        },
-        "r-practices.serverPath": {
-          "type": "string",
-          "default": "r-practices",
-          "description": "Path to r-practices CLI tool or MCP server"
-        }
-      }
-    },
     "keybindings": [
       {
-        "command": "r-practices.validate",
+        "command": "r-best-practices.validate",
         "key": "shift+alt+v",
-        "when": "editorLangId in r-practices.languages"
+        "mac": "shift+cmd+v",
+        "when": "editorFocus && (editorLangId == r || resourceFilename =~ /\\.(R|Rmd|qmd)$/)"
+      },
+      {
+        "command": "r-best-practices.validateFile",
+        "key": "shift+alt+f",
+        "mac": "shift+cmd+f",
+        "when": "editorFocus && (editorLangId == r || resourceFilename =~ /\\.(R|Rmd|qmd)$/)"
+      }
+    ],
+    "configuration": [
+      {
+        "title": "R Best Practices",
+        "properties": {
+          "r-best-practices.autoValidate": {
+            "type": "boolean",
+            "default": true,
+            "description": "Automatically validate project on file save"
+          },
+          "r-best-practices.severity": {
+            "type": "string",
+            "enum": ["critical", "important", "recommended", "info"],
+            "default": "recommended",
+            "description": "Minimum severity level for diagnostics"
+          },
+          "r-best-practices.categories": {
+            "type": "array",
+            "default": [],
+            "description": "Filter diagnostics by category (empty = all)"
+          },
+          "r-best-practices.enableCodeActions": {
+            "type": "boolean",
+            "default": true,
+            "description": "Enable quick fixes and code actions"
+          },
+          "r-best-practices.showNotifications": {
+            "type": "boolean",
+            "default": true,
+            "description": "Show validation notifications"
+          },
+          "r-best-practices.serverPath": {
+            "type": "string",
+            "default": "localhost:3000",
+            "description": "Path to R Best Practices MCP server"
+          }
+        }
       }
     ],
     "languages": [
       {
         "id": "r",
-        "extensions": [
-          ".R",
-          ".r"
-        ]
+        "extensions": [".R", ".r"],
+        "filenames": ["DESCRIPTION", ".Rprofile"],
+        "aliases": ["R", "Rscript"],
+        "mimetypes": ["text/x-r", "application/x-r"]
       }
     ]
   },
   "scripts": {
+    "vscode:prepublish": "npm run build",
     "build": "tsc -p ./",
-    "watch": "tsc -w -p ./",
-    "package": "vsce package",
-    "publish": "vsce publish"
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run build && npm run lint",
+    "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.80.0",
-    "typescript": "^5.0.0"
+    "@types/vscode": "^1.70.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vscode-test": "^1.6.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^0.1.0"
   }
 }
