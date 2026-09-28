@@ -9,6 +9,11 @@ import {
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
+import { ComplexityAnalyzer } from './engine/complexity-analyzer.js';
+import { DependencyAnalyzer } from './engine/dependency-analyzer.js';
+import { PerformanceAnalyzer } from './engine/performance-analyzer.js';
+import { CustomRuleEngine } from './engine/custom-rules.js';
+import { AutomatedFixer } from './engine/automated-fixer.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
@@ -18,6 +23,11 @@ export class RPracticesMCPServer {
   private detector: WorkflowDetector;
   private validator: Validator;
   private templateGenerator: TemplateGenerator;
+  private complexityAnalyzer: ComplexityAnalyzer;
+  private dependencyAnalyzer: DependencyAnalyzer;
+  private performanceAnalyzer: PerformanceAnalyzer;
+  private ruleEngine: CustomRuleEngine;
+  private fixer: AutomatedFixer;
 
   constructor() {
     this.server = new Server({
@@ -27,6 +37,11 @@ export class RPracticesMCPServer {
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
+    this.complexityAnalyzer = new ComplexityAnalyzer();
+    this.dependencyAnalyzer = new DependencyAnalyzer();
+    this.performanceAnalyzer = new PerformanceAnalyzer();
+    this.ruleEngine = new CustomRuleEngine();
+    this.fixer = new AutomatedFixer();
     this.setupHandlers();
   }
 
@@ -149,6 +164,88 @@ export class RPracticesMCPServer {
             required: ['workflow'],
           },
         },
+        {
+          name: 'analyze_complexity',
+          description: 'Analyze code complexity metrics of an R project',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Directory path to analyze',
+              },
+            },
+            required: ['path'],
+          },
+        },
+        {
+          name: 'analyze_dependencies',
+          description: 'Analyze project dependencies and package usage',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Directory path to analyze',
+              },
+            },
+            required: ['path'],
+          },
+        },
+        {
+          name: 'analyze_performance',
+          description: 'Analyze performance issues and optimization opportunities',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Directory path to analyze',
+              },
+            },
+            required: ['path'],
+          },
+        },
+        {
+          name: 'apply_custom_rules',
+          description: 'Apply custom rules to a project',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Directory path to analyze',
+              },
+              workflow: {
+                type: 'string',
+                description: 'Optional workflow type',
+              },
+            },
+            required: ['path'],
+          },
+        },
+        {
+          name: 'get_fix_suggestion',
+          description: 'Get automated fix suggestion for a finding',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              findingId: {
+                type: 'string',
+                description: 'Finding ID to get fix for',
+              },
+              filePath: {
+                type: 'string',
+                description: 'Path to the file with the finding',
+              },
+              lineNumber: {
+                type: 'number',
+                description: 'Optional line number of the finding',
+              },
+            },
+            required: ['findingId', 'filePath'],
+          },
+        },
       ],
     };
   }
@@ -181,6 +278,21 @@ export class RPracticesMCPServer {
           break;
         case 'generate_template':
           result = await this.generateTemplate(args);
+          break;
+        case 'analyze_complexity':
+          result = await this.analyzeComplexity(args);
+          break;
+        case 'analyze_dependencies':
+          result = await this.analyzeDependencies(args);
+          break;
+        case 'analyze_performance':
+          result = await this.analyzePerformance(args);
+          break;
+        case 'apply_custom_rules':
+          result = await this.applyCustomRules(args);
+          break;
+        case 'get_fix_suggestion':
+          result = await this.getFixSuggestion(args);
           break;
         default:
           result = {
@@ -346,6 +458,184 @@ export class RPracticesMCPServer {
       return {
         error: true,
         code: 'TEMPLATE_GENERATION_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async analyzeComplexity(args: Record<string, unknown>): Promise<unknown> {
+    const path = args.path as string;
+
+    const exists = await FileUtils.isDirectory(path);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'PATH_NOT_FOUND',
+        message: `Directory not found: ${path}`,
+      };
+    }
+
+    try {
+      const result = await this.complexityAnalyzer.analyzeProject(path);
+      return {
+        error: false,
+        data: result,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error analyzing complexity for ${path}`, error);
+      return {
+        error: true,
+        code: 'ANALYSIS_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async analyzeDependencies(args: Record<string, unknown>): Promise<unknown> {
+    const path = args.path as string;
+
+    const exists = await FileUtils.isDirectory(path);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'PATH_NOT_FOUND',
+        message: `Directory not found: ${path}`,
+      };
+    }
+
+    try {
+      const result = await this.dependencyAnalyzer.analyzeProject(path);
+      return {
+        error: false,
+        data: result,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error analyzing dependencies for ${path}`, error);
+      return {
+        error: true,
+        code: 'ANALYSIS_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async analyzePerformance(args: Record<string, unknown>): Promise<unknown> {
+    const path = args.path as string;
+
+    const exists = await FileUtils.isDirectory(path);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'PATH_NOT_FOUND',
+        message: `Directory not found: ${path}`,
+      };
+    }
+
+    try {
+      const result = await this.performanceAnalyzer.analyzeProject(path);
+      return {
+        error: false,
+        data: result,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error analyzing performance for ${path}`, error);
+      return {
+        error: true,
+        code: 'ANALYSIS_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async applyCustomRules(args: Record<string, unknown>): Promise<unknown> {
+    const path = args.path as string;
+    const workflow = args.workflow as string | undefined;
+
+    const exists = await FileUtils.isDirectory(path);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'PATH_NOT_FOUND',
+        message: `Directory not found: ${path}`,
+      };
+    }
+
+    try {
+      await this.ruleEngine.loadCustomRules(path);
+      const rFiles = await FileUtils.listFiles(path, '**/*.R', true);
+      const violations: any[] = [];
+
+      for (const file of rFiles) {
+        const content = await FileUtils.readFile(file);
+        const fileViolations = await this.ruleEngine.applyRules(file, content, workflow);
+        violations.push(...fileViolations);
+      }
+
+      return {
+        error: false,
+        data: {
+          totalViolations: violations.length,
+          violations,
+          rules: this.ruleEngine.getRules(),
+        },
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error applying custom rules for ${path}`, error);
+      return {
+        error: true,
+        code: 'ANALYSIS_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  private async getFixSuggestion(args: Record<string, unknown>): Promise<unknown> {
+    const findingId = args.findingId as string;
+    const filePath = args.filePath as string;
+    const lineNumber = args.lineNumber as number | undefined;
+
+    const exists = await FileUtils.exists(filePath);
+    if (!exists) {
+      return {
+        error: true,
+        code: 'FILE_NOT_FOUND',
+        message: `File not found: ${filePath}`,
+      };
+    }
+
+    try {
+      const content = await FileUtils.readFile(filePath);
+      const lines = content.split('\n');
+
+      // Create a mock finding object
+      const finding = {
+        id: findingId,
+        severity: 'important' as const,
+        category: 'style',
+        message: 'Finding to fix',
+      };
+
+      const fix = await this.fixer.fixFinding(finding, content, lines);
+      const suggestion = this.fixer.generateFixSuggestion(finding);
+
+      return {
+        error: false,
+        data: {
+          findingId,
+          fix,
+          suggestion,
+        },
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      logger.error(`Error generating fix for ${findingId}`, error);
+      return {
+        error: true,
+        code: 'FIX_ERROR',
         message: error instanceof Error ? error.message : 'Unknown error',
       };
     }

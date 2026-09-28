@@ -36,12 +36,30 @@ export class FileUtils {
 
   static async listFiles(
     dirPath: string,
-    pattern?: RegExp,
+    pattern?: string | RegExp,
     recursive: boolean = false
   ): Promise<string[]> {
     const files: string[] = [];
 
-    const traverse = async (dir: string) => {
+    // Convert glob pattern to regex if needed
+    let regex: RegExp | undefined;
+    if (pattern) {
+      if (typeof pattern === 'string') {
+        // Convert glob pattern to regex
+        const globToRegex = (glob: string) => {
+          const regexPattern = glob
+            .replace(/\./g, '\\.')
+            .replace(/\*/g, '[^/]*')
+            .replace(/\*\*\//g, '(.*/)?');
+          return new RegExp(`^${regexPattern}$`);
+        };
+        regex = globToRegex(pattern);
+      } else {
+        regex = pattern;
+      }
+    }
+
+    const traverse = async (dir: string, relativePath: string = '') => {
       const entries = await fs.promises.readdir(dir, { withFileTypes: true });
 
       for (const entry of entries) {
@@ -49,11 +67,12 @@ export class FileUtils {
         if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
 
         const fullPath = path.join(dir, entry.name);
+        const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
 
         if (entry.isDirectory() && recursive) {
-          await traverse(fullPath);
+          await traverse(fullPath, relPath);
         } else if (entry.isFile()) {
-          if (!pattern || pattern.test(entry.name)) {
+          if (!regex || regex.test(relPath) || regex.test(entry.name)) {
             files.push(fullPath);
           }
         }
