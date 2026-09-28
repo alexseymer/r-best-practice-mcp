@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileUtils } from '../utils/file';
+import { globalCache } from '../utils/cache';
 
 export type RuleType = 'regex' | 'function' | 'structure' | 'naming' | 'documentation';
 export type RuleSeverity = 'info' | 'recommended' | 'important' | 'critical';
@@ -32,6 +33,7 @@ export interface RuleViolation {
 
 export class CustomRuleEngine {
   private rules: Map<string, CustomRule> = new Map();
+  private compiledPatterns: Map<string, RegExp> = new Map();
 
   constructor() {
     this.initializeDefaultRules();
@@ -195,6 +197,10 @@ export class CustomRuleEngine {
   }
 
   async applyRules(filePath: string, content: string, workflow?: string): Promise<RuleViolation[]> {
+    const cacheKey = `violations:${filePath}:${workflow || 'all'}:${content.length}`;
+    const cached = globalCache.get<RuleViolation[]>(cacheKey);
+    if (cached) return cached;
+
     const violations: RuleViolation[] = [];
     const lines = content.split('\n');
 
@@ -206,6 +212,7 @@ export class CustomRuleEngine {
       violations.push(...ruleViolations);
     }
 
+    globalCache.set(cacheKey, violations, 60000); // 1 minute cache
     return violations;
   }
 
@@ -213,7 +220,20 @@ export class CustomRuleEngine {
     const violations: RuleViolation[] = [];
 
     if (rule.type === 'regex' && rule.pattern) {
-      const pattern = typeof rule.pattern === 'string' ? new RegExp(rule.pattern, 'g') : rule.pattern;
+      let pattern: RegExp;
+
+      if (typeof rule.pattern === 'string') {
+        const cacheKey = `pattern:${rule.id}`;
+        if (this.compiledPatterns.has(cacheKey)) {
+          pattern = this.compiledPatterns.get(cacheKey)!;
+        } else {
+          pattern = new RegExp(rule.pattern, 'g');
+          this.compiledPatterns.set(cacheKey, pattern);
+        }
+      } else {
+        pattern = rule.pattern;
+      }
+
       lines.forEach((line, index) => {
         const match = line.match(pattern);
         if (match) {

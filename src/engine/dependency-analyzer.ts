@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileUtils } from '../utils/file';
+import { globalCache } from '../utils/cache';
 
 export interface Dependency {
   name: string;
@@ -31,6 +32,10 @@ export class DependencyAnalyzer {
   private usedDependencies: Set<string> = new Set();
 
   async analyzeProject(projectPath: string): Promise<DependencyAnalysis> {
+    const cacheKey = `dependency:project:${projectPath}`;
+    const cached = globalCache.get<DependencyAnalysis>(cacheKey);
+    if (cached) return cached;
+
     this.declaredDependencies.clear();
     this.usedDependencies.clear();
 
@@ -40,7 +45,9 @@ export class DependencyAnalyzer {
     // Parse R files for used packages
     await this.parseUsedPackages(projectPath);
 
-    return this.generateAnalysis();
+    const result = this.generateAnalysis();
+    globalCache.set(cacheKey, result, 120000); // 2 minute cache
+    return result;
   }
 
   private async parseDependencies(projectPath: string): Promise<void> {

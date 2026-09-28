@@ -1,4 +1,5 @@
 import { FileUtils } from '../utils/file';
+import { globalCache } from '../utils/cache';
 
 export interface PerformanceIssue {
   file: string;
@@ -20,6 +21,10 @@ export interface PerformanceAnalysis {
 
 export class PerformanceAnalyzer {
   async analyzeProject(projectPath: string): Promise<PerformanceAnalysis> {
+    const cacheKey = `performance:project:${projectPath}`;
+    const cached = globalCache.get<PerformanceAnalysis>(cacheKey);
+    if (cached) return cached;
+
     const rFiles = await FileUtils.listFiles(projectPath, '**/*.R', true);
     const issues: PerformanceIssue[] = [];
 
@@ -33,7 +38,9 @@ export class PerformanceAnalyzer {
       }
     }
 
-    return this.generateAnalysis(issues);
+    const result = this.generateAnalysis(issues);
+    globalCache.set(cacheKey, result, 120000); // 2 minute cache
+    return result;
   }
 
   private analyzeFile(filePath: string, content: string): PerformanceIssue[] {

@@ -1,7 +1,5 @@
-import { Finding } from '../types';
-
 export interface CodeFix {
-  finding: Finding;
+  finding: any;
   originalCode: string;
   fixedCode: string;
   confidence: number;
@@ -9,7 +7,7 @@ export interface CodeFix {
 }
 
 export class AutomatedFixer {
-  async fixFinding(finding: Finding, content: string, lines: string[]): Promise<CodeFix | null> {
+  async fixFinding(finding: { id: string; line?: number }, content: string, lines: string[]): Promise<CodeFix | null> {
     switch (finding.id) {
       case 'style-spaces':
         return this.fixSpacingAroundOperators(finding, content, lines);
@@ -24,7 +22,7 @@ export class AutomatedFixer {
     }
   }
 
-  private fixSpacingAroundOperators(finding: Finding, content: string, lines: string[]): CodeFix | null {
+  private fixSpacingAroundOperators(finding: { id: string; line?: number }, content: string, lines: string[]): CodeFix | null {
     const line = lines[finding.line ? finding.line - 1 : 0];
     if (!line) return null;
 
@@ -45,7 +43,7 @@ export class AutomatedFixer {
     };
   }
 
-  private fixSnakeCasing(finding: Finding, content: string, lines: string[]): CodeFix | null {
+  private fixSnakeCasing(finding: { id: string; line?: number }, content: string, lines: string[]): CodeFix | null {
     const line = lines[finding.line ? finding.line - 1 : 0];
     if (!line) return null;
 
@@ -72,7 +70,7 @@ export class AutomatedFixer {
     };
   }
 
-  private fixAttachUsage(finding: Finding, content: string, lines: string[]): CodeFix | null {
+  private fixAttachUsage(finding: { id: string; line?: number }, content: string, lines: string[]): CodeFix | null {
     const line = lines[finding.line ? finding.line - 1 : 0];
     if (!line) return null;
 
@@ -94,7 +92,7 @@ export class AutomatedFixer {
     };
   }
 
-  private addRoxygenDoc(finding: Finding, content: string, lines: string[]): CodeFix | null {
+  private addRoxygenDoc(finding: { id: string; line?: number }, content: string, lines: string[]): CodeFix | null {
     const line = lines[finding.line ? finding.line - 1 : 0];
     if (!line) return null;
 
@@ -138,7 +136,7 @@ export class AutomatedFixer {
     return lines.join('\n');
   }
 
-  generateFixSuggestion(finding: Finding): string {
+  generateFixSuggestion(finding: { id: string }): string {
     const suggestions: Record<string, string> = {
       'style-spaces': 'Add spaces around operators for better readability',
       'naming-snake_case': 'Rename function to use snake_case convention',

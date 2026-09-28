@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileUtils } from '../utils/file';
+import { globalCache } from '../utils/cache';
 
 export interface ComplexityMetric {
   file: string;
@@ -32,7 +33,21 @@ export interface ComplexityFinding {
 }
 
 export class ComplexityAnalyzer {
+  private static readonly patterns = {
+    ifStatement: /\bif\s*\(/g,
+    elseIfStatement: /\belse\s+if\s*\(/g,
+    forLoop: /\bfor\s*\(/g,
+    whileLoop: /\bwhile\s*\(/g,
+    repeatBlock: /\brepeat\s*\{/g,
+    switchStatement: /\bswitch\s*\(/g,
+    lapplyFamily: /\b(lapply|sapply|mapply|vapply)\s*\(/g,
+  };
+
   async analyzeProject(projectPath: string): Promise<ProjectComplexity> {
+    const cacheKey = `complexity:project:${projectPath}`;
+    const cached = globalCache.get<ProjectComplexity>(cacheKey);
+    if (cached) return cached;
+
     const rFiles = await FileUtils.listFiles(projectPath, '**/*.R', true);
     const metrics: ComplexityMetric[] = [];
 
@@ -45,7 +60,9 @@ export class ComplexityAnalyzer {
       }
     }
 
-    return this.aggregateMetrics(metrics);
+    const result = this.aggregateMetrics(metrics);
+    globalCache.set(cacheKey, result, 120000); // 2 minute cache
+    return result;
   }
 
   private async analyzeFile(filePath: string): Promise<ComplexityMetric> {
@@ -84,13 +101,13 @@ export class ComplexityAnalyzer {
   private calculateCyclomaticComplexity(content: string): number {
     let complexity = 1;
 
-    const ifMatches = content.match(/\bif\s*\(/g) || [];
-    const elseMatches = content.match(/\belse\s+if\s*\(/g) || [];
-    const forMatches = content.match(/\bfor\s*\(/g) || [];
-    const whileMatches = content.match(/\bwhile\s*\(/g) || [];
-    const repeatMatches = content.match(/\brepeat\s*\{/g) || [];
-    const switchMatches = content.match(/\bswitch\s*\(/g) || [];
-    const lapplyMatches = content.match(/\b(lapply|sapply|mapply|vapply)\s*\(/g) || [];
+    const ifMatches = content.match(ComplexityAnalyzer.patterns.ifStatement) || [];
+    const elseMatches = content.match(ComplexityAnalyzer.patterns.elseIfStatement) || [];
+    const forMatches = content.match(ComplexityAnalyzer.patterns.forLoop) || [];
+    const whileMatches = content.match(ComplexityAnalyzer.patterns.whileLoop) || [];
+    const repeatMatches = content.match(ComplexityAnalyzer.patterns.repeatBlock) || [];
+    const switchMatches = content.match(ComplexityAnalyzer.patterns.switchStatement) || [];
+    const lapplyMatches = content.match(ComplexityAnalyzer.patterns.lapplyFamily) || [];
 
     complexity += ifMatches.length + elseMatches.length + forMatches.length + whileMatches.length;
     complexity += repeatMatches.length + switchMatches.length + lapplyMatches.length;
@@ -165,7 +182,8 @@ export class ComplexityAnalyzer {
         });
       }
 
-      if (metric.linesOfCode > 500 && metric.commentPercentage < 0.1) {
+      const commentPercentage = this.getCommentPercentage(metric);
+      if (metric.linesOfCode > 500 && commentPercentage < 0.1) {
         findings.push({
           file: metric.file,
           message: `Large file (${metric.linesOfCode} LOC) with minimal comments`,
@@ -189,4 +207,5 @@ export class ComplexityAnalyzer {
   // Helper to get comment percentage for a metric
   private getCommentPercentage(metric: ComplexityMetric): number {
     return metric.linesOfCode > 0 ? metric.commentLines / metric.linesOfCode : 0;
+  }
 }
