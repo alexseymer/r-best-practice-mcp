@@ -1,997 +1,779 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>R Best Practices - Modern Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
 
-        :root {
-            --color-accent: #0ea5e9;
-            --color-accent-light: #38bdf8;
-            --color-accent-dark: #0284c7;
-            --color-success: #10b981;
-            --color-warning: #f59e0b;
-            --color-error: #ef4444;
-            --color-info: #06b6d4;
-            --color-bg: #ffffff;
-            --color-bg-secondary: #f8fafc;
-            --color-bg-tertiary: #f1f5f9;
-            --color-text: #0f172a;
-            --color-text-secondary: #475569;
-            --color-border: #e2e8f0;
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --color-bg: #0f172a;
-                --color-bg-secondary: #1e293b;
-                --color-bg-tertiary: #334155;
-                --color-text: #f1f5f9;
-                --color-text-secondary: #cbd5e0;
-                --color-border: #475569;
-            }
-        }
-
-        html, body {
-            height: 100%;
-            width: 100%;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: var(--color-bg);
-            color: var(--color-text);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        /* HEADER - Glassmorphism Effect */
-        .header {
-            position: relative;
-            padding: 3.5rem 2rem;
-            overflow: hidden;
-            border-bottom: 1px solid var(--color-border);
-            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
-        }
-
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -40%;
-            right: -15%;
-            width: 800px;
-            height: 800px;
-            background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .header::after {
-            content: '';
-            position: absolute;
-            bottom: -20%;
-            left: -10%;
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 800;
-            color: white;
-            margin-bottom: 0.5rem;
-            letter-spacing: -0.02em;
-        }
-
-        .header p {
-            font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.95);
-            max-width: 500px;
-        }
-
-        .header-badges {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .badge {
-            background: rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        /* MAIN CONTAINER */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 3rem 2rem;
-        }
-
-        /* SECTION HEADING */
-        .section-heading {
-            margin-bottom: 2.5rem;
-        }
-
-        .section-heading h2 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--color-text);
-        }
-
-        .section-heading p {
-            color: var(--color-text-secondary);
-            font-size: 1rem;
-        }
-
-        /* GRID LAYOUTS */
-        .grid {
-            display: grid;
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .grid-2 {
-            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-        }
-
-        .grid-3 {
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        }
-
-        .grid-4 {
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        }
-
-        /* CARD COMPONENT - Premium Styling */
-        .card {
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--color-accent) 0%, transparent 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .card:hover {
-            border-color: var(--color-accent);
-            box-shadow: 0 20px 25px -5px rgba(14, 165, 233, 0.1);
-            transform: translateY(-4px);
-        }
-
-        .card:hover::before {
-            opacity: 1;
-        }
-
-        .card-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .card h3 {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--color-text);
-        }
-
-        .card p {
-            color: var(--color-text-secondary);
-            font-size: 0.95rem;
-            margin-bottom: 1.5rem;
-            line-height: 1.6;
-        }
-
-        /* FORM STYLING */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-
-        label {
-            display: block;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--color-text);
-            margin-bottom: 0.5rem;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 0.875rem 1rem;
-            border: 1.5px solid var(--color-border);
-            border-radius: var(--radius-md);
-            font-size: 0.95rem;
-            background: var(--color-bg);
-            color: var(--color-text);
-            transition: var(--transition);
-            font-family: inherit;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--color-accent);
-            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
-            background: var(--color-bg);
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        /* BUTTON STYLES */
-        .btn {
-            padding: 0.875rem 1.5rem;
-            border: none;
-            border-radius: var(--radius-md);
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            white-space: nowrap;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
-            color: white;
-            width: 100%;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(14, 165, 233, 0.2);
-        }
-
-        .btn-primary:active {
-            transform: translateY(0);
-        }
-
-        .btn-secondary {
-            background: var(--color-bg-secondary);
-            color: var(--color-accent);
-            border: 2px solid var(--color-accent);
-        }
-
-        .btn-secondary:hover {
-            background: var(--color-accent);
-            color: white;
-        }
-
-        .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-        }
-
-        /* TABS */
-        .tabs {
-            display: flex;
-            gap: 0;
-            border-bottom: 2px solid var(--color-border);
-            margin-bottom: 2rem;
-        }
-
-        .tab-btn {
-            padding: 1rem 1.5rem;
-            border: none;
-            background: transparent;
-            color: var(--color-text-secondary);
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            border-bottom: 3px solid transparent;
-            transition: var(--transition);
-            position: relative;
-        }
-
-        .tab-btn:hover {
-            color: var(--color-text);
-        }
-
-        .tab-btn.active {
-            color: var(--color-accent);
-            border-bottom-color: var(--color-accent);
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* STAT BOXES */
-        .stat-box {
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            transition: var(--transition);
-        }
-
-        .stat-box:hover {
-            border-color: var(--color-accent);
-            transform: translateY(-2px);
-        }
-
-        .stat-content h4 {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--color-text);
-        }
-
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        /* FINDINGS/RESULTS */
-        .findings {
-            background: var(--color-bg-secondary);
-            border-radius: var(--radius-lg);
-            padding: 2rem;
-            margin-top: 1.5rem;
-        }
-
-        .finding-item {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            background: var(--color-bg);
-            border-left: 4px solid var(--color-info);
-            border-radius: var(--radius-md);
-            transition: var(--transition);
-        }
-
-        .finding-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .finding-item:hover {
-            background: var(--color-bg-tertiary);
-            transform: translateX(4px);
-        }
-
-        .finding-item.critical {
-            border-left-color: var(--color-error);
-        }
-
-        .finding-item.important {
-            border-left-color: var(--color-warning);
-        }
-
-        .finding-item.recommended {
-            border-left-color: var(--color-info);
-        }
-
-        .finding-item.success {
-            border-left-color: var(--color-success);
-        }
-
-        .finding-icon {
-            flex-shrink: 0;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .finding-item.critical .finding-icon {
-            background: var(--color-error);
-        }
-
-        .finding-item.important .finding-icon {
-            background: var(--color-warning);
-        }
-
-        .finding-item.recommended .finding-icon,
-        .finding-item.info .finding-icon {
-            background: var(--color-info);
-        }
-
-        .finding-item.success .finding-icon {
-            background: var(--color-success);
-        }
-
-        .finding-content {
-            flex: 1;
-        }
-
-        .finding-title {
-            font-weight: 600;
-            color: var(--color-text);
-            margin-bottom: 0.25rem;
-        }
-
-        .finding-message {
-            font-size: 0.9rem;
-            color: var(--color-text-secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .finding-suggestions {
-            font-size: 0.85rem;
-            color: var(--color-text-secondary);
-            list-style: none;
-        }
-
-        .finding-suggestions li {
-            margin-left: 0;
-            padding-left: 0;
-            margin-top: 0.25rem;
-        }
-
-        .finding-suggestions li:before {
-            content: '→ ';
-            color: var(--color-accent);
-            font-weight: 600;
-            margin-right: 0.25rem;
-        }
-
-        /* PROGRESS BAR */
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: var(--color-border);
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 1rem 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
-            border-radius: 4px;
-            transition: width 0.5s ease;
-        }
-
-        /* CONFIDENCE INDICATOR */
-        .confidence {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin: 1rem 0;
-        }
-
-        .confidence-label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-        }
-
-        .confidence-value {
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: var(--color-accent);
-        }
-
-        /* ALERTS */
-        .alert {
-            padding: 1rem 1.5rem;
-            border-radius: var(--radius-md);
-            margin-bottom: 1rem;
-            border-left: 4px solid;
-            animation: slideDown 0.3s ease;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .alert-success {
-            background: rgba(16, 185, 129, 0.1);
-            border-left-color: var(--color-success);
-            color: var(--color-success);
-        }
-
-        .alert-error {
-            background: rgba(239, 68, 68, 0.1);
-            border-left-color: var(--color-error);
-            color: var(--color-error);
-        }
-
-        .alert-info {
-            background: rgba(6, 182, 212, 0.1);
-            border-left-color: var(--color-info);
-            color: var(--color-info);
-        }
-
-        /* EMPTY STATE */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            color: var(--color-text-secondary);
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-
-        .empty-state h3 {
-            font-size: 1.3rem;
-            color: var(--color-text);
-            margin-bottom: 0.5rem;
-        }
-
-        /* FOOTER */
-        .footer {
-            text-align: center;
-            padding: 2rem;
-            border-top: 1px solid var(--color-border);
-            color: var(--color-text-secondary);
-            font-size: 0.9rem;
-            margin-top: 3rem;
-        }
-
-        /* RESPONSIVE */
-        @media (max-width: 768px) {
-            .container {
-                padding: 1.5rem;
-            }
-
-            .header {
-                padding: 2rem 1rem;
-            }
-
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .grid-2, .grid-3, .grid-4 {
-                grid-template-columns: 1fr;
-            }
-
-            .card {
-                padding: 1.5rem;
-            }
-
-            .header-badges {
-                flex-direction: column;
-            }
-
-            .badge {
-                width: 100%;
-                text-align: center;
-            }
-
-            .tabs {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-
-            .tab-btn {
-                padding: 0.75rem 1rem;
-                font-size: 0.85rem;
-            }
-        }
-
-        /* DARK MODE SPECIFIC */
-        @media (prefers-color-scheme: dark) {
-            input, select, textarea {
-                background: var(--color-bg-secondary);
-            }
-
-            input:focus, select:focus, textarea:focus {
-                background: var(--color-bg-secondary);
-            }
-        }
-
-        /* UTILITY CLASSES */
-        .hidden {
-            display: none !important;
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .mt-1 { margin-top: 0.5rem; }
-        .mt-2 { margin-top: 1rem; }
-        .mt-3 { margin-top: 1.5rem; }
-        .mt-4 { margin-top: 2rem; }
-
-        .mb-1 { margin-bottom: 0.5rem; }
-        .mb-2 { margin-bottom: 1rem; }
-        .mb-3 { margin-bottom: 1.5rem; }
-        .mb-4 { margin-bottom: 2rem; }
-
-        .text-muted {
-            color: var(--color-text-secondary);
-        }
-
-        .font-bold {
-            font-weight: 700;
-        }
-
-        .font-mono {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-size: 0.85rem;
-        }
-    </style>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>R Best Practices MCP - Enterprise Code Quality Engine</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Geist & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "error": "#ba1a1a",
+            "secondary-container": "#dae2fd",
+            "outline": "#707881",
+            "error-container": "#ffdad6",
+            "on-background": "#0b1c30",
+            "on-primary-fixed": "#001d31",
+            "on-tertiary-fixed": "#00174b",
+            "telemetry-indigo": "#6366F1",
+            "surface-card": "#FFFFFF",
+            "tertiary-fixed-dim": "#b4c5ff",
+            "surface-container-high": "#dce9ff",
+            "surface-dim": "#cbdbf5",
+            "tertiary-fixed": "#dbe1ff",
+            "outline-variant": "#bfc7d2",
+            "on-secondary": "#ffffff",
+            "surface-container": "#e5eeff",
+            "surface-bright": "#f8f9ff",
+            "on-secondary-container": "#5c647a",
+            "on-surface": "#0b1c30",
+            "primary-fixed-dim": "#93ccff",
+            "border-subtle": "#E2E8F0",
+            "telemetry-emerald": "#10B981",
+            "surface-container-lowest": "#ffffff",
+            "telemetry-rose": "#F43F5E",
+            "primary-fixed": "#cce5ff",
+            "on-primary-fixed-variant": "#004b73",
+            "surface-tint": "#006398",
+            "on-tertiary": "#ffffff",
+            "surface-canvas": "#F8FAFC",
+            "surface-variant": "#d3e4fe",
+            "secondary": "#565e74",
+            "primary-container": "#007bb9",
+            "on-primary-container": "#fdfcff",
+            "on-surface-variant": "#3f4850",
+            "primary": "#006194",
+            "telemetry-amber": "#F59E0B",
+            "surface-container-highest": "#d3e4fe",
+            "on-tertiary-container": "#fefcff",
+            "secondary-fixed-dim": "#bec6e0",
+            "r-accent": "#0EA5E9",
+            "border-strong": "#CBD5E1",
+            "inverse-surface": "#213145",
+            "on-tertiary-fixed-variant": "#003ea8",
+            "tertiary": "#0051d5",
+            "tertiary-container": "#316bf3",
+            "surface-container-low": "#eff4ff",
+            "surface": "#f8f9ff",
+            "background": "#f8f9ff",
+            "on-error-container": "#93000a",
+            "inverse-primary": "#93ccff",
+            "on-primary": "#ffffff",
+            "on-error": "#ffffff",
+            "inverse-on-surface": "#eaf1ff",
+            "on-secondary-fixed-variant": "#3f465c",
+            "secondary-fixed": "#dae2fd",
+            "on-secondary-fixed": "#131b2e"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.125rem",
+            "lg": "0.25rem",
+            "xl": "0.5rem",
+            "full": "0.75rem",
+            "card": "1rem"
+          },
+          "spacing": {
+            "gutter": "1rem",
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-3xl": "3rem",
+            "margin-desktop": "2rem",
+            "space-xl": "1.5rem",
+            "gutter-desktop": "1.5rem",
+            "space-2xl": "2rem",
+            "space-2xs": "0.125rem",
+            "space-lg": "1rem",
+            "space-xs": "0.25rem",
+            "margin": "1rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Geist"],
+            "code-md": ["JetBrains Mono"],
+            "display-lg": ["Geist"],
+            "body-md": ["Geist"],
+            "headline-md": ["Geist"],
+            "headline-lg-mobile": ["Geist"],
+            "body-lg": ["Geist"],
+            "label-md": ["Geist"],
+            "headline-sm": ["Geist"],
+            "headline-lg": ["Geist"],
+            "code-sm": ["JetBrains Mono"],
+            "body-sm": ["Geist"]
+          },
+          "fontSize": {
+            "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+            "code-md": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+            "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+            "body-lg": ["15px", {"lineHeight": "24px", "fontWeight": "400"}],
+            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+            "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+            "headline-lg": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "600"}],
+            "code-sm": ["11px", {"lineHeight": "16px", "fontWeight": "500"}],
+            "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      vertical-align: middle;
+      display: inline-block;
+      line-height: 1;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+  </style>
 </head>
-<body>
-    <!-- HEADER -->
-    <header class="header">
-        <div class="header-content">
-            <h1>🚀 R Best Practices</h1>
-            <p>Professional validation, detection, and generation tools for R projects</p>
-            <div class="header-badges">
-                <span class="badge">✨ Production Ready</span>
-                <span class="badge">⚡ Fast Analysis</span>
-                <span class="badge">🎯 Accurate Results</span>
-            </div>
+<body class="bg-surface-canvas text-on-surface antialiased min-h-screen flex flex-col font-body-md text-body-md selection:bg-r-accent selection:text-white">
+<!-- ================= TOP APP BAR (from Shared Components JSON) ================= -->
+<header class="bg-surface-card sticky top-0 z-50 shadow-sm border-b border-border-subtle w-full">
+<div class="flex justify-between items-center w-full px-space-lg h-14 max-w-full">
+<!-- Left: Search & Brand Identity -->
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-r-accent to-primary flex items-center justify-center text-white font-bold text-headline-sm shadow-sm">
+            R
+          </div>
+<span class="text-headline-sm font-headline-sm font-bold text-on-surface tracking-tight">
+            R Best Practices MCP
+          </span>
+<span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-surface-container text-primary border border-primary-fixed-dim">
+            v1.4.2 stdio
+          </span>
+</div>
+<!-- Integrated Search on Left -->
+<div class="relative hidden lg:block w-72">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">search</span>
+<input class="w-full pl-9 pr-4 py-1.5 bg-surface-canvas border border-border-strong rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent" placeholder="Search rules, diagnostics, AST heuristics..." type="text"/>
+</div>
+</div>
+<!-- Center / Desktop Navigation Links from JSON: ["Validate", "Detect", "Generate", "Practices"] -->
+<nav class="hidden md:flex items-center space-x-6 h-14">
+<button class="h-full inline-flex items-center px-1 text-primary border-b-2 border-primary font-semibold text-label-md font-label-md transition-colors duration-150 active:scale-[0.99]">
+          Validate
+        </button>
+<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
+          Detect
+        </button>
+<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
+          Generate
+        </button>
+<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
+          Practices
+        </button>
+</nav>
+<!-- Trailing Actions from JSON -->
+<div class="flex items-center gap-space-sm">
+<button class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-canvas hover:bg-surface-container-low border border-border-subtle rounded-lg text-label-md font-label-md text-on-surface font-medium transition-colors">
+<span class="material-symbols-outlined text-[16px] text-secondary">menu_book</span>
+          Docs
+        </button>
+<button class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-r-accent to-primary text-white rounded-lg text-label-md font-label-md font-medium shadow-sm hover:shadow transition-all duration-150 active:scale-[0.98]">
+<span class="material-symbols-outlined text-[16px]">play_arrow</span>
+          Run Audit
+        </button>
+<div class="h-5 w-px bg-border-subtle mx-1"></div>
+<button class="p-1.5 text-secondary hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" title="MCP Terminal">
+<span class="material-symbols-outlined text-[20px]">terminal</span>
+</button>
+<button class="p-1.5 text-secondary hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" title="Settings">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+<div class="w-7 h-7 rounded-full bg-surface-container border border-border-subtle flex items-center justify-center text-primary font-semibold text-label-sm" title="User workspace profile avatar">
+          RA
         </div>
-    </header>
-
-    <div class="container">
-        <!-- QUICK STATS -->
-        <div class="section-heading">
-            <h2>Dashboard Overview</h2>
-            <p>Monitor your R project health and best practice compliance</p>
+</div>
+</div>
+</header>
+<!-- ================= HERO / HEADER SECTION (~280px) ================= -->
+<section class="relative overflow-hidden bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#0F172A] text-white py-10 px-space-lg sm:px-space-xl border-b border-slate-700/40">
+<!-- Subtle radial glow effects -->
+<div class="absolute -right-20 -top-24 w-96 h-96 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute left-1/4 -bottom-32 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="max-w-[1400px] mx-auto relative z-10">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<!-- Left: Branding & Tagline -->
+<div class="space-y-3 max-w-3xl">
+<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-label-sm font-label-sm shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            MCP PROTOCOL ENGINE • R 4.3+ AST PARSER READY
+          </div>
+<h1 class="text-white text-display-lg font-display-lg tracking-tight">
+            R Best Practices
+          </h1>
+<p class="text-cyan-50/90 text-body-lg font-body-lg max-w-2xl leading-relaxed">
+            Enterprise R development validation, workflow heuristics &amp; automated code quality engine. Deterministic static checks, targets dependency resolution, and CRAN-grade telemetry.
+          </p>
+<!-- Glassmorphism Status Badges with backdrop blur -->
+<div class="flex flex-wrap items-center gap-2.5 pt-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[15px] text-emerald-300">verified</span>
+              Production Ready
+            </span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[15px] text-cyan-300">bolt</span>
+              Fast Analysis (&lt;1s)
+            </span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[15px] text-indigo-200">account_tree</span>
+              Accurate Results (100% AST Rules)
+            </span>
+</div>
+</div>
+<!-- Right: Quick Workspace Path Switcher Chip -->
+<div class="flex flex-col items-start md:items-end gap-2 shrink-0">
+<div class="text-cyan-100/70 text-label-sm font-label-sm font-medium">ACTIVE MCP WORKSPACE</div>
+<div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/15 hover:border-white/30 text-white transition-all shadow-inner">
+<span class="material-symbols-outlined text-[18px] text-cyan-400">folder_open</span>
+<div class="font-code-sm text-code-sm text-slate-100 font-medium">
+              ~/projects/clinical-genomics-pipeline
+            </div>
+<button class="p-1 hover:bg-white/10 rounded transition-colors text-slate-300 hover:text-white" title="Switch R Project Workspace">
+<span class="material-symbols-outlined text-[16px]">swap_horiz</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= MAIN CONTENT CONTAINER ================= -->
+<main class="max-w-[1400px] w-full mx-auto px-space-lg sm:px-space-xl -mt-6 pb-space-3xl relative z-20 flex-1">
+<!-- ================= QUICK STATS BAR (4 Metric Cards) ================= -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<!-- Card 1: Supported Workflows -->
+<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-r-accent to-primary"></div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">SUPPORTED WORKFLOWS</div>
+<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">9</div>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[26px]">account_tree</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
+<span class="text-telemetry-emerald font-semibold flex items-center">
+<span class="material-symbols-outlined text-[14px]">check</span> Auto-detected
+          </span>
+<span>targets, Shiny, Quarto +6</span>
+</div>
+</div>
+<!-- Card 2: Best Practices -->
+<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">BEST PRACTICES</div>
+<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">52+</div>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-r-accent group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[26px]">rule</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
+<span class="text-primary font-semibold">Tidyverse &amp; Bioconductor</span> standards
         </div>
-
-        <div class="grid grid-4">
-            <div class="stat-box">
-                <div class="stat-content">
-                    <h4>Supported Workflows</h4>
-                    <div class="stat-value">9</div>
+</div>
+<!-- Card 3: Analysis Speed -->
+<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-r-accent"></div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">ANALYSIS SPEED</div>
+<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">&lt;1s</div>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-telemetry-amber group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[26px]">bolt</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
+<span class="text-telemetry-emerald font-semibold">AST Cache Hit</span>
+<span>mean runtime 140ms</span>
+</div>
+</div>
+<!-- Card 4: Rule Coverage -->
+<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
+<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-600"></div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">RULE COVERAGE</div>
+<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">100%</div>
+</div>
+<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-telemetry-emerald group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined text-[26px]">verified_user</span>
+</div>
+</div>
+<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
+<span class="text-telemetry-emerald font-semibold">Deterministic</span>
+<span>Zero LLM hallucination</span>
+</div>
+</div>
+</div>
+<!-- ================= MAIN TAB INTERFACE ================= -->
+<div class="bg-surface-card rounded-[16px] border border-slate-200/80 shadow-sm overflow-hidden mb-8">
+<!-- Tab Header Strip -->
+<div class="border-b border-border-subtle bg-surface-canvas/60 px-6 pt-3 flex flex-wrap items-center justify-between gap-4">
+<!-- 4 Specified Tabs -->
+<nav aria-label="Tabs" class="flex space-x-8">
+<!-- Tab 1: Validate Project (Active Default) -->
+<button class="relative py-3 px-1 inline-flex items-center gap-2 text-primary font-semibold text-body-md font-body-md border-b-2 border-r-accent -mb-px group">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+            Validate Project
+            <span class="px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-surface-container text-primary font-semibold">
+              4 Issues
+            </span>
+</button>
+<!-- Tab 2: Detect Workflow -->
+<button class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
+<span class="material-symbols-outlined text-[18px]">radar</span>
+            Detect Workflow
+            <span class="px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-slate-200/70 text-slate-700">
+              Targets 98%
+            </span>
+</button>
+<!-- Tab 3: Generate Template -->
+<button class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+            Generate Template
+          </button>
+<!-- Tab 4: Browse Practices -->
+<button class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
+<span class="material-symbols-outlined text-[18px]">menu_book</span>
+            Browse Practices
+            <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">52</span>
+</button>
+</nav>
+<!-- Right Side: Engine Controls & Real-time Indicator -->
+<div class="flex items-center gap-3 pb-2 sm:pb-0">
+<div class="flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            AST Parser: <span class="font-code-sm text-on-surface">tree-sitter-r</span>
+</div>
+<button class="p-1.5 text-secondary hover:text-on-surface rounded hover:bg-slate-100" title="Refresh Diagnostics">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+</button>
+</div>
+</div>
+<!-- Tab Content Canvas: Dual-Pane Grid Layout -->
+<div class="p-6 lg:p-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- ================= LEFT COLUMN: Project Validation Controls ================= -->
+<div class="lg:col-span-5 space-y-6">
+<div class="bg-surface-canvas rounded-xl p-5 border border-border-subtle">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
+<h3 class="text-headline-sm font-headline-sm text-on-surface">Validation Scope</h3>
+</div>
+<span class="text-label-sm font-label-sm text-secondary font-medium">Session #8104</span>
+</div>
+<!-- Project Path Input -->
+<div class="space-y-1.5 mb-4">
+<label class="block text-label-md font-label-md text-on-surface font-semibold">
+                  Project Workspace Path
+                </label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">folder</span>
+<input class="w-full pl-9 pr-3 py-2 bg-white border border-border-strong rounded-lg text-code-md font-code-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent" type="text" value="/Users/analyst/projects/clinical-genomics-pipeline"/>
+</div>
+<p class="text-label-sm font-label-sm text-secondary">Absolute path to R workspace or Git repository root.</p>
+</div>
+<!-- Workflow Type Dropdown Selector -->
+<div class="space-y-1.5 mb-4">
+<label class="block text-label-md font-label-md text-on-surface font-semibold">
+                  Workflow Archetype
+                </label>
+<select class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent">
+<option selected="">Auto-detect (Recommended: Targets Pipeline)</option>
+<option>Targets Data Pipeline (_targets.R)</option>
+<option>R Package Development (DESCRIPTION)</option>
+<option>Quarto Scientific Report (.qmd)</option>
+<option>Shiny Web Application (app.R)</option>
+<option>Plumber Microservice API</option>
+<option>Renv Reproducible Environment</option>
+<option>Standalone R Analysis Script</option>
+</select>
+</div>
+<!-- Checkbox / Toggle Switches -->
+<div class="space-y-3 pt-2 pb-4 border-y border-border-subtle">
+<div class="flex items-center justify-between">
+<div>
+<div class="text-body-md font-body-md font-medium text-on-surface">Auto-fix Safe Violations</div>
+<div class="text-label-sm font-label-sm text-secondary">Apply automated codemods for naming &amp; style rules</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-r-accent"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-body-md font-body-md font-medium text-on-surface">Strict Bioconductor Lints</div>
+<div class="text-label-sm font-label-sm text-secondary">Enforce S4 method signatures &amp; object slot bounds</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox"/>
+<div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-r-accent"></div>
+</label>
+</div>
+</div>
+<!-- Primary Gradient Action Button -->
+<div class="mt-5">
+<button class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-headline-sm text-headline-sm font-semibold shadow-md hover:shadow-lg hover:from-cyan-500 hover:to-blue-700 transition-all flex items-center justify-center gap-2 active:scale-[0.99]">
+<span class="material-symbols-outlined text-[20px]">play_circle</span>
+                  Run Project Audit
+                </button>
+</div>
+</div>
+<!-- Standalone File Validator Mini-Card -->
+<div class="bg-surface-card rounded-xl p-4 border border-dashed border-border-strong text-center">
+<div class="flex flex-col items-center gap-1.5">
+<span class="material-symbols-outlined text-secondary text-[24px]">description</span>
+<span class="text-body-sm font-body-sm font-semibold text-on-surface">Quick Standalone File Validator</span>
+<p class="text-label-sm font-label-sm text-secondary max-w-xs">Drop an individual .R, .Rmd or .qmd file to run targeted AST static heuristics without parsing the whole pipeline.</p>
+<button class="mt-2 text-label-md font-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1">
+<span>Browse single file</span>
+<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Workflow Detection Heuristics Meter (Integrated preview) -->
+<div class="bg-surface-card rounded-xl p-5 border border-border-subtle shadow-sm">
+<div class="flex items-center justify-between mb-3">
+<div class="text-body-md font-body-md font-semibold text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-r-accent text-[18px]">radar</span>
+                  Workflow Detection Heuristics
                 </div>
-                <div class="stat-icon">📦</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-content">
-                    <h4>Best Practices</h4>
-                    <div class="stat-value">52+</div>
-                </div>
-                <div class="stat-icon">✓</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-content">
-                    <h4>Analysis Speed</h4>
-                    <div class="stat-value">&lt;1s</div>
-                </div>
-                <div class="stat-icon">⚡</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-content">
-                    <h4>Coverage</h4>
-                    <div class="stat-value">100%</div>
-                </div>
-                <div class="stat-icon">🎯</div>
-            </div>
+<span class="text-label-sm font-label-sm font-code-sm text-primary font-medium">9 Signatures</span>
+</div>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between text-label-sm font-label-sm mb-1">
+<span class="font-medium text-on-surface">Targets Pipeline Architecture</span>
+<span class="font-code-sm font-bold text-primary">98% match</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-cyan-400 to-primary rounded-full" style="width: 98%"></div>
+</div>
+<div class="text-[10px] text-secondary mt-0.5">Matched `_targets.R` and `tar_target()` symbols in 14 files</div>
+</div>
+<div>
+<div class="flex justify-between text-label-sm font-label-sm mb-1">
+<span class="font-medium text-on-surface">Quarto Analytical Report</span>
+<span class="font-code-sm font-bold text-slate-700">94% match</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full" style="width: 94%"></div>
+</div>
+<div class="text-[10px] text-secondary mt-0.5">Detected `_quarto.yml` metadata config &amp; rendering chunks</div>
+</div>
+<div>
+<div class="flex justify-between text-label-sm font-label-sm mb-1">
+<span class="font-medium text-on-surface">Renv Lockfile Environment</span>
+<span class="font-code-sm font-bold text-emerald-700">100% synchronized</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-emerald-500 rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ================= RIGHT COLUMN: Audit Findings & Diagnostics ================= -->
+<div class="lg:col-span-7 space-y-4">
+<div class="flex items-center justify-between pb-2">
+<div>
+<h2 class="text-headline-md font-headline-md text-on-surface">Audit Findings &amp; Diagnostics</h2>
+<p class="text-body-sm font-body-sm text-secondary">
+                  Analysis completed in <span class="font-code-sm text-primary font-semibold">142ms</span> • 4 files inspected • 4 recommendations
+                </p>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded bg-error-container text-on-error-container text-label-sm font-label-sm font-bold">
+                  1 CRITICAL
+                </span>
+<span class="px-2.5 py-1 rounded bg-amber-100 text-amber-900 text-label-sm font-label-sm font-bold">
+                  1 WARNING
+                </span>
+</div>
+</div>
+<!-- Finding 1: Critical (Red #ef4444 left border & badge) -->
+<div class="bg-surface-card rounded-xl p-4 border border-border-subtle border-l-4 border-l-red-500 shadow-sm transition-all hover:shadow-md">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] font-code-sm font-semibold bg-red-100 text-red-800 border border-red-200">
+                    CRITICAL
+                  </span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">R/pipeline_stages.R:88</span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Rule: [TAR-CIRC-04]</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface mt-2">
+                Circular targets dependency detected in DAG graph
+              </h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Target <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded text-red-700">fit_cox_model</code> depends on <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded text-red-700">filtered_cohort</code>, which references the output of <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded text-red-700">fit_cox_model$coefficients</code>. This causes a deadlock during pipeline execution.
+              </p>
+<div class="mt-3 p-2.5 bg-slate-900 rounded-lg text-slate-200 text-code-sm font-code-sm overflow-x-auto">
+<div class="text-slate-400"># Targets DAG Graph Cycle</div>
+<div><span class="text-red-400 font-bold">×</span> tar_target(fit_cox_model, run_regression(filtered_cohort))</div>
+<div><span class="text-red-400 font-bold">×</span> tar_target(filtered_cohort, prune_patients(raw_data, threshold = fit_cox_model$cutoff))</div>
+</div>
+<div class="mt-3 flex items-center justify-between text-label-sm font-label-sm">
+<span class="text-red-700 font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">error</span>
+                  Execution will fail on `tar_make()`
+                </span>
+<button class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-on-surface font-semibold transition-colors">
+                  Isolate Node DAG
+                </button>
+</div>
+</div>
+<!-- Finding 2: Warning (Orange #f59e0b left border with code diff block) -->
+<div class="bg-surface-card rounded-xl p-4 border border-border-subtle border-l-4 border-l-amber-500 shadow-sm transition-all hover:shadow-md">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] font-code-sm font-semibold bg-amber-100 text-amber-900 border border-amber-200">
+                    WARNING
+                  </span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">R/helpers/utils.R:14</span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Rule: [PKG-NAMESPACE-02]</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface mt-2">
+                Bare library() call in helper script instead of explicit imports
+              </h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Attaching whole packages via <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded">library(dplyr)</code> inside modular files pollutes the global namespace. Use <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded">box::use()</code> or package namespace qualified calls.
+              </p>
+<!-- Code Diff Block -->
+<div class="mt-3 rounded-lg overflow-hidden border border-border-subtle font-code-sm text-code-sm">
+<div class="bg-slate-800 text-slate-300 px-3 py-1 text-label-sm flex justify-between">
+<span>Diff: R/helpers/utils.R</span>
+<span>Unified Format</span>
+</div>
+<div class="bg-red-50 text-red-900 px-3 py-1 border-l-4 border-red-500 flex items-center">
+<span class="select-none text-red-400 w-5">-</span>
+<span>library(dplyr)</span>
+</div>
+<div class="bg-red-50 text-red-900 px-3 py-1 border-l-4 border-red-500 flex items-center">
+<span class="select-none text-red-400 w-5">-</span>
+<span>library(stringr)</span>
+</div>
+<div class="bg-emerald-50 text-emerald-900 px-3 py-1 border-l-4 border-emerald-500 flex items-center">
+<span class="select-none text-emerald-500 w-5">+</span>
+<span>box::use(dplyr[select, filter, mutate], stringr[str_extract])</span>
+</div>
+</div>
+<div class="mt-3 flex items-center justify-between text-label-sm font-label-sm">
+<span class="text-amber-800 font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">warning</span>
+                  Namespace collisions possible with `stats::filter`
+                </span>
+<button class="px-2.5 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-semibold transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">auto_fix_high</span>
+                  Apply Box Codemod
+                </button>
+</div>
+</div>
+<!-- Finding 3: Info / Style (Cyan #06b6d4 left border) -->
+<div class="bg-surface-card rounded-xl p-4 border border-border-subtle border-l-4 border-l-cyan-500 shadow-sm transition-all hover:shadow-md">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] font-code-sm font-semibold bg-cyan-100 text-cyan-900 border border-cyan-200">
+                    INFO / STYLE
+                  </span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">R/pipeline_stages.R:142</span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Rule: [STYLE-SNAKE-01]</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface mt-2">
+                Snake_case naming convention violation
+              </h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Object identifier <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded text-primary">PatientCohort_MasterDF</code> uses mixed CamelCase. R best practices mandate deterministic snake_case identifiers: <code class="font-code-sm text-code-sm bg-slate-100 px-1 py-0.5 rounded text-emerald-700">patient_cohort_master_df</code>.
+              </p>
+<div class="mt-3 flex items-center justify-between text-label-sm font-label-sm">
+<span class="text-cyan-800 font-medium">Auto-fixable safely via AST variable renaming</span>
+<button class="px-2.5 py-1 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-900 border border-cyan-200 font-semibold transition-colors flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">bolt</span>
+                  Quick Auto-Fix
+                </button>
+</div>
+</div>
+<!-- Finding 4: Success (Green #10b981 left border) -->
+<div class="bg-surface-card rounded-xl p-4 border border-border-subtle border-l-4 border-l-emerald-500 shadow-sm">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded text-[11px] font-code-sm font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200">
+                    SUCCESS / PASS
+                  </span>
+<span class="font-code-sm text-code-sm font-medium text-on-surface">renv.lock</span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary">Rule: [ENV-REPRO-01]</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface mt-2">
+                Valid renv.lock lockfile synchronized
+              </h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                All 68 declared package dependencies possess exact hashes matched against the Posit Public Package Manager snapshot. Fully reproducible across Docker containers.
+              </p>
+</div>
+</div>
+</div>
+<!-- ================= BROWSE PRACTICES PREVIEW (6-Card Grid) ================= -->
+<div class="mt-12 pt-8 border-t border-border-subtle">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
+<div>
+<h3 class="text-headline-md font-headline-md text-on-surface">
+                Browse Practices &amp; Knowledge Base
+              </h3>
+<p class="text-body-sm font-body-sm text-secondary">
+                Curated heuristics for modern enterprise R development across engineering disciplines.
+              </p>
+</div>
+<a class="text-label-md font-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1" href="#practices">
+<span>View all 52 rules in catalog</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- Category 1: Package Structure -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">inventory_2</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Package Structure</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                DESCRIPTION standards, R/ directory organization, internal vs exported symbol demarcation, and clean NAMESPACE exports.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>12 Rules</span> • <span>CRAN Compliant</span>
+</div>
+</div>
+<!-- Category 2: Documentation -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">auto_stories</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Documentation</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                roxygen2 tags, parameter validation examples, markdown vignette styling, and reproducible executable code chunks.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>8 Rules</span> • <span>pkgdown Ready</span>
+</div>
+</div>
+<!-- Category 3: Testing -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">fact_check</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Testing</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                testthat 3e edition patterns, snapshot testing for analytical plots, mock fixtures with httptest2, and code coverage minimums.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>10 Rules</span> • <span>CI Automated</span>
+</div>
+</div>
+<!-- Category 4: Naming Conventions -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">spellcheck</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Naming Conventions</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Snake_case standard enforcement, tidyverse verb consistency (verbs for actions, nouns for objects), and prefix matching rules.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>6 Rules</span> • <span>Linter Enforced</span>
+</div>
+</div>
+<!-- Category 5: Performance -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">speed</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Performance</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Vectorization, pre-allocation of lists, data.table indexing, memory leak detection in long-running Shiny reactive graphs.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>9 Rules</span> • <span>Benchmarked</span>
+</div>
+</div>
+<!-- Category 6: Security -->
+<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
+<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
+<span class="material-symbols-outlined text-[22px]">security</span>
+</div>
+<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Security</h4>
+<p class="text-body-sm font-body-sm text-secondary mt-1">
+                Safe SQL parameterized queries in DBI/glue_sql, credential isolation via keyring/Sys.getenv(), and sanitized user inputs.
+              </p>
+<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
+<span>7 Rules</span> • <span>OWASP Aligned</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- ================= FOOTER ================= -->
+<footer class="bg-white border-t border-border-subtle py-8 px-space-lg text-secondary text-body-sm font-body-sm">
+<div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 rounded bg-primary text-white flex items-center justify-center font-bold text-xs">
+          R
         </div>
-
-        <!-- MAIN TOOLS SECTION -->
-        <div class="section-heading mt-4">
-            <h2>Validation & Analysis Tools</h2>
-            <p>Comprehensive project analysis and best practice validation</p>
-        </div>
-
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('validate')">Validate Project</button>
-            <button class="tab-btn" onclick="switchTab('detect')">Detect Workflow</button>
-            <button class="tab-btn" onclick="switchTab('generate')">Generate Template</button>
-            <button class="tab-btn" onclick="switchTab('practices')">Browse Practices</button>
-        </div>
-
-        <!-- VALIDATE TAB -->
-        <div id="validate" class="tab-content active">
-            <div class="grid grid-2">
-                <div class="card">
-                    <div class="card-icon">✓</div>
-                    <h3>Validate Project</h3>
-                    <p>Analyze your entire R project against best practices for your workflow type.</p>
-                    <form>
-                        <div class="form-group">
-                            <label for="project-path">Project Path</label>
-                            <input type="text" id="project-path" placeholder="/path/to/your/project" />
-                        </div>
-                        <div class="form-group">
-                            <label for="project-workflow">Workflow Type (Optional)</label>
-                            <select id="project-workflow">
-                                <option value="">Auto-detect</option>
-                                <option value="r-script">R Script</option>
-                                <option value="package">R Package</option>
-                                <option value="shiny">Shiny App</option>
-                                <option value="quarto">Quarto Document</option>
-                                <option value="rmarkdown">R Markdown</option>
-                                <option value="analysis">Data Analysis</option>
-                                <option value="targets">Targets Pipeline</option>
-                                <option value="plumber">Plumber API</option>
-                                <option value="renv">Renv Project</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-primary">Run Validation</button>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <div class="card-icon">📄</div>
-                    <h3>Validate File</h3>
-                    <p>Validate individual R files for code quality and style best practices.</p>
-                    <form>
-                        <div class="form-group">
-                            <label for="file-path">File Path</label>
-                            <input type="text" id="file-path" placeholder="/path/to/script.R" />
-                        </div>
-                        <div class="form-group">
-                            <label for="file-workflow">Workflow Context (Optional)</label>
-                            <select id="file-workflow">
-                                <option value="">General</option>
-                                <option value="package">Package</option>
-                                <option value="shiny">Shiny</option>
-                                <option value="analysis">Analysis</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-primary">Validate File</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="findings">
-                <div class="alert alert-success">
-                    <strong>✓ No findings detected!</strong> Your project follows best practices.
-                </div>
-            </div>
-        </div>
-
-        <!-- DETECT TAB -->
-        <div id="detect" class="tab-content">
-            <div class="card">
-                <div class="card-icon">🔍</div>
-                <h3>Workflow Detection</h3>
-                <p>Automatically detect your R project's workflow type based on file structure and configuration.</p>
-                <form>
-                    <div class="form-group">
-                        <label for="detect-path">Project Path</label>
-                        <input type="text" id="detect-path" placeholder="/path/to/project" />
-                    </div>
-                    <button type="button" class="btn btn-primary">Detect Workflow</button>
-                </form>
-
-                <div class="findings mt-4">
-                    <div class="finding-item success">
-                        <div class="finding-icon">✓</div>
-                        <div class="finding-content">
-                            <div class="finding-title">Workflow: R Package</div>
-                            <div class="finding-message">Detected with 95% confidence</div>
-                            <div class="confidence">
-                                <span class="confidence-label">Confidence:</span>
-                                <span class="confidence-value">95%</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: 95%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- GENERATE TAB -->
-        <div id="generate" class="tab-content">
-            <div class="card">
-                <div class="card-icon">⚙️</div>
-                <h3>Generate Template</h3>
-                <p>Create a new R project scaffold with best practices built-in for your workflow.</p>
-                <form>
-                    <div class="form-group">
-                        <label for="gen-workflow">Workflow Type *</label>
-                        <select id="gen-workflow" required>
-                            <option value="">Select a workflow...</option>
-                            <option value="r-script">R Script</option>
-                            <option value="package">R Package</option>
-                            <option value="shiny">Shiny App</option>
-                            <option value="quarto">Quarto Document</option>
-                            <option value="rmarkdown">R Markdown</option>
-                            <option value="analysis">Data Analysis</option>
-                            <option value="targets">Targets Pipeline</option>
-                            <option value="plumber">Plumber API</option>
-                            <option value="renv">Renv Project</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="gen-name">Project Name *</label>
-                        <input type="text" id="gen-name" placeholder="my-awesome-project" required />
-                    </div>
-                    <div class="form-group">
-                        <label for="gen-author">Author Name</label>
-                        <input type="text" id="gen-author" placeholder="Your Name" />
-                    </div>
-                    <div class="form-group">
-                        <label for="gen-email">Email</label>
-                        <input type="email" id="gen-email" placeholder="your@email.com" />
-                    </div>
-                    <button type="button" class="btn btn-primary">Generate Template</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- PRACTICES TAB -->
-        <div id="practices" class="tab-content">
-            <div class="section-heading">
-                <h2>Best Practices Library</h2>
-                <p>Browse and learn about best practices for your workflow</p>
-            </div>
-
-            <div class="grid grid-3">
-                <div class="card">
-                    <div class="card-icon">📦</div>
-                    <h3>Package Structure</h3>
-                    <p>Organize your R package with standard directory layouts and configurations.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-                <div class="card">
-                    <div class="card-icon">📝</div>
-                    <h3>Documentation</h3>
-                    <p>Create comprehensive documentation using roxygen2 and vignettes.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-                <div class="card">
-                    <div class="card-icon">✓</div>
-                    <h3>Testing</h3>
-                    <p>Write and organize tests using testthat or other testing frameworks.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-                <div class="card">
-                    <div class="card-icon">🎯</div>
-                    <h3>Naming Conventions</h3>
-                    <p>Follow consistent naming patterns for files, functions, and variables.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-                <div class="card">
-                    <div class="card-icon">⚡</div>
-                    <h3>Performance</h3>
-                    <p>Optimize code for speed and efficiency with profiling and best practices.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-                <div class="card">
-                    <div class="card-icon">🔒</div>
-                    <h3>Security</h3>
-                    <p>Secure your R applications with proper input validation and error handling.</p>
-                    <button class="btn btn-secondary btn-sm">Learn More</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- FOOTER -->
-    <footer class="footer">
-        <p>&copy; 2024 R Best Practices MCP Server. Built for excellence in R development.</p>
-    </footer>
-
-    <script>
-        function switchTab(tabName) {
-            // Hide all tab contents
-            const contents = document.querySelectorAll('.tab-content');
-            contents.forEach(content => content.classList.remove('active'));
-
-            // Remove active class from all buttons
-            const buttons = document.querySelectorAll('.tab-btn');
-            buttons.forEach(button => button.classList.remove('active'));
-
-            // Show selected tab content
-            document.getElementById(tabName).classList.add('active');
-
-            // Add active class to clicked button
-            event.target.classList.add('active');
-        }
-
-        // Placeholder for form submissions
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-primary')) {
-                e.preventDefault();
-                console.log('Form submitted');
-            }
-        });
-    </script>
-</body>
-</html>
+<span class="text-on-surface font-semibold">R Best Practices MCP</span>
+<span class="text-slate-400">•</span>
+<span>Deterministic Code Quality Architecture</span>
+</div>
+<div class="flex items-center gap-6 text-label-md font-label-md">
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#cli">
+<span class="material-symbols-outlined text-[16px]">terminal</span>
+          CLI Integration
+        </a>
+<a class="hover:text-primary transition-colors flex items-center gap-1" href="#docs">
+<span class="material-symbols-outlined text-[16px]">help</span>
+          Documentation
+        </a>
+<a class="hover:text-primary transition-colors" href="#github">
+          Repository
+        </a>
+</div>
+<div class="text-slate-500 text-label-sm font-label-sm">
+        MCP Protocol v1.4.2 • © 2025 Enterprise R Foundation
+      </div>
+</div>
+</footer>
+</body></html>
