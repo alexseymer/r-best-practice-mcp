@@ -71,7 +71,7 @@ export class CranModule {
               cat(jsonlite::toJSON(info, pretty=TRUE))
             }
           }, error = function(e) {
-            cat(jsonlite::toJSON(list(error = e\$message)))
+            cat(jsonlite::toJSON(list(error = e$message)))
           })
         "`
       );

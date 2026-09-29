@@ -252,7 +252,6 @@ export class Validator {
     }
 
     const desc = await FileUtils.readFile(`${dirPath}/DESCRIPTION`);
-    const descLines = desc.split('\n');
 
     // Check required fields
     const requiredFields = ['Package', 'Version', 'Title', 'Author', 'Maintainer', 'License'];

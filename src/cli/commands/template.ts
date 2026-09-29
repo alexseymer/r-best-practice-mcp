@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { TemplateGenerator } from '../../engine/template-generator';
-import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
-import { Workflow } from '../../types/workflow';
+import { TemplateGenerator } from '../../engine/template-generator.js';
+import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
+import { Workflow } from '../../types/workflow.js';
 
 export async function templateCommand(args: string[], options: CLIOptions): Promise<void> {
   const workflow = args[0];

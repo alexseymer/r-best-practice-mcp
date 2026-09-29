@@ -63,7 +63,6 @@ export class RPracticesWebServer {
 
     // Request logging middleware with performance tracking
     this.app.use((req: Request, res: Response, next: NextFunction) => {
-      const startTime = Date.now();
       const startHrTime = process.hrtime();
 
       logger.info(`${req.method} ${req.path}`, { params: req.query });
@@ -352,7 +351,7 @@ export class RPracticesWebServer {
         res.json({
           error: false,
           data: {
-            path,
+            path: inputPath,
             findings,
           },
           timestamp: Date.now(),
@@ -850,7 +849,8 @@ export class RPracticesWebServer {
   private handleListPractices(req: Request, res: Response, withPagination: boolean): any {
     const startTime = process.hrtime();
     try {
-      let { workflow, category } = req.query;
+      const { workflow } = req.query;
+      let { category } = req.query;
 
       // Validate workflow if provided
       if (workflow && !SecurityUtils.isValidWorkflow(workflow as string)) {
@@ -928,7 +928,7 @@ export class RPracticesWebServer {
     });
 
     // Error handler
-    this.app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
       logger.error('Unhandled error', err);
       res.status(500).json({
         error: true,

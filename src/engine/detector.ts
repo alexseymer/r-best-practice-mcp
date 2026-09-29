@@ -5,7 +5,7 @@ import { Workflow, DetectionResult, DetectionOptions } from '../types/workflow.j
 export class WorkflowDetector {
   async detect(
     dirPath: string,
-    options: DetectionOptions = {}
+    _options: DetectionOptions = {}
   ): Promise<DetectionResult> {
     const startTime = Date.now();
     logger.info(`Detecting workflow for: ${dirPath}`);

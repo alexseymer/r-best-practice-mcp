@@ -1,6 +1,6 @@
 import { Practice, PracticeListOptions, PracticeQueryResult } from '../types/practice.js';
 import { Workflow } from '../types/workflow.js';
-import { Category, Severity } from '../types/finding.js';
+import { Severity } from '../types/finding.js';
 import { logger } from '../utils/logger.js';
 
 export class KnowledgeBase {

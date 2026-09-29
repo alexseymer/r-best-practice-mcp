@@ -1,5 +1,3 @@
-import { logger } from '../utils/logger.js';
-
 export interface ComplexityMetrics {
   cyclomaticComplexity: number;
   nestingDepth: number;
@@ -25,7 +23,7 @@ export class ComplexityAnalyzer {
   analyzeFile(filePath: string, content: string): FileComplexity {
     const lines = content.split('\n');
     const metrics = this.calculateMetrics(content, lines);
-    const functions = this.extractFunctions(content, lines);
+    const functions = this.extractFunctions(content);
 
     return {
       filePath,
@@ -104,8 +102,7 @@ export class ComplexityAnalyzer {
   }
 
   private extractFunctions(
-    content: string,
-    lines: string[]
+    content: string
   ): Array<{ name: string; startLine: number; endLine: number; complexity: number; length: number }> {
     const functions: Array<{ name: string; startLine: number; endLine: number; complexity: number; length: number }> =
       [];

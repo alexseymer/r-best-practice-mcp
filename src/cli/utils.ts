@@ -129,7 +129,7 @@ export class ConfigLoader {
   static loadConfig(startPath: string = process.cwd()): Partial<CLIOptions> {
     let currentPath = startPath;
 
-    while (true) {
+    for (;;) {
       for (const configName of this.CONFIG_NAMES) {
         const configPath = path.join(currentPath, configName);
         if (fs.existsSync(configPath)) {

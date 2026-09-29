@@ -22,12 +22,12 @@ export class TestingModule {
           results <- devtools::test(stop_on_failure = FALSE${filterArg})
           cat('\\n=== TEST SUMMARY ===\\n')
           cat('Total tests:', nrow(results), '\\n')
-          cat('Passed:', sum(results\$result == 'P'), '\\n')
-          cat('Failed:', sum(results\$result == 'F'), '\\n')
-          cat('Skipped:', sum(results\$result == 'S'), '\\n')
-          if (any(results\$result != 'P')) {
+          cat('Passed:', sum(results$result == 'P'), '\\n')
+          cat('Failed:', sum(results$result == 'F'), '\\n')
+          cat('Skipped:', sum(results$result == 'S'), '\\n')
+          if (any(results$result != 'P')) {
             cat('\\n=== FAILURES ===\\n')
-            failed <- results[results\$result != 'P', ]
+            failed <- results[results$result != 'P', ]
             print(failed)
           }
         "`,
@@ -79,7 +79,7 @@ export class TestingModule {
       const { stdout, stderr } = await execAsync(
         `cd '${args.package_path.replace(/'/g, "\\'")}' && Rscript -e "
           # Check if roxygen comments are valid
-          files <- list.files('R', pattern = '\\\\.R\$', full.names = TRUE)
+          files <- list.files('R', pattern = '\\\\.R$', full.names = TRUE)
           if (length(files) == 0) {
             cat('No R files found\\n')
           } else {
@@ -89,7 +89,7 @@ export class TestingModule {
               cat('\\nRoxygen2 validation successful!\\n')
               cat('Run devtools::document() to update docs\\n')
             }, error = function(e) {
-              cat('Roxygen2 validation failed:', e\$message, '\\n')
+              cat('Roxygen2 validation failed:', e$message, '\\n')
             })
           }
         "`,

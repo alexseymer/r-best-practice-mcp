@@ -27,7 +27,7 @@ export class DependencyAnalyzer {
       const content = await FileUtils.readFile(file);
       reports.push({
         filePath: file,
-        dependencies: this.extractDependencies(content, file),
+        dependencies: this.extractDependencies(content),
       });
     }
 
@@ -62,7 +62,7 @@ export class DependencyAnalyzer {
     return reports;
   }
 
-  private extractDependencies(content: string, filePath: string): Dependency[] {
+  private extractDependencies(content: string): Dependency[] {
     const dependencies: Dependency[] = [];
     const seen = new Set<string>();
 
