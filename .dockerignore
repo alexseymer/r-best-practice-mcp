@@ -22,5 +22,3 @@ tests
 *~
 .test
 jest.config.js
-tsconfig.json
-src
