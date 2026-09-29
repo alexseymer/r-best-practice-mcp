@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runCLI } from '../cli/index.js';
+import { run } from '../cli/index.js';
 
 const args = process.argv.slice(2);
 
@@ -32,7 +32,7 @@ For more help: r-practices <command> --help
   process.exit(0);
 }
 
-runCLI(['node', 'cli.ts', ...args]).catch((error) => {
+run().catch((error: unknown) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

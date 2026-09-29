@@ -2,6 +2,7 @@ import { Validator } from '../../engine/validator';
 import { FileUtils } from '../../utils/file';
 import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
 import { Finding } from '../../types/finding';
+import { Workflow } from '../../types/workflow';
 
 export async function validateCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);
@@ -19,10 +20,10 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
 
   try {
     const validator = new Validator();
-    const result = await validator.validateProject(projectPath, workflow, {
-      severity: options.severity,
-      category: options.category,
-      limit: options.limit ? parseInt(options.limit as string) : undefined,
+    const result = await validator.validateProject(projectPath, workflow as Workflow, {
+      minSeverity: options.severity as Finding['severity'],
+      categories: options.category ? [options.category as string] : undefined,
+      maxFindings: options.limit ? (typeof options.limit === 'string' ? parseInt(options.limit) : options.limit) : undefined,
     });
 
     if (options.format === 'json') {
@@ -31,7 +32,7 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
       displayValidationResult(result);
     }
 
-    if (result.data.findings.length > 0 && !options.quiet) {
+    if (result.findings.length > 0 && !options.quiet) {
       process.exit(1);
     }
   } catch (error) {
@@ -43,7 +44,7 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
 function displayValidationResult(result: any): void {
   CLIFormatter.header('Project Validation Result');
 
-  const findings = result.data.findings as Finding[];
+  const findings = result.findings as Finding[];
   const bySeverity: Record<string, Finding[]> = {
     critical: [],
     important: [],

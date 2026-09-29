@@ -36,7 +36,7 @@ export async function reportCommand(args: string[], options: CLIOptions): Promis
     fs.writeFileSync(reportPath, html);
 
     if (options.format === 'json') {
-      console.log(JSON.stringify({ reportPath, findings: validationResult.data.findings.length }, null, 2));
+      console.log(JSON.stringify({ reportPath, findings: validationResult.findings.length }, null, 2));
     } else {
       CLIFormatter.success(`Report generated: ${reportPath}`);
       if (!options.quiet) {
