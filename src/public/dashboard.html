@@ -3,7 +3,8 @@
 <html lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>R Best Practices MCP - Enterprise Code Quality Engine</title>
+<title>R Best Practices Dashboard</title>
+<meta name="description" content="Validate R projects, detect workflows, generate templates and browse best practices."/>
 <!-- Material Symbols Outlined -->
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <!-- Google Fonts: Geist & JetBrains Mono -->
@@ -136,6 +137,11 @@
       display: inline-block;
       line-height: 1;
     }
+    .tab-btn[aria-selected="true"] {
+      color: #006194;
+      border-bottom-color: #0EA5E9;
+      font-weight: 600;
+    }
     .custom-scroll::-webkit-scrollbar {
       height: 6px;
       width: 6px;
@@ -150,514 +156,323 @@
   </style>
 </head>
 <body class="bg-surface-canvas text-on-surface antialiased min-h-screen flex flex-col font-body-md text-body-md selection:bg-r-accent selection:text-white">
-<!-- ================= TOP APP BAR (from Shared Components JSON) ================= -->
+
+<!-- ================= HEADER ================= -->
 <header class="bg-surface-card sticky top-0 z-50 shadow-sm border-b border-border-subtle w-full">
-<div class="flex justify-between items-center w-full px-space-lg h-14 max-w-full">
-<!-- Left: Search & Brand Identity -->
-<div class="flex items-center gap-space-lg">
-<div class="flex items-center gap-space-sm">
-<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-r-accent to-primary flex items-center justify-center text-white font-bold text-headline-sm shadow-sm">
-            R
-          </div>
-<span class="text-headline-sm font-headline-sm font-bold text-on-surface tracking-tight">
-            R Best Practices MCP
-          </span>
-<span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-surface-container text-primary border border-primary-fixed-dim">
-            v1.4.2 stdio
-          </span>
-</div>
-<!-- Integrated Search on Left -->
-<div class="relative hidden lg:block w-72">
-<span class="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">search</span>
-<input class="w-full pl-9 pr-4 py-1.5 bg-surface-canvas border border-border-strong rounded-lg text-body-sm font-body-sm text-on-surface placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent" placeholder="Search rules, diagnostics, AST heuristics..." type="text"/>
-</div>
-</div>
-<!-- Center / Desktop Navigation Links from JSON: ["Validate", "Detect", "Generate", "Practices"] -->
-<nav class="hidden md:flex items-center space-x-6 h-14">
-<button class="h-full inline-flex items-center px-1 text-primary border-b-2 border-primary font-semibold text-label-md font-label-md transition-colors duration-150 active:scale-[0.99]">
-          Validate
-        </button>
-<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
-          Detect
-        </button>
-<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
-          Generate
-        </button>
-<button class="h-full inline-flex items-center px-1 text-on-surface-variant hover:text-on-surface font-medium text-label-md font-label-md transition-colors duration-150 hover:bg-surface-container-low active:scale-[0.99]">
-          Practices
-        </button>
-</nav>
-<!-- Trailing Actions from JSON -->
-<div class="flex items-center gap-space-sm">
-<button class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-canvas hover:bg-surface-container-low border border-border-subtle rounded-lg text-label-md font-label-md text-on-surface font-medium transition-colors">
-<span class="material-symbols-outlined text-[16px] text-secondary">menu_book</span>
-          Docs
-        </button>
-<button class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-r-accent to-primary text-white rounded-lg text-label-md font-label-md font-medium shadow-sm hover:shadow transition-all duration-150 active:scale-[0.98]">
-<span class="material-symbols-outlined text-[16px]">play_arrow</span>
-          Run Audit
-        </button>
-<div class="h-5 w-px bg-border-subtle mx-1"></div>
-<button class="p-1.5 text-secondary hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" title="MCP Terminal">
-<span class="material-symbols-outlined text-[20px]">terminal</span>
-</button>
-<button class="p-1.5 text-secondary hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" title="Settings">
-<span class="material-symbols-outlined text-[20px]">settings</span>
-</button>
-<div class="w-7 h-7 rounded-full bg-surface-container border border-border-subtle flex items-center justify-center text-primary font-semibold text-label-sm" title="User workspace profile avatar">
-          RA
-        </div>
-</div>
-</div>
+  <div class="flex flex-wrap justify-between items-center w-full px-4 sm:px-6 min-h-14 gap-x-6 gap-y-1 max-w-full">
+    <a href="#validate" class="flex items-center gap-2 py-2" aria-label="R Best Practices home">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-r-accent to-primary flex items-center justify-center text-white font-bold text-headline-sm shadow-sm">R</div>
+      <span class="text-headline-sm font-headline-sm font-bold text-on-surface tracking-tight">R Best Practices</span>
+      <span data-el="version" class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-surface-container text-primary border border-primary-fixed-dim">v&hellip;</span>
+    </a>
+
+    <nav role="tablist" aria-label="Dashboard sections" class="flex items-center gap-1 sm:gap-4 overflow-x-auto custom-scroll order-3 sm:order-none w-full sm:w-auto">
+      <button role="tab" id="tab-validate" data-tab="validate" aria-controls="panel-validate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span>Validate
+        <span data-el="issue-badge" class="hidden px-1.5 rounded-full text-[10px] font-bold bg-surface-container text-primary"></span>
+      </button>
+      <button role="tab" id="tab-detect" data-tab="detect" aria-controls="panel-detect" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span>Detect
+      </button>
+      <button role="tab" id="tab-generate" data-tab="generate" aria-controls="panel-generate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span>Generate
+      </button>
+      <button role="tab" id="tab-practices" data-tab="practices" aria-controls="panel-practices" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">menu_book</span>Practices
+      </button>
+      <button role="tab" id="tab-system" data-tab="system" aria-controls="panel-system" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">monitor_heart</span>System
+      </button>
+    </nav>
+
+    <div class="flex items-center gap-2 py-2">
+      <button type="button" data-action="refresh-status" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border-subtle bg-surface-canvas text-label-sm font-label-sm text-secondary hover:bg-surface-container-low transition-colors" title="Check server status">
+        <span data-el="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+        <span data-el="status-text">Checking&hellip;</span>
+      </button>
+      <a href="https://github.com/alexseymer/r-best-practice-mcp#readme" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-canvas hover:bg-surface-container-low border border-border-subtle rounded-lg text-label-md font-label-md text-on-surface font-medium transition-colors">
+        <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">menu_book</span>Docs
+      </a>
+    </div>
+  </div>
 </header>
-<!-- ================= HERO / HEADER SECTION (~280px) ================= -->
-<section class="relative overflow-hidden bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#0F172A] text-white py-10 px-space-lg sm:px-space-xl border-b border-slate-700/40">
-<!-- Subtle radial glow effects -->
-<div class="absolute -right-20 -top-24 w-96 h-96 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none"></div>
-<div class="absolute left-1/4 -bottom-32 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
-<div class="max-w-[1400px] mx-auto relative z-10">
-<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-<!-- Left: Branding & Tagline -->
-<div class="space-y-3 max-w-3xl">
-<div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-label-sm font-label-sm shadow-sm">
-<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            MCP PROTOCOL ENGINE • R 4.3+ AST PARSER READY
-          </div>
-<h1 class="text-white text-display-lg font-display-lg tracking-tight">
-            R Best Practices
-          </h1>
-<p class="text-cyan-50/90 text-body-lg font-body-lg max-w-2xl leading-relaxed">
-            Enterprise R development validation, workflow heuristics &amp; automated code quality engine. Deterministic static checks, targets dependency resolution, and CRAN-grade telemetry.
-          </p>
-<!-- Glassmorphism Status Badges with backdrop blur -->
-<div class="flex flex-wrap items-center gap-2.5 pt-2">
-<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
-<span class="material-symbols-outlined text-[15px] text-emerald-300">verified</span>
-              Production Ready
-            </span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
-<span class="material-symbols-outlined text-[15px] text-cyan-300">bolt</span>
-              Fast Analysis (&lt;1s)
-            </span>
-<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 backdrop-blur-md border border-white/15 text-white text-label-sm font-label-sm">
-<span class="material-symbols-outlined text-[15px] text-indigo-200">account_tree</span>
-              Accurate Results (100% AST Rules)
-            </span>
-</div>
-</div>
-<!-- Right: Quick Workspace Path Switcher Chip -->
-<div class="flex flex-col items-start md:items-end gap-2 shrink-0">
-<div class="text-cyan-100/70 text-label-sm font-label-sm font-medium">ACTIVE MCP WORKSPACE</div>
-<div class="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/15 hover:border-white/30 text-white transition-all shadow-inner">
-<span class="material-symbols-outlined text-[18px] text-cyan-400">folder_open</span>
-<div class="font-code-sm text-code-sm text-slate-100 font-medium">
-              ~/projects/clinical-genomics-pipeline
-            </div>
-<button class="p-1 hover:bg-white/10 rounded transition-colors text-slate-300 hover:text-white" title="Switch R Project Workspace">
-<span class="material-symbols-outlined text-[16px]">swap_horiz</span>
-</button>
-</div>
-</div>
-</div>
-</div>
+
+<!-- ================= HERO ================= -->
+<section class="relative overflow-hidden bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#0F172A] text-white py-8 px-4 sm:px-6 border-b border-slate-700/40">
+  <div class="absolute -right-20 -top-24 w-96 h-96 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="max-w-[1400px] mx-auto relative z-10 space-y-2">
+    <h1 class="text-white text-headline-lg font-headline-lg sm:text-display-lg sm:font-display-lg tracking-tight">R Best Practices</h1>
+    <p class="text-cyan-50/90 text-body-lg font-body-lg max-w-3xl leading-relaxed">
+      Check any R project against a curated knowledge base of best practices &mdash; no AI assistant or MCP client needed.
+      Point the dashboard at a project folder to validate it, detect its workflow, or scaffold a new project.
+    </p>
+  </div>
 </section>
-<!-- ================= MAIN CONTENT CONTAINER ================= -->
-<main class="max-w-[1400px] w-full mx-auto px-space-lg sm:px-space-xl -mt-6 pb-space-3xl relative z-20 flex-1">
-<!-- ================= QUICK STATS BAR (4 Metric Cards) ================= -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-<!-- Card 1: Supported Workflows -->
-<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
-<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-r-accent to-primary"></div>
-<div class="flex items-center justify-between">
-<div>
-<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">SUPPORTED WORKFLOWS</div>
-<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">9</div>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
-<span class="material-symbols-outlined text-[26px]">account_tree</span>
-</div>
-</div>
-<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
-<span class="text-telemetry-emerald font-semibold flex items-center">
-<span class="material-symbols-outlined text-[14px]">check</span> Auto-detected
-          </span>
-<span>targets, Shiny, Quarto +6</span>
-</div>
-</div>
-<!-- Card 2: Best Practices -->
-<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
-<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
-<div class="flex items-center justify-between">
-<div>
-<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">BEST PRACTICES</div>
-<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">52+</div>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-r-accent group-hover:scale-105 transition-transform">
-<span class="material-symbols-outlined text-[26px]">rule</span>
-</div>
-</div>
-<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
-<span class="text-primary font-semibold">Tidyverse &amp; Bioconductor</span> standards
-        </div>
-</div>
-<!-- Card 3: Analysis Speed -->
-<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
-<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-r-accent"></div>
-<div class="flex items-center justify-between">
-<div>
-<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">ANALYSIS SPEED</div>
-<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">&lt;1s</div>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-telemetry-amber group-hover:scale-105 transition-transform">
-<span class="material-symbols-outlined text-[26px]">bolt</span>
-</div>
-</div>
-<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
-<span class="text-telemetry-emerald font-semibold">AST Cache Hit</span>
-<span>mean runtime 140ms</span>
-</div>
-</div>
-<!-- Card 4: Rule Coverage -->
-<div class="bg-surface-card rounded-[16px] p-5 border border-slate-200/80 shadow-[0_1px_3px_0_rgba(15,23,42,0.06)] relative overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-md group">
-<div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-600"></div>
-<div class="flex items-center justify-between">
-<div>
-<div class="text-secondary font-label-md text-label-md font-medium tracking-wide">RULE COVERAGE</div>
-<div class="text-display-lg font-display-lg text-on-surface mt-1 group-hover:text-primary transition-colors">100%</div>
-</div>
-<div class="w-12 h-12 rounded-xl bg-surface-container-low border border-border-subtle flex items-center justify-center text-telemetry-emerald group-hover:scale-105 transition-transform">
-<span class="material-symbols-outlined text-[26px]">verified_user</span>
-</div>
-</div>
-<div class="mt-3 flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
-<span class="text-telemetry-emerald font-semibold">Deterministic</span>
-<span>Zero LLM hallucination</span>
-</div>
-</div>
-</div>
-<!-- ================= MAIN TAB INTERFACE ================= -->
-<div class="bg-surface-card rounded-[16px] border border-slate-200/80 shadow-sm overflow-hidden mb-8">
-<!-- Tab Header Strip -->
-<div class="border-b border-border-subtle bg-surface-canvas/60 px-6 pt-3 flex flex-wrap items-center justify-between gap-4">
-<!-- 4 Specified Tabs -->
-<nav aria-label="Tabs" class="flex space-x-8">
-<!-- Tab 1: Validate Project (Active Default) -->
-<button data-tab="validate" class="relative py-3 px-1 inline-flex items-center gap-2 text-primary font-semibold text-body-md font-body-md border-b-2 border-r-accent -mb-px group">
-<span class="material-symbols-outlined text-[18px]">verified</span>
-            Validate Project
-            <span class="px-2 py-0.5 rounded-full text-code-sm font-code-sm bg-surface-container text-primary font-semibold" data-findings-badge>
-              0 Issues
-            </span>
-</button>
-<!-- Tab 2: Detect Workflow -->
-<button data-tab="detect" class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
-<span class="material-symbols-outlined text-[18px]">radar</span>
-            Detect Workflow
+
+<main class="max-w-[1400px] w-full mx-auto px-4 sm:px-6 -mt-5 pb-10 relative z-20 flex-1">
+
+  <!-- ================= LIVE STATS ================= -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+    <div class="bg-surface-card rounded-card p-4 border border-slate-200/80 shadow-sm">
+      <div class="text-secondary text-label-md font-label-md font-medium tracking-wide">PRACTICES</div>
+      <div data-el="stat-practices" class="text-headline-lg font-headline-lg text-on-surface mt-1">&ndash;</div>
+      <div data-el="stat-practices-sub" class="text-label-sm font-label-sm text-secondary">in the knowledge base</div>
+    </div>
+    <div class="bg-surface-card rounded-card p-4 border border-slate-200/80 shadow-sm">
+      <div class="text-secondary text-label-md font-label-md font-medium tracking-wide">WORKFLOWS</div>
+      <div data-el="stat-workflows" class="text-headline-lg font-headline-lg text-on-surface mt-1">&ndash;</div>
+      <div class="text-label-sm font-label-sm text-secondary">project types supported</div>
+    </div>
+    <div class="bg-surface-card rounded-card p-4 border border-slate-200/80 shadow-sm">
+      <div class="text-secondary text-label-md font-label-md font-medium tracking-wide">LAST AUDIT</div>
+      <div data-el="stat-audit" class="text-headline-lg font-headline-lg text-on-surface mt-1">&ndash;</div>
+      <div data-el="stat-audit-sub" class="text-label-sm font-label-sm text-secondary">no audit run yet</div>
+    </div>
+    <div class="bg-surface-card rounded-card p-4 border border-slate-200/80 shadow-sm">
+      <div class="text-secondary text-label-md font-label-md font-medium tracking-wide">SERVER</div>
+      <div data-el="stat-server" class="text-headline-lg font-headline-lg text-on-surface mt-1">&ndash;</div>
+      <div data-el="stat-server-sub" class="text-label-sm font-label-sm text-secondary">checking&hellip;</div>
+    </div>
+  </div>
+
+  <div data-el="alert" role="alert" class="hidden mb-4 rounded-xl border border-red-200 bg-red-50 text-red-900 px-4 py-3 text-body-sm font-body-sm flex items-start gap-2">
+    <span class="material-symbols-outlined text-[18px] mt-0.5" aria-hidden="true">error</span>
+    <span data-el="alert-text" class="flex-1 break-words"></span>
+    <button type="button" data-action="dismiss-alert" class="text-red-900 hover:underline font-semibold">Dismiss</button>
+  </div>
+
+  <!-- ================= VALIDATE ================= -->
+  <section role="tabpanel" id="panel-validate" data-panel="validate" aria-labelledby="tab-validate" class="bg-surface-card rounded-card border border-slate-200/80 shadow-sm p-4 sm:p-6 lg:p-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div class="lg:col-span-5 space-y-6">
+        <form data-form="audit" class="bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">tune</span>
+            <h2 class="text-headline-sm font-headline-sm text-on-surface">Validate a project</h2>
+          </div>
+          <div class="space-y-1.5">
+            <label for="audit-path" class="block text-label-md font-label-md text-on-surface font-semibold">Project folder</label>
+            <input id="audit-path" data-input="project-path" list="recent-paths" autocomplete="off" spellcheck="false" type="text" placeholder="/home/me/projects/my-r-project" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-code-md font-code-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent"/>
+            <p class="text-label-sm font-label-sm text-secondary">Absolute path on the machine running this server (for example <code class="font-code-sm">.</code> for the server's own working directory).</p>
+          </div>
+          <div class="space-y-1.5">
+            <label for="audit-workflow" class="block text-label-md font-label-md text-on-surface font-semibold">Workflow type</label>
+            <select id="audit-workflow" data-el="audit-workflow" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent"></select>
+          </div>
+          <button type="submit" data-el="audit-btn" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-headline-sm text-headline-sm font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">play_circle</span>
+            <span data-el="audit-btn-label">Run project audit</span>
           </button>
-<!-- Tab 3: Generate Template -->
-<button data-tab="generate" class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
-<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-            Generate Template
-          </button>
-<!-- Tab 4: Browse Practices -->
-<button data-tab="practices" class="relative py-3 px-1 inline-flex items-center gap-2 text-secondary hover:text-on-surface font-medium text-body-md font-body-md border-b-2 border-transparent hover:border-slate-300 -mb-px transition-colors">
-<span class="material-symbols-outlined text-[18px]">menu_book</span>
-            Browse Practices
-            <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-100 text-emerald-800 font-bold">52</span>
-</button>
-</nav>
-<!-- Right Side: Engine Controls & Real-time Indicator -->
-<div class="flex items-center gap-3 pb-2 sm:pb-0">
-<div class="flex items-center gap-1.5 text-label-sm font-label-sm text-secondary">
-<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            AST Parser: <span class="font-code-sm text-on-surface">tree-sitter-r</span>
-</div>
-<button class="p-1.5 text-secondary hover:text-on-surface rounded hover:bg-slate-100" title="Refresh Diagnostics">
-<span class="material-symbols-outlined text-[18px]">refresh</span>
-</button>
-</div>
-</div>
-<!-- Tab Content Canvas: Dual-Pane Grid Layout -->
-<div class="p-6 lg:p-8">
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-<!-- ================= LEFT COLUMN: Project Validation Controls ================= -->
-<div class="lg:col-span-5 space-y-6">
-<div class="bg-surface-canvas rounded-xl p-5 border border-border-subtle">
-<div class="flex items-center justify-between mb-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-primary text-[20px]">tune</span>
-<h3 class="text-headline-sm font-headline-sm text-on-surface">Validation Scope</h3>
-</div>
-<span class="text-label-sm font-label-sm text-secondary font-medium">Session #8104</span>
-</div>
-<!-- Project Path Input -->
-<div class="space-y-1.5 mb-4">
-<label class="block text-label-md font-label-md text-on-surface font-semibold">
-                  Project Workspace Path
-                </label>
-<div class="relative">
-<span class="material-symbols-outlined absolute left-3 top-2.5 text-secondary text-[18px]">folder</span>
-<input data-input="project-path" class="w-full pl-9 pr-3 py-2 bg-white border border-border-strong rounded-lg text-code-md font-code-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent" type="text" placeholder="Enter absolute path to your R project" value=""/>
-</div>
-<p class="text-label-sm font-label-sm text-secondary">Absolute path to R workspace or Git repository root.</p>
-</div>
-<!-- Workflow Type Dropdown Selector -->
-<div class="space-y-1.5 mb-4">
-<label class="block text-label-md font-label-md text-on-surface font-semibold">
-                  Workflow Archetype
-                </label>
-<select data-select="workflow" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent">
-<option selected="">Auto-detect (Recommended)</option>
-<option value="targets">Targets Data Pipeline (_targets.R)</option>
-<option value="package">R Package Development (DESCRIPTION)</option>
-<option value="quarto">Quarto Scientific Report (.qmd)</option>
-<option value="shiny">Shiny Web Application (app.R)</option>
-<option value="plumber">Plumber Microservice API</option>
-<option value="renv">Renv Reproducible Environment</option>
-<option value="r-script">Standalone R Analysis Script</option>
-<option value="rmarkdown">R Markdown Document</option>
-<option value="analysis">Data Analysis Project</option>
-</select>
-</div>
-<!-- Checkbox / Toggle Switches -->
-<div class="space-y-3 pt-2 pb-4 border-y border-border-subtle">
-<div class="flex items-center justify-between">
-<div>
-<div class="text-body-md font-body-md font-medium text-on-surface">Auto-fix Safe Violations</div>
-<div class="text-label-sm font-label-sm text-secondary">Apply automated codemods for naming &amp; style rules</div>
-</div>
-<label class="relative inline-flex items-center cursor-pointer">
-<input checked="" class="sr-only peer" type="checkbox"/>
-<div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-r-accent"></div>
-</label>
-</div>
-<div class="flex items-center justify-between">
-<div>
-<div class="text-body-md font-body-md font-medium text-on-surface">Strict Bioconductor Lints</div>
-<div class="text-label-sm font-label-sm text-secondary">Enforce S4 method signatures &amp; object slot bounds</div>
-</div>
-<label class="relative inline-flex items-center cursor-pointer">
-<input class="sr-only peer" type="checkbox"/>
-<div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-r-accent"></div>
-</label>
-</div>
-</div>
-<!-- Primary Gradient Action Button -->
-<div class="mt-5">
-<button data-action="run-audit" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-headline-sm text-headline-sm font-semibold shadow-md hover:shadow-lg hover:from-cyan-500 hover:to-blue-700 transition-all flex items-center justify-center gap-2 active:scale-[0.99]">
-<span class="material-symbols-outlined text-[20px]">play_circle</span>
-                  Run Project Audit
-                </button>
-</div>
-</div>
-<!-- Standalone File Validator Mini-Card -->
-<div class="bg-surface-card rounded-xl p-4 border border-dashed border-border-strong text-center">
-<div class="flex flex-col items-center gap-1.5">
-<span class="material-symbols-outlined text-secondary text-[24px]">description</span>
-<span class="text-body-sm font-body-sm font-semibold text-on-surface">Quick Standalone File Validator</span>
-<p class="text-label-sm font-label-sm text-secondary max-w-xs">Drop an individual .R, .Rmd or .qmd file to run targeted AST static heuristics without parsing the whole pipeline.</p>
-<button class="mt-2 text-label-md font-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1">
-<span>Browse single file</span>
-<span class="material-symbols-outlined text-[14px]">arrow_forward</span>
-</button>
-</div>
-</div>
-<!-- Workflow Detection Heuristics Meter (Integrated preview) -->
-<div class="bg-surface-card rounded-xl p-5 border border-border-subtle shadow-sm">
-<div class="flex items-center justify-between mb-3">
-<div class="text-body-md font-body-md font-semibold text-on-surface flex items-center gap-1.5">
-<span class="material-symbols-outlined text-r-accent text-[18px]">radar</span>
-                  Workflow Detection Heuristics
-                </div>
-<span class="text-label-sm font-label-sm font-code-sm text-primary font-medium">9 Signatures</span>
-</div>
-<div class="space-y-3">
-<div>
-<div class="flex justify-between text-label-sm font-label-sm mb-1">
-<span class="font-medium text-on-surface">Targets Pipeline Architecture</span>
-<span class="font-code-sm font-bold text-primary">98% match</span>
-</div>
-<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-<div class="h-full bg-gradient-to-r from-cyan-400 to-primary rounded-full" style="width: 98%"></div>
-</div>
-<div class="text-[10px] text-secondary mt-0.5">Matched `_targets.R` and `tar_target()` symbols in 14 files</div>
-</div>
-<div>
-<div class="flex justify-between text-label-sm font-label-sm mb-1">
-<span class="font-medium text-on-surface">Quarto Analytical Report</span>
-<span class="font-code-sm font-bold text-slate-700">94% match</span>
-</div>
-<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-<div class="h-full bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full" style="width: 94%"></div>
-</div>
-<div class="text-[10px] text-secondary mt-0.5">Detected `_quarto.yml` metadata config &amp; rendering chunks</div>
-</div>
-<div>
-<div class="flex justify-between text-label-sm font-label-sm mb-1">
-<span class="font-medium text-on-surface">Renv Lockfile Environment</span>
-<span class="font-code-sm font-bold text-emerald-700">100% synchronized</span>
-</div>
-<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-<div class="h-full bg-emerald-500 rounded-full" style="width: 100%"></div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<!-- ================= RIGHT COLUMN: Audit Findings & Diagnostics ================= -->
-<div class="lg:col-span-7 space-y-4">
-<div class="flex items-center justify-between pb-2">
-<div>
-<h2 class="text-headline-md font-headline-md text-on-surface">Audit Findings &amp; Diagnostics</h2>
-<p class="text-body-sm font-body-sm text-secondary">
-                  Analysis completed in <span class="font-code-sm text-primary font-semibold">142ms</span> • 4 files inspected • 4 recommendations
-                </p>
-</div>
-<div class="flex items-center gap-2">
-<span class="px-2.5 py-1 rounded bg-error-container text-on-error-container text-label-sm font-label-sm font-bold">
-                  1 CRITICAL
-                </span>
-<span class="px-2.5 py-1 rounded bg-amber-100 text-amber-900 text-label-sm font-label-sm font-bold">
-                  1 WARNING
-                </span>
-</div>
-</div>
-<!-- Findings will be populated by JavaScript -->
-<div data-findings-container class="space-y-4">
-<div class="text-center py-8 text-secondary">
-Enter a project path and click "Run Project Audit" to see findings
-</div>
-</div>
-</div>
-</div>
-<!-- ================= BROWSE PRACTICES PREVIEW (6-Card Grid) ================= -->
-<div class="mt-12 pt-8 border-t border-border-subtle">
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-<div>
-<h3 class="text-headline-md font-headline-md text-on-surface">
-                Browse Practices &amp; Knowledge Base
-              </h3>
-<p class="text-body-sm font-body-sm text-secondary">
-                Curated heuristics for modern enterprise R development across engineering disciplines.
-              </p>
-</div>
-<a class="text-label-md font-label-md text-primary font-semibold hover:underline inline-flex items-center gap-1" href="#practices">
-<span>View all 52 rules in catalog</span>
-<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
-</a>
-</div>
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-<!-- Category 1: Package Structure -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">inventory_2</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Package Structure</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                DESCRIPTION standards, R/ directory organization, internal vs exported symbol demarcation, and clean NAMESPACE exports.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>12 Rules</span> • <span>CRAN Compliant</span>
-</div>
-</div>
-<!-- Category 2: Documentation -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">auto_stories</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Documentation</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                roxygen2 tags, parameter validation examples, markdown vignette styling, and reproducible executable code chunks.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>8 Rules</span> • <span>pkgdown Ready</span>
-</div>
-</div>
-<!-- Category 3: Testing -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">fact_check</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Testing</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                testthat 3e edition patterns, snapshot testing for analytical plots, mock fixtures with httptest2, and code coverage minimums.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>10 Rules</span> • <span>CI Automated</span>
-</div>
-</div>
-<!-- Category 4: Naming Conventions -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">spellcheck</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Naming Conventions</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                Snake_case standard enforcement, tidyverse verb consistency (verbs for actions, nouns for objects), and prefix matching rules.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>6 Rules</span> • <span>Linter Enforced</span>
-</div>
-</div>
-<!-- Category 5: Performance -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">speed</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Performance</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                Vectorization, pre-allocation of lists, data.table indexing, memory leak detection in long-running Shiny reactive graphs.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>9 Rules</span> • <span>Benchmarked</span>
-</div>
-</div>
-<!-- Category 6: Security -->
-<div class="bg-surface-canvas rounded-[16px] p-5 border border-slate-200/80 hover:border-slate-300 transition-all hover:-translate-y-0.5 shadow-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center mb-3">
-<span class="material-symbols-outlined text-[22px]">security</span>
-</div>
-<h4 class="text-headline-sm font-headline-sm text-on-surface font-semibold">Security</h4>
-<p class="text-body-sm font-body-sm text-secondary mt-1">
-                Safe SQL parameterized queries in DBI/glue_sql, credential isolation via keyring/Sys.getenv(), and sanitized user inputs.
-              </p>
-<div class="mt-3 flex items-center gap-2 text-label-sm font-label-sm text-primary font-semibold">
-<span>7 Rules</span> • <span>OWASP Aligned</span>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-</main>
-<!-- ================= FOOTER ================= -->
-<footer class="bg-white border-t border-border-subtle py-8 px-space-lg text-secondary text-body-sm font-body-sm">
-<div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-<div class="flex items-center gap-3">
-<div class="w-6 h-6 rounded bg-primary text-white flex items-center justify-center font-bold text-xs">
-          R
-        </div>
-<span class="text-on-surface font-semibold">R Best Practices MCP</span>
-<span class="text-slate-400">•</span>
-<span>Deterministic Code Quality Architecture</span>
-</div>
-<div class="flex items-center gap-6 text-label-md font-label-md">
-<a class="hover:text-primary transition-colors flex items-center gap-1" href="#cli">
-<span class="material-symbols-outlined text-[16px]">terminal</span>
-          CLI Integration
-        </a>
-<a class="hover:text-primary transition-colors flex items-center gap-1" href="#docs">
-<span class="material-symbols-outlined text-[16px]">help</span>
-          Documentation
-        </a>
-<a class="hover:text-primary transition-colors" href="#github">
-          Repository
-        </a>
-</div>
-<div class="text-slate-500 text-label-sm font-label-sm">
-        MCP Protocol v1.4.2 • © 2025 Enterprise R Foundation
+        </form>
+
+        <form data-form="file" class="bg-surface-card rounded-xl p-5 border border-dashed border-border-strong space-y-3" novalidate>
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-[20px]" aria-hidden="true">description</span>
+            <h2 class="text-headline-sm font-headline-sm text-on-surface">Validate a single file</h2>
+          </div>
+          <p class="text-label-sm font-label-sm text-secondary">Check one <code class="font-code-sm">.R</code>, <code class="font-code-sm">.Rmd</code> or <code class="font-code-sm">.qmd</code> file without scanning the whole project.</p>
+          <label for="file-path" class="sr-only">File path</label>
+          <input id="file-path" data-input="file-path" autocomplete="off" spellcheck="false" type="text" placeholder="/home/me/projects/my-r-project/R/utils.R" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-code-md font-code-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent"/>
+          <button type="submit" data-el="file-btn" class="w-full py-2 px-4 rounded-lg border border-primary text-primary font-semibold hover:bg-surface-container-low transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Validate file</button>
+        </form>
       </div>
-</div>
+
+      <div class="lg:col-span-7 space-y-4 min-w-0">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="text-headline-md font-headline-md text-on-surface">Findings</h2>
+            <p data-el="findings-summary" class="text-body-sm font-body-sm text-secondary break-words">Run an audit to see results.</p>
+          </div>
+          <div data-el="findings-actions" class="hidden flex items-center gap-2 flex-wrap">
+            <button type="button" data-action="copy-report" class="px-2.5 py-1 rounded-lg border border-border-strong text-label-md font-label-md text-on-surface hover:bg-surface-container-low">Copy JSON</button>
+            <button type="button" data-action="download-json" class="px-2.5 py-1 rounded-lg border border-border-strong text-label-md font-label-md text-on-surface hover:bg-surface-container-low">Download JSON</button>
+            <button type="button" data-action="download-md" class="px-2.5 py-1 rounded-lg border border-border-strong text-label-md font-label-md text-on-surface hover:bg-surface-container-low">Download report (.md)</button>
+          </div>
+        </div>
+
+        <div data-el="findings-filters" class="hidden flex flex-wrap items-center gap-2">
+          <div data-el="severity-chips" class="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by severity"></div>
+          <label for="finding-category" class="sr-only">Category</label>
+          <select id="finding-category" data-el="finding-category" class="px-2 py-1 bg-white border border-border-strong rounded-lg text-label-md font-label-md">
+            <option value="">All categories</option>
+          </select>
+          <label for="finding-text" class="sr-only">Search findings</label>
+          <input id="finding-text" data-el="finding-text" type="search" placeholder="Filter findings&hellip;" class="flex-1 min-w-[140px] px-2.5 py-1 bg-white border border-border-strong rounded-lg text-label-md font-label-md focus:outline-none focus:ring-2 focus:ring-r-accent/30"/>
+        </div>
+
+        <div data-el="findings" class="space-y-3" aria-live="polite">
+          <div class="text-center py-12 text-secondary border border-dashed border-border-strong rounded-xl">
+            Enter a project folder and choose &ldquo;Run project audit&rdquo;.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DETECT ================= -->
+  <section role="tabpanel" id="panel-detect" data-panel="detect" aria-labelledby="tab-detect" hidden class="bg-surface-card rounded-card border border-slate-200/80 shadow-sm p-4 sm:p-6 lg:p-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <form data-form="detect" class="lg:col-span-5 bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">radar</span>
+          <h2 class="text-headline-sm font-headline-sm text-on-surface">Detect workflow</h2>
+        </div>
+        <p class="text-body-sm font-body-sm text-secondary">Inspects the folder structure to work out what kind of R project it is, and how confident that guess is.</p>
+        <div class="space-y-1.5">
+          <label for="detect-path" class="block text-label-md font-label-md text-on-surface font-semibold">Project folder</label>
+          <input id="detect-path" data-input="project-path" list="recent-paths" autocomplete="off" spellcheck="false" type="text" placeholder="/home/me/projects/my-r-project" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-code-md font-code-md text-on-surface focus:outline-none focus:ring-2 focus:ring-r-accent/30 focus:border-r-accent"/>
+        </div>
+        <button type="submit" data-el="detect-btn" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed">Detect workflow</button>
+      </form>
+      <div class="lg:col-span-7 min-w-0">
+        <div data-el="detect-result" aria-live="polite">
+          <div class="text-center py-12 text-secondary border border-dashed border-border-strong rounded-xl">Run detection to see the result.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= GENERATE ================= -->
+  <section role="tabpanel" id="panel-generate" data-panel="generate" aria-labelledby="tab-generate" hidden class="bg-surface-card rounded-card border border-slate-200/80 shadow-sm p-4 sm:p-6 lg:p-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <form data-form="generate" class="lg:col-span-4 bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">auto_awesome</span>
+          <h2 class="text-headline-sm font-headline-sm text-on-surface">Generate a project template</h2>
+        </div>
+        <div class="space-y-1.5">
+          <label for="gen-workflow" class="block text-label-md font-label-md text-on-surface font-semibold">Workflow type</label>
+          <select id="gen-workflow" data-el="gen-workflow" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md focus:outline-none focus:ring-2 focus:ring-r-accent/30"></select>
+        </div>
+        <div class="space-y-1.5">
+          <label for="gen-name" class="block text-label-md font-label-md text-on-surface font-semibold">Project name <span class="text-secondary font-normal">(optional)</span></label>
+          <input id="gen-name" data-el="gen-name" type="text" maxlength="100" placeholder="my-analysis" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md focus:outline-none focus:ring-2 focus:ring-r-accent/30"/>
+        </div>
+        <div class="space-y-1.5">
+          <label for="gen-author" class="block text-label-md font-label-md text-on-surface font-semibold">Author name <span class="text-secondary font-normal">(optional)</span></label>
+          <input id="gen-author" data-el="gen-author" type="text" maxlength="100" placeholder="Jane Doe" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md focus:outline-none focus:ring-2 focus:ring-r-accent/30"/>
+        </div>
+        <div class="space-y-1.5">
+          <label for="gen-email" class="block text-label-md font-label-md text-on-surface font-semibold">Author email <span class="text-secondary font-normal">(optional)</span></label>
+          <input id="gen-email" data-el="gen-email" type="email" maxlength="100" placeholder="jane@example.org" class="w-full px-3 py-2 bg-white border border-border-strong rounded-lg text-body-md font-body-md focus:outline-none focus:ring-2 focus:ring-r-accent/30"/>
+        </div>
+        <button type="submit" data-el="gen-btn" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed">Generate template</button>
+        <p class="text-label-sm font-label-sm text-secondary">Nothing is written to the server. Preview the files and download them as a ZIP.</p>
+      </form>
+      <div class="lg:col-span-8 min-w-0" aria-live="polite">
+        <div data-el="gen-empty" class="text-center py-12 text-secondary border border-dashed border-border-strong rounded-xl">Choose a workflow and generate a template.</div>
+        <div data-el="gen-result" class="hidden space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 data-el="gen-title" class="text-headline-md font-headline-md text-on-surface"></h2>
+              <p data-el="gen-sub" class="text-body-sm font-body-sm text-secondary"></p>
+            </div>
+            <button type="button" data-action="download-zip" class="px-3 py-1.5 rounded-lg bg-primary text-white text-label-md font-label-md font-semibold hover:opacity-90 inline-flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">download</span>Download ZIP
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div class="md:col-span-4 border border-border-subtle rounded-xl bg-surface-canvas p-3 max-h-[480px] overflow-auto custom-scroll">
+              <ul data-el="gen-tree" class="space-y-0.5 text-code-md font-code-md"></ul>
+            </div>
+            <div class="md:col-span-8 border border-border-subtle rounded-xl overflow-hidden min-w-0">
+              <div class="flex items-center justify-between gap-2 px-3 py-2 bg-surface-canvas border-b border-border-subtle">
+                <span data-el="gen-file-name" class="font-code-md text-code-md text-on-surface truncate">Select a file</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button type="button" data-action="copy-file" class="px-2 py-0.5 rounded border border-border-strong text-label-md font-label-md hover:bg-white">Copy</button>
+                  <button type="button" data-action="download-file" class="px-2 py-0.5 rounded border border-border-strong text-label-md font-label-md hover:bg-white">Download</button>
+                </div>
+              </div>
+              <pre class="m-0 p-3 max-h-[440px] overflow-auto custom-scroll bg-slate-900 text-slate-100 text-code-md font-code-md"><code data-el="gen-file-content"></code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PRACTICES ================= -->
+  <section role="tabpanel" id="panel-practices" data-panel="practices" aria-labelledby="tab-practices" hidden class="bg-surface-card rounded-card border border-slate-200/80 shadow-sm p-4 sm:p-6 lg:p-8 space-y-4">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-headline-md font-headline-md text-on-surface">Best practices</h2>
+        <p data-el="practice-count" class="text-body-sm font-body-sm text-secondary">Loading&hellip;</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <label for="practice-text" class="sr-only">Search practices</label>
+        <input id="practice-text" data-el="practice-text" type="search" placeholder="Search practices&hellip;" class="px-3 py-1.5 bg-white border border-border-strong rounded-lg text-body-sm font-body-sm w-56 focus:outline-none focus:ring-2 focus:ring-r-accent/30"/>
+        <label for="practice-workflow" class="sr-only">Workflow</label>
+        <select id="practice-workflow" data-el="practice-workflow" class="px-2 py-1.5 bg-white border border-border-strong rounded-lg text-body-sm font-body-sm"><option value="">All workflows</option></select>
+        <label for="practice-category" class="sr-only">Category</label>
+        <select id="practice-category" data-el="practice-category" class="px-2 py-1.5 bg-white border border-border-strong rounded-lg text-body-sm font-body-sm"><option value="">All categories</option></select>
+        <label for="practice-severity" class="sr-only">Severity</label>
+        <select id="practice-severity" data-el="practice-severity" class="px-2 py-1.5 bg-white border border-border-strong rounded-lg text-body-sm font-body-sm">
+          <option value="">All severities</option>
+          <option value="critical">Critical</option>
+          <option value="important">Important</option>
+          <option value="recommended">Recommended</option>
+          <option value="info">Info</option>
+        </select>
+        <button type="button" data-action="reset-practices" class="px-2.5 py-1.5 rounded-lg border border-border-strong text-body-sm font-body-sm hover:bg-surface-container-low">Reset</button>
+      </div>
+    </div>
+    <div data-el="practice-list" class="grid grid-cols-1 lg:grid-cols-2 gap-3" aria-live="polite"></div>
+  </section>
+
+  <!-- ================= SYSTEM ================= -->
+  <section role="tabpanel" id="panel-system" data-panel="system" aria-labelledby="tab-system" hidden class="bg-surface-card rounded-card border border-slate-200/80 shadow-sm p-4 sm:p-6 lg:p-8 space-y-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-headline-md font-headline-md text-on-surface">Server &amp; API</h2>
+        <p class="text-body-sm font-body-sm text-secondary">Live health and usage of the server behind this dashboard.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" data-action="refresh-status" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>Refresh
+        </button>
+        <a href="/api-docs" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Interactive API docs</a>
+        <a href="/openapi.json" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">OpenAPI spec</a>
+        <a href="/metrics/requests.csv" download class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Requests CSV</a>
+        <a href="/metrics/operations.csv" download class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Operations CSV</a>
+      </div>
+    </div>
+    <dl data-el="health-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></dl>
+    <div>
+      <h3 class="text-headline-sm font-headline-sm text-on-surface mb-2">Operations since start</h3>
+      <div class="overflow-x-auto border border-border-subtle rounded-xl">
+        <table class="w-full text-body-sm font-body-sm text-left">
+          <thead class="bg-surface-canvas text-secondary"><tr><th class="px-3 py-2 font-semibold">Operation</th><th class="px-3 py-2 font-semibold">Calls</th><th class="px-3 py-2 font-semibold">Errors</th></tr></thead>
+          <tbody data-el="ops-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div>
+      <h3 class="text-headline-sm font-headline-sm text-on-surface mb-2">Available endpoints</h3>
+      <div data-el="tools-list" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+    </div>
+  </section>
+</main>
+
+<datalist id="recent-paths"></datalist>
+<div data-el="toast" role="status" aria-live="polite" class="fixed bottom-4 right-4 z-[60] hidden max-w-sm rounded-lg bg-slate-900 text-white px-4 py-3 shadow-lg text-body-sm font-body-sm"></div>
+
+<!-- ================= FOOTER ================= -->
+<footer class="bg-white border-t border-border-subtle py-6 px-4 sm:px-6 text-secondary text-body-sm font-body-sm">
+  <div class="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-6 h-6 rounded bg-primary text-white flex items-center justify-center font-bold text-xs">R</div>
+      <span class="text-on-surface font-semibold">R Best Practices</span>
+    </div>
+    <nav aria-label="Footer" class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-label-md font-label-md">
+      <a class="hover:text-primary transition-colors" href="https://github.com/alexseymer/r-best-practice-mcp/blob/main/CLI_GUIDE.md" target="_blank" rel="noopener noreferrer">CLI guide</a>
+      <a class="hover:text-primary transition-colors" href="https://github.com/alexseymer/r-best-practice-mcp#readme" target="_blank" rel="noopener noreferrer">Documentation</a>
+      <a class="hover:text-primary transition-colors" href="https://github.com/alexseymer/r-best-practice-mcp" target="_blank" rel="noopener noreferrer">Repository</a>
+      <a class="hover:text-primary transition-colors" href="https://github.com/alexseymer/r-best-practice-mcp/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+    </nav>
+    <div class="text-slate-500 text-label-sm font-label-sm">&copy; <span data-el="year">2026</span> Alexander Seymer</div>
+  </div>
 </footer>
+
 <script src="/dashboard.js"></script>
-</body></html>
+</body>
+</html>
