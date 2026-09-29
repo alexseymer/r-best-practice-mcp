@@ -7,6 +7,14 @@ export interface CLIOptions {
   format?: 'json' | 'text' | 'html';
   verbose?: boolean;
   quiet?: boolean;
+  name?: string;
+  author?: string;
+  email?: string;
+  force?: boolean;
+  severity?: string;
+  category?: string;
+  limit?: number;
+  [key: string]: unknown;
 }
 
 export class CLIFormatter {

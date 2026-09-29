@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TemplateGenerator } from '../../engine/template-generator';
 import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
+import { Workflow } from '../../types/workflow';
 
 export async function templateCommand(args: string[], options: CLIOptions): Promise<void> {
   const workflow = args[0];
@@ -21,7 +22,7 @@ export async function templateCommand(args: string[], options: CLIOptions): Prom
 
   try {
     const generator = new TemplateGenerator();
-    const template = await generator.generate(workflow, {
+    const template = await generator.generate(workflow as Workflow, {
       projectName,
       authorName: options.author as string,
       authorEmail: options.email as string,
