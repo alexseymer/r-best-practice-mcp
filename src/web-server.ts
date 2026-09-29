@@ -1,6 +1,5 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
@@ -13,8 +12,9 @@ import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+if (typeof __dirname === 'undefined') {
+  (global as any).__dirname = path.join(process.cwd(), 'src');
+}
 
 export class RPracticesWebServer {
   private app: Express;
