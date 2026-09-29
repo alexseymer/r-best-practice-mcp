@@ -2,9 +2,9 @@ name: Docker Build & Test
 
 on:
   push:
-    branches: [main, develop, claude/development-assistance-e1oir2]
+    branches: [main, develop, 'claude/**']
   pull_request:
-    branches: [main, develop, claude/development-assistance-e1oir2]
+    branches: [main, develop, 'claude/**']
 
 jobs:
   build:
