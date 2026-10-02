@@ -4,7 +4,20 @@ import { ALL_PRACTICES } from '../../src/data/practices/index';
  * Workflows whose practices must have full content (details, examples, references).
  * Override locally with CONTENT_WORKFLOWS=package,renv to check a subset.
  */
-const ENFORCED_WORKFLOWS: string[] = [];
+const ENFORCED_WORKFLOWS: string[] = [
+  'r-script',
+  'quarto',
+  'rmarkdown',
+  'shiny',
+  'package',
+  'renv',
+  'targets',
+  'plumber',
+  'analysis',
+  'bookdown',
+  'blogdown',
+  'shinytest',
+];
 
 const scope = process.env.CONTENT_WORKFLOWS
   ? process.env.CONTENT_WORKFLOWS.split(',').map((s) => s.trim())
