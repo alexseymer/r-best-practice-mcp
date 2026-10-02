@@ -2,6 +2,7 @@ import { Finding, Severity, ValidationResult } from '../types/finding.js';
 import { Workflow } from '../types/workflow.js';
 import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
+import { runRegisteredRules } from './rules/index.js';
 
 export interface ValidatorOptions {
   maxFindings?: number;
@@ -59,6 +60,8 @@ export class Validator {
           findings.push(...(await this.validateShinytest(dirPath)));
           break;
       }
+
+      findings.push(...(await runRegisteredRules({ dirPath, workflow })));
 
       // Filter findings
       let filtered = findings;
@@ -562,7 +565,7 @@ export class Validator {
     const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
     if (!contentDir) {
       findings.push({
-        id: 'blogdown-content',
+        id: 'blogdown-content-structure',
         severity: 'important',
         category: 'structure',
         message: 'Blogdown site should have content/ directory',
@@ -573,7 +576,7 @@ export class Validator {
     const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
     if (!themesDir) {
       findings.push({
-        id: 'blogdown-themes',
+        id: 'blogdown-theme',
         severity: 'recommended',
         category: 'structure',
         message: 'Blogdown site should have themes/ directory for custom theme',
