@@ -1,6 +1,6 @@
 import path from 'path';
 import { RuleDef } from './types.js';
-import { anyExists, findFiles, pathExists, readText } from './helpers.js';
+import { anyExists, findFiles, pathExists, readText, stripBom } from './helpers.js';
 
 const ROXYGEN_LINE = /^[ \t]*#'/m;
 
@@ -56,7 +56,7 @@ export const packageRules: RuleDef[] = [
       for (const file of files) {
         const text = await readText(file);
         // Unreadable or oversized files: stay silent rather than risk a false positive.
-        if (text === null || ROXYGEN_LINE.test(text)) return [];
+        if (text === null || ROXYGEN_LINE.test(stripBom(text))) return [];
       }
       return [
         {

@@ -1,6 +1,6 @@
 import path from 'path';
 import { RuleDef } from './types.js';
-import { findFiles, readText } from './helpers.js';
+import { findFiles, maskRSource, readText } from './helpers.js';
 
 const SNAKE = /^[a-z][a-z0-9_]*$/;
 const TARGET_CALL = /(?:^|[^\w.])tar_target\(\s*(?:name\s*=\s*)?([A-Za-z._][A-Za-z0-9._]*)\s*[,)]/g;
@@ -27,12 +27,22 @@ export const targetsRules: RuleDef[] = [
       for (const file of files) {
         const content = await readText(file);
         if (content === null) continue;
-        content.split(/\r?\n/).forEach((line, idx) => {
-          if (line.trimStart().startsWith('#')) return;
-          for (const m of line.matchAll(TARGET_CALL)) {
-            if (!SNAKE.test(m[1])) bad.push({ name: m[1], file, line: idx + 1 });
+        // Comments and string contents are blanked (same length), so calls spanning several
+        // lines are matched as a whole and the line comes from the match index.
+        const code = maskRSource(content, true);
+        for (const m of code.matchAll(TARGET_CALL)) {
+          if (SNAKE.test(m[1])) continue;
+          const callStart = m.index + m[0].indexOf('tar_target');
+          let line = 1;
+          for (
+            let i = code.indexOf('\n');
+            i !== -1 && i < callStart;
+            i = code.indexOf('\n', i + 1)
+          ) {
+            line++;
           }
-        });
+          bad.push({ name: m[1], file, line });
+        }
       }
       if (bad.length === 0) return [];
       const names = [...new Set(bad.map((b) => b.name))];

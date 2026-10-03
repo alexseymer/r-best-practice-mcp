@@ -1,15 +1,52 @@
 import path from 'path';
 import { RuleDef } from './types.js';
-import { findFiles, readText } from './helpers.js';
+import fs from 'fs';
+import {
+  DEFAULT_SKIPPED_DIRS,
+  MAX_FILES,
+  compareNames,
+  findFiles,
+  maskRSource,
+  readText,
+} from './helpers.js';
 
-const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*\.R$/;
-const SECTION_MARKERS = [/^#.*-{4,}\s*$/, /^#{4,}/, /^#\s*={4,}/, /^#.*(#{4}|={4})\s*$/];
+const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*\.[Rr]$/;
+const SECTION_START = /^#{4,}|^#\s*={4,}/;
+
+/** `# Title ----`, `#### Title`, `# ====` ... Uses endsWith instead of `.*` regexes (quadratic). */
+function isSectionMarker(line: string): boolean {
+  const t = line.trim();
+  if (!t.startsWith('#')) return false;
+  return SECTION_START.test(t) || t.endsWith('----') || t.endsWith('####') || t.endsWith('====');
+}
 const ERROR_HANDLING = /(?:^|[^\w.])(?:tryCatch|try|stopifnot|stop|withCallingHandlers)\(/;
 
-/** `.R` files in the project root and one level of subdirectories. */
+const R_FILE = /\.[Rr]$/;
+
+/**
+ * `.R`/`.r` files in the project root, then in each first-level subdirectory (skipping hidden and
+ * default-skipped directories), capped at MAX_FILES in total. Listing the levels explicitly keeps
+ * the depth limit from being defeated by a file cap that deeper trees would use up.
+ */
 async function listScripts(dirPath: string): Promise<string[]> {
-  const files = await findFiles(dirPath, /\.R$/);
-  return files.filter((f) => path.relative(dirPath, f).split(path.sep).length <= 2);
+  const out = await findFiles(dirPath, R_FILE, { recursive: false });
+  let entries: fs.Dirent[] = [];
+  try {
+    entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  const dirs = entries
+    .filter(
+      (e) => e.isDirectory() && !e.name.startsWith('.') && !DEFAULT_SKIPPED_DIRS.includes(e.name)
+    )
+    .map((e) => e.name)
+    .sort(compareNames);
+  for (const name of dirs) {
+    if (out.length >= MAX_FILES) break;
+    out.push(...(await findFiles(path.join(dirPath, name), R_FILE, { recursive: false })));
+  }
+  return out.slice(0, MAX_FILES);
 }
 
 function toLines(content: string): string[] {
@@ -23,6 +60,8 @@ const isComment = (line: string): boolean => line.trimStart().startsWith('#');
 interface Opener {
   label: string;
   open: RegExp;
+  /** Optional check on the original (unmasked) line text following the opener match. */
+  reject?: RegExp;
   release: RegExp;
   releaseLabel: string;
 }
@@ -36,13 +75,14 @@ const OPENERS: Opener[] = [
   },
   {
     label: 'file()',
-    open: /(?:^|[^\w.])\w+\s*(?:<-|=)\s*file\(\s*(?!["']stdin["'])/,
+    open: /(?:^|[^\w.])[A-Za-z._][\w.]*\s*(?:<-|=)\s*file\(\s*/,
+    reject: /^["']stdin["']/,
     release: /(?:^|[^\w.])close\(/,
     releaseLabel: 'close()',
   },
   {
     label: 'url()',
-    open: /(?:^|[^\w.])\w+\s*(?:<-|=)\s*url\(/,
+    open: /(?:^|[^\w.])[A-Za-z._][\w.]*\s*(?:<-|=)\s*url\(/,
     release: /(?:^|[^\w.])close\(/,
     releaseLabel: 'close()',
   },
@@ -67,12 +107,19 @@ interface Unmatched {
 }
 
 function findUnmatched(content: string): Unmatched | null {
-  const lines = toLines(content).map((l) => (isComment(l) ? '' : l));
+  // Comments are removed and string contents blanked (same length), so openers and releases
+  // inside strings or trailing comments are ignored; `original` keeps the real arguments.
+  const original = toLines(content);
+  const lines = toLines(maskRSource(content, true));
   const code = lines.join('\n');
   let first: Unmatched | null = null;
   for (const op of OPENERS) {
     if (op.release.test(code)) continue;
-    const idx = lines.findIndex((l) => op.open.test(l));
+    const idx = lines.findIndex((l, i) => {
+      const m = op.open.exec(l);
+      if (!m) return false;
+      return !op.reject || !op.reject.test(original[i].slice(m.index + m[0].length));
+    });
     if (idx !== -1 && (first === null || idx + 1 < first.line)) {
       first = { label: op.label, line: idx + 1, release: op.releaseLabel };
     }
@@ -117,10 +164,7 @@ export const rscriptRules: RuleDef[] = [
         if (content === null) continue;
         const lines = toLines(content);
         if (lines.length <= 80) continue;
-        const hasSection = lines.some((l) => {
-          const t = l.trim();
-          return SECTION_MARKERS.some((re) => re.test(t));
-        });
+        const hasSection = lines.some(isSectionMarker);
         if (hasSection) continue;
         return [
           {

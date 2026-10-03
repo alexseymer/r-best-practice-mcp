@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { RuleDef } from './types.js';
-import { findFiles, pathExists, readText } from './helpers.js';
+import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
 
 const TOP_LEVEL_FILES = ['app.R', 'server.R', 'ui.R', 'global.R'];
 
@@ -13,11 +13,7 @@ interface SourceFile {
 }
 
 function stripComments(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .filter((line) => !/^\s*#/.test(line))
-    .map((line) => line.replace(/\s#[^"'\r\n]*$/, ''))
-    .join('\n');
+  return maskRSource(text, false);
 }
 
 function countLines(text: string): number {
