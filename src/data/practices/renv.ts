@@ -41,18 +41,22 @@ my-project/
     enforcement: 'automated',
     description: 'Commit renv.lock to git for reproducible environments',
     details:
-      'The lockfile records the exact version and source of every package, so collaborators and servers can recreate the same environment. Commit renv.lock together with renv/activate.R, renv/settings.json and .Rprofile, but ignore the renv/library directory (renv creates the needed .gitignore itself). The automated check only verifies that renv.lock exists in the project root; it does not inspect git.',
+      'The lockfile records the exact version and source of every package, so collaborators and servers can recreate the same environment. Commit renv.lock together with renv/activate.R, renv/settings.json and .Rprofile, but not the private library and caches: renv::init() writes renv/.gitignore (relative entries such as library/, local/, cellar/, lock/, python/, sandbox/ and staging/) for you, so do not ignore the whole renv/ directory. The automated check only verifies that renv.lock exists in the project root; it does not inspect git or .gitignore.',
     badExample: `# .gitignore
 renv.lock
 renv/
 
 # collaborators cannot reproduce the environment`,
-    goodExample: `# .gitignore (written by renv::init())
-renv/library/
-renv/local/
-renv/staging/
+    goodExample: `# renv/.gitignore (written by renv::init(); entries are relative to renv/)
+library/
+local/
+cellar/
+lock/
+python/
+sandbox/
+staging/
 
-# Commit the lockfile
+# Commit the lockfile, the bootstrap script and .Rprofile
 git add renv.lock renv/activate.R renv/settings.json .Rprofile
 git commit -m "Update renv lockfile"`,
     tags: ['renv', 'vcs'],
