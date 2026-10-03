@@ -10,7 +10,7 @@ export const shinyPractices: Practice[] = [
     enforcement: 'automated',
     description: 'Use ui.R/server.R or modular app.R with clear sections',
     details:
-      'A single long app.R that mixes layout, reactive logic and helper functions is hard to read, review and test. Keep the UI and server in clearly separated objects or files, and move helpers into R/. The automated check is a heuristic: it flags an app.R of more than 200 lines that defines both ui and server when the project has no R/ directory, no ui.R/server.R and no source() call.',
+      'A single long app.R that mixes layout, reactive logic and helper functions is hard to read, review and test. Keep the UI and server in clearly separated objects or files, and move helpers into R/. The automated check is a size heuristic on app.R only: it flags an app.R of more than 200 lines that defines both ui and server (an assignment to ui and server at the start of a line, comments ignored) when the project has no R/ directory, no ui.R or server.R file and no source() call.',
     badExample: `# app.R (400+ lines)
 library(shiny)
 
@@ -68,6 +68,7 @@ shinyApp(ui, server)`,
     plot(data()$x, data()$y)
   })
 }`,
+    tags: ['reactive', 'performance', 'caching'],
     references: [
       'https://mastering-shiny.org/basic-reactivity.html',
       'https://shiny.posit.co/r/reference/shiny/latest/reactive.html',
@@ -115,7 +116,7 @@ shinyApp(ui, server)`,
     enforcement: 'automated',
     description: 'Check input validity before processing',
     details:
-      'Inputs are empty or invalid at startup and whenever users make mistakes, which otherwise surfaces as cryptic R errors in the UI. Use req() to wait for required values, validate()/need() for friendly messages, or shinyvalidate/shinyFeedback for field-level checks. The automated check is a keyword heuristic: it flags apps whose source (app.R, ui.R, server.R, global.R, R/*.R) reads input$ but never contains req(, validate( (or a validate_*() helper), need(, InputValidator or shinyFeedback.',
+      'Inputs are empty or invalid at startup and whenever users make mistakes, which otherwise surfaces as cryptic R errors in the UI. Use req() to wait for required values, validate()/need() for friendly messages, or shinyvalidate/shinyFeedback for field-level checks. The automated check is a keyword heuristic: it flags apps whose source (app.R, ui.R, server.R, global.R and R/*.R, comments ignored) reads input$ or input[[ but nowhere contains req(, validate( (or a validate_*() helper), need(, InputValidator or shinyFeedback. It does not check that the validation covers every input.',
     badExample: `server <- function(input, output, session) {
   output$hist <- renderPlot({
     hist(rnorm(input$n), main = input$title)
@@ -142,9 +143,9 @@ shinyApp(ui, server)`,
     category: 'structure',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Break large apps into reusable modules (callModule pattern)',
+    description: 'Break large apps into reusable modules with moduleServer()',
     details:
-      'Modules give a piece of an app its own namespace so IDs cannot collide, and let you reuse and test it in isolation. Write a UI function taking an id and a server function using moduleServer(). The automated check is a size heuristic: it flags apps whose source (app.R, ui.R, server.R, global.R, R/*.R) has more than 300 lines in total and contains neither moduleServer( nor callModule(.',
+      'Modules give a piece of an app its own namespace so IDs cannot collide, and let you reuse and test it in isolation. Write a UI function taking an id and a server function using moduleServer() (Shiny >= 1.5.0). The older callModule() is deprecated since Shiny 1.5.0, although the check still accepts it. The automated check is a size heuristic: it flags apps whose Shiny source (app.R, ui.R, server.R, global.R and R/*.R, including subdirectories; comments count towards the lines) has more than 300 lines in total and whose code, with comments removed, contains neither moduleServer( nor callModule(. It does not check that modules are used well.',
     badExample: `# One server function with repeated, hand-prefixed ids
 server <- function(input, output, session) {
   output$sales_plot <- renderPlot(plot(sales_data(input$sales_region)))
@@ -209,7 +210,7 @@ regionPlotServer <- function(id, get_data) {
     enforcement: 'automated',
     description: 'Document how to run the app and use its features',
     details:
-      'A README tells new users and deployers what the app does, which packages it needs and how to start it. Include the purpose, install steps, the run command and any required data or environment variables. The automated check looks for README.md in the project root.',
+      'A README tells new users and deployers what the app does, which packages it needs and how to start it. Include the purpose, install steps, the run command and any required data or environment variables. The automated check only verifies that README.md exists in the project root (README.Rmd or a README in a subdirectory does not count); it does not read the content.',
     badExample: `myapp/
   app.R
   data/

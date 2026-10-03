@@ -10,7 +10,7 @@ export const packagePractices: Practice[] = [
     enforcement: 'automated',
     description: "Document functions with #' @param, #' @return, #' @export",
     details:
-      "Keeping documentation next to the code means it is updated together with the function, and roxygen2 generates the man/*.Rd files and NAMESPACE entries for you. Describe every parameter, the return value and at least one example. The automated check only looks for the absence of any roxygen comment line (a line starting with #') in the .R files directly under R/; it does not judge how complete the documentation is.",
+      "Keeping documentation next to the code means it is updated together with the function, and roxygen2 generates the man/*.Rd files and NAMESPACE entries for you. Describe every parameter, the return value and at least one example. The automated check only reports a package in which none of the .R files directly under R/ (subdirectories are not searched) contains a roxygen comment line, i.e. a line starting with #' (leading whitespace allowed). One such line anywhere is enough to pass, and it stays silent when R/ has no .R files or a file cannot be read; it does not judge how complete the documentation is.",
     badExample: `# R/stats.R
 # Computes the standard error
 se <- function(x, na.rm = FALSE) {
@@ -43,9 +43,9 @@ se <- function(x, na.rm = FALSE) {
     category: 'structure',
     severity: 'critical',
     enforcement: 'automated',
-    description: 'Keep Package, Version, Title, Description, Authors, License current',
+    description: 'Keep Package, Version, Title, Description, Authors@R and License current',
     details:
-      'DESCRIPTION holds the metadata that R, CRAN and users rely on: name, version, title, authors, license and dependencies. Keep the Title in title case without a trailing period, write a full-sentence Description, and declare every package you use under Imports or Suggests. The automated check reports a missing DESCRIPTION file and any of the fields Package, Version, Title, Author, Maintainer and License that do not appear in it; it does not validate their values.',
+      'DESCRIPTION holds the metadata that R, CRAN and users rely on: name, version, title, authors, license and dependencies. Keep the Title in title case without a trailing period, write a full-sentence Description, and declare every package you use under Imports or Suggests. The automated check reports a missing DESCRIPTION file, and any of the fields Package, Version, Title, Description and License that is absent. It also requires either Authors@R or both Author and Maintainer. Field names are matched at the start of a line (a word inside another field does not count); the values are not validated.',
     badExample: `Package: mypkg
 Version: 1.0
 Title: a package that does stuff.
@@ -73,7 +73,7 @@ Encoding: UTF-8`,
     enforcement: 'automated',
     description: 'Use testthat package in tests/testthat/ directory',
     details:
-      'Automated tests let you change code with confidence and catch regressions before users do. Use testthat with the third edition, keep one test file per source file in tests/testthat/, and cover both normal behavior and edge cases. The automated check only verifies that a tests/ directory exists; it does not run the tests or measure how thorough they are.',
+      'Automated tests let you change code with confidence and catch regressions before users do. Use testthat with the third edition, keep one test file per source file in tests/testthat/, and cover both normal behavior and edge cases. The automated check only verifies that a tests/ directory exists next to DESCRIPTION; it does not look for tests/testthat/, run the tests or measure how thorough they are.',
     badExample: `mypkg/
   DESCRIPTION
   NAMESPACE
@@ -104,7 +104,7 @@ test_that("se() propagates NA by default", {
     enforcement: 'automated',
     description: 'Export public functions and import dependencies properly',
     details:
-      "NAMESPACE decides which functions your package exports and which functions it imports from other packages. Do not edit it by hand: add #' @export and #' @importFrom tags in roxygen comments and let devtools::document() regenerate the file. The automated check only reports a project that has a DESCRIPTION file but no NAMESPACE file; it does not compare the exports against your code.",
+      "NAMESPACE decides which functions your package exports and which functions it imports from other packages. Do not edit it by hand: add #' @export and #' @importFrom tags in roxygen comments and let devtools::document() regenerate the file. The automated check only reports a project that has a DESCRIPTION file but no NAMESPACE file; it does not compare the exports against your code or detect a hand-edited file.",
     badExample: `# NAMESPACE edited by hand and out of date
 export(se)
 import(dplyr)
@@ -124,6 +124,7 @@ importFrom(stats,sd)`,
     references: [
       'https://r-pkgs.org/dependencies-mindset-background.html',
       'https://r-pkgs.org/dependencies-in-practice.html',
+      'https://roxygen2.r-lib.org/articles/namespace.html',
     ],
   },
   {
@@ -135,7 +136,7 @@ importFrom(stats,sd)`,
     enforcement: 'automated',
     description: 'Add vignettes/ directory with usage examples',
     details:
-      'Function reference pages explain single functions, while a vignette shows how they work together to solve a real problem. Create one with usethis::use_vignette() and list knitr and rmarkdown in Suggests. The automated check is a heuristic: it fires when there is no vignettes/ directory and R/ holds at least three .R files, which is used as a proxy for a package complex enough to need a guide.',
+      'Function reference pages explain single functions, while a vignette shows how they work together to solve a real problem. Create one with usethis::use_vignette(), which also adds knitr and rmarkdown to Suggests and sets VignetteBuilder: knitr in DESCRIPTION (required for the vignette to be built). The automated check is a heuristic: it fires when there is no vignettes/ directory and R/ holds at least three .R files directly in R/ (subdirectories are not counted), which is used as a proxy for a package complex enough to need a guide. It does not check the vignette content or DESCRIPTION.',
     badExample: `mypkg/
   DESCRIPTION
   R/
@@ -144,8 +145,12 @@ importFrom(stats,sd)`,
     summarise.R
     plot.R
   # no vignettes/ directory`,
-    goodExample: `# In the console
+    goodExample: `# In the console (also sets VignetteBuilder and Suggests)
 usethis::use_vignette("getting-started")
+
+# DESCRIPTION (added by use_vignette())
+Suggests: knitr, rmarkdown
+VignetteBuilder: knitr
 
 # vignettes/getting-started.Rmd
 ---
@@ -195,14 +200,15 @@ se(c(1, 2, 3, 4))
   },
   {
     id: 'pkg-license',
-    title: 'Include LICENSE file',
+    title: 'Declare a license and ship the LICENSE file it needs',
     workflow: 'package',
     category: 'structure',
     severity: 'critical',
     enforcement: 'automated',
-    description: 'Specify license (MIT, GPL, Apache, etc.) in LICENSE file',
+    description:
+      'Set the License field in DESCRIPTION, with a LICENSE file when it says file LICENSE',
     details:
-      'Without a license nobody else may legally use or modify your code. Pick a license with usethis (for example usethis::use_mit_license()), which fills in the License field of DESCRIPTION and creates the LICENSE file. The automated check only verifies that a file named LICENSE exists in the package root; it does not validate its contents.',
+      'Without a license nobody else may legally use or modify your code. Pick a license with usethis (for example usethis::use_mit_license()), which fills in the License field of DESCRIPTION and creates the LICENSE file. Licenses such as MIT and BSD need a short template file, so DESCRIPTION says License: MIT + file LICENSE; well-known licenses such as GPL-3 or Apache License (>= 2) are written by name and need no LICENSE file. The automated check reports a DESCRIPTION without a License field, and a License field that says file LICENSE (or file LICENCE) when none of LICENSE, LICENSE.md, LICENCE or LICENCE.md exists in the package root. It does not validate the license name or the file contents.',
     badExample: `Package: mypkg
 Version: 0.1.0
 License: file LICENSE
@@ -213,9 +219,12 @@ usethis::use_mit_license("Ada Lovelace")
 # DESCRIPTION
 License: MIT + file LICENSE
 
-# LICENSE
+# LICENSE (the file the License field points to)
 YEAR: 2026
-COPYRIGHT HOLDER: Ada Lovelace`,
+COPYRIGHT HOLDER: Ada Lovelace
+
+# Licenses written by name need no LICENSE file, e.g.
+# License: GPL (>= 3)`,
     tags: ['license', 'legal'],
     references: ['https://r-pkgs.org/license.html'],
   },
@@ -279,7 +288,7 @@ usethis::use_coverage()`,
     enforcement: 'automated',
     description: 'An R package keeps its source files in the R/ directory next to DESCRIPTION',
     details:
-      'R only loads and installs code from the R/ directory, so scripts placed elsewhere are not part of the package. Put functions in R/ with one file per topic, and keep exploratory scripts in a separate folder that is excluded with .Rbuildignore. The automated check only verifies that the R/ directory exists next to DESCRIPTION.',
+      'R only loads and installs code from the R/ directory, so scripts placed elsewhere are not part of the package. Put functions in R/ with one file per topic, and keep exploratory scripts in a separate folder that is excluded with .Rbuildignore. The automated check only verifies that the R/ directory exists next to DESCRIPTION (it runs only once DESCRIPTION is present); it does not inspect the files inside.',
     badExample: `mypkg/
   DESCRIPTION
   NAMESPACE
