@@ -95,7 +95,7 @@ This book explains how we analyse flight delays.`,
     enforcement: 'automated',
     description: 'Define HTML, PDF and optionally EPUB outputs in _output.yml',
     details:
-      'Readers want the same book as a web page, a PDF and an e-book, and keeping each format in `_output.yml` avoids cluttering index.Rmd. List `bookdown::gitbook`, `bookdown::pdf_book` and optionally `bookdown::epub_book` there. This is a heuristic: the check passes whenever `_output.yml` or `_output.yaml` exists in the project root, whatever it contains. Without one, it counts the distinct `bookdown::name` strings in the YAML header of index.Rmd (so `site: bookdown::bookdown_site` counts as one of them) and flags fewer than two. It stays silent when index.Rmd is missing.',
+      'Readers want the same book as a web page, a PDF and an e-book, and keeping each format in `_output.yml` avoids cluttering index.Rmd. List `bookdown::gitbook`, `bookdown::pdf_book` and optionally `bookdown::epub_book` there. This is a heuristic: the check passes whenever `_output.yml` or `_output.yaml` exists in the project root, whatever it contains. Without one, it counts the distinct `bookdown::name` strings in the YAML header of index.Rmd (`bookdown::bookdown_site` is not an output format and is not counted) and flags fewer than two. It stays silent when index.Rmd is missing.',
     badExample: `---
 title: "My Book"
 output: bookdown::gitbook   # HTML only, and no _output.yml
@@ -162,7 +162,7 @@ Table \\@ref(tab:cars-table) lists the first observations.
     enforcement: 'automated',
     description: 'Include build instructions and dependencies in README.md',
     details:
-      'Contributors need to know which packages and system tools (such as LaTeX) are required and which command builds the book. Add a README.md that lists dependencies and the build command, for example `bookdown::render_book("index.Rmd")`. The check only tests that a file named exactly `README.md` exists in the project root (`README.Rmd` does not satisfy it) and does not read its content.',
+      'Contributors need to know which packages and system tools (such as LaTeX) are required and which command builds the book. Add a README.md (or README.Rmd) that lists dependencies and the build command, for example `bookdown::render_book("index.Rmd")`. The check only tests that a file named `README.md` or `README.Rmd` exists in the project root and does not read its content.',
     badExample: `my-book/
   index.Rmd
   _bookdown.yml

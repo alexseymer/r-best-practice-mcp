@@ -129,6 +129,30 @@ async function readProjectConfig(dirPath: string): Promise<string> {
 }
 
 const PLOT_CALL = /(^|[^A-Za-z0-9_.])(ggplot|plot|hist|barplot|boxplot)\s*\(/;
+const PLOT_LABEL_CALL = /(^|[^A-Za-z0-9_.])(labs|ggtitle|xlab|ylab)\s*\(/g;
+
+/** Removes every call matching `opening` (up to its balanced closing paren). Linear scan. */
+function removeCalls(code: string, opening: RegExp): string {
+  let out = '';
+  let pos = 0;
+  opening.lastIndex = 0;
+  for (let m = opening.exec(code); m !== null; m = opening.exec(code)) {
+    const start = m.index + m[1].length;
+    if (start < pos) continue;
+    let depth = 1;
+    let i = m.index + m[0].length;
+    while (i < code.length && depth > 0) {
+      if (code[i] === '(') depth++;
+      else if (code[i] === ')') depth--;
+      i++;
+    }
+    out += code.slice(pos, start);
+    pos = i;
+    opening.lastIndex = i;
+  }
+  return out + code.slice(pos);
+}
+
 const TABLE_CALL =
   /(^|[^A-Za-z0-9_.])(kable|kbl|gt|kable_styling|kable_classic|kable_paper|kable_minimal|add_header_above)\s*\(|kableExtra::/;
 
@@ -297,8 +321,10 @@ export const quartoRules: RuleDef[] = [
         for (const chunk of doc.chunks) {
           if (isHidden(chunk) || !TABLE_CALL.test(chunk.code)) continue;
           if (hasOption(chunk, 'tbl-cap') || /tbl[.-]cap\s*=/.test(chunk.header)) continue;
-          // kable(caption = "...") is accepted as a caption, too
-          if (/(^|[^A-Za-z0-9_.])caption\s*=/.test(chunk.code)) continue;
+          // kable(caption = "...") is accepted; captions of labs()/ggtitle() are plot captions
+          if (/(^|[^A-Za-z0-9_.])caption\s*=/.test(removeCalls(chunk.code, PLOT_LABEL_CALL))) {
+            continue;
+          }
           hits.push({ doc, chunk });
         }
       }
