@@ -1,3 +1,114 @@
+import { CATEGORIES, SEVERITIES } from '../types/finding.js';
+import { ENFORCEMENTS } from '../types/practice.js';
+import {
+  TOOL_DEFS,
+  ToolDef,
+  requestSchemaName,
+  toOpenApiParameters,
+  toOpenApiPath,
+  toOpenApiRequestSchema,
+} from '../tools/schemas.js';
+
+/** Response documentation per operation (parameters and routes come from tools/schemas.ts). */
+const TOOL_RESPONSES: Record<
+  string,
+  { ok: string; schema: string; errors: Record<number, string> }
+> = {
+  detectWorkflow: {
+    ok: 'Workflow detected successfully',
+    schema: 'DetectionResult',
+    errors: { 400: 'Invalid input or missing parameters', 500: 'Server error during detection' },
+  },
+  validateProject: {
+    ok: 'Project validation completed',
+    schema: 'ValidationResult',
+    errors: {
+      400: 'Invalid input or parameters (code INVALID_PARAMETER for bad filter values)',
+      404: 'Project directory not found',
+      500: 'Server error during validation',
+    },
+  },
+  validateFile: {
+    ok: 'File validation completed',
+    schema: 'FileValidationResult',
+    errors: {
+      400: 'Invalid input or parameters (code INVALID_PARAMETER for bad filter values)',
+      404: 'File not found',
+      500: 'Server error during validation',
+    },
+  },
+  generateTemplate: {
+    ok: 'Template generated successfully',
+    schema: 'TemplateResult',
+    errors: { 400: 'Invalid workflow type', 500: 'Server error during generation' },
+  },
+  listPractices: {
+    ok: 'List of practices',
+    schema: 'PracticesListResult',
+    errors: {
+      400: 'Invalid filter parameters (code INVALID_PARAMETER or INVALID_WORKFLOW)',
+      500: 'Server error',
+    },
+  },
+  getPractice: {
+    ok: 'Practice details',
+    schema: 'Practice',
+    errors: { 404: 'Practice not found', 500: 'Server error' },
+  },
+};
+
+function buildOperation(tool: ToolDef): Record<string, unknown> {
+  const doc = TOOL_RESPONSES[tool.operationId];
+  const responses: Record<number, unknown> = {
+    200: {
+      description: doc.ok,
+      content: {
+        'application/json': { schema: { $ref: `#/components/schemas/${doc.schema}` } },
+      },
+    },
+  };
+  for (const [code, description] of Object.entries(doc.errors)) {
+    responses[Number(code)] = { description };
+  }
+  const operation: Record<string, unknown> = {
+    summary: tool.summary,
+    description: tool.description,
+    operationId: tool.operationId,
+    tags: [tool.tag],
+  };
+  if (tool.method === 'POST') {
+    operation.requestBody = {
+      required: true,
+      content: {
+        'application/json': {
+          schema: { $ref: `#/components/schemas/${requestSchemaName(tool)}` },
+        },
+      },
+    };
+  } else {
+    operation.parameters = toOpenApiParameters(tool);
+  }
+  operation.responses = responses;
+  return operation;
+}
+
+function buildToolPaths(): Record<string, unknown> {
+  const paths: Record<string, unknown> = {};
+  for (const tool of TOOL_DEFS) {
+    paths[toOpenApiPath(tool)] = { [tool.method.toLowerCase()]: buildOperation(tool) };
+  }
+  return paths;
+}
+
+function buildRequestSchemas(): Record<string, unknown> {
+  return Object.fromEntries(
+    TOOL_DEFS.filter((t) => t.method === 'POST').map((t) => [
+      requestSchemaName(t),
+      toOpenApiRequestSchema(t),
+    ])
+  );
+}
+
 export interface OpenAPISpec {
   openapi: string;
   info: {
@@ -23,7 +134,10 @@ export interface OpenAPISpec {
 }
 
 export class OpenAPIGenerator {
-  static generateSpec(version: string = '0.2.0', baseUrl: string = 'http://localhost:3000'): OpenAPISpec {
+  static generateSpec(
+    version: string = '0.2.0',
+    baseUrl: string = 'http://localhost:3000'
+  ): OpenAPISpec {
     return {
       openapi: '3.0.0',
       info: {
@@ -64,270 +178,7 @@ export class OpenAPIGenerator {
             },
           },
         },
-        '/api/v1/detect-workflow': {
-          post: {
-            summary: 'Detect Workflow Type',
-            description: 'Automatically detect the R workflow type from a directory path',
-            operationId: 'detectWorkflow',
-            tags: ['Workflows'],
-            requestBody: {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/DetectWorkflowRequest',
-                  },
-                },
-              },
-            },
-            responses: {
-              200: {
-                description: 'Workflow detected successfully',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/DetectionResult',
-                    },
-                  },
-                },
-              },
-              400: {
-                description: 'Invalid input or missing parameters',
-              },
-              500: {
-                description: 'Server error during detection',
-              },
-            },
-          },
-        },
-        '/api/v1/validate-project': {
-          post: {
-            summary: 'Validate Project',
-            description: 'Validate an R project against best practices',
-            operationId: 'validateProject',
-            tags: ['Validation'],
-            requestBody: {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/ValidateProjectRequest',
-                  },
-                },
-              },
-            },
-            responses: {
-              200: {
-                description: 'Project validation completed',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/ValidationResult',
-                    },
-                  },
-                },
-              },
-              400: {
-                description: 'Invalid input or parameters',
-              },
-              404: {
-                description: 'Project directory not found',
-              },
-              500: {
-                description: 'Server error during validation',
-              },
-            },
-          },
-        },
-        '/api/v1/validate-file': {
-          post: {
-            summary: 'Validate File',
-            description: 'Validate a single R or Quarto file against best practices',
-            operationId: 'validateFile',
-            tags: ['Validation'],
-            requestBody: {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/ValidateFileRequest',
-                  },
-                },
-              },
-            },
-            responses: {
-              200: {
-                description: 'File validation completed',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/FileValidationResult',
-                    },
-                  },
-                },
-              },
-              400: {
-                description: 'Invalid input or parameters',
-              },
-              404: {
-                description: 'File not found',
-              },
-              500: {
-                description: 'Server error during validation',
-              },
-            },
-          },
-        },
-        '/api/v1/generate-template': {
-          post: {
-            summary: 'Generate Project Template',
-            description: 'Generate a complete project scaffold for a specific R workflow',
-            operationId: 'generateTemplate',
-            tags: ['Templates'],
-            requestBody: {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    $ref: '#/components/schemas/GenerateTemplateRequest',
-                  },
-                },
-              },
-            },
-            responses: {
-              200: {
-                description: 'Template generated successfully',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/TemplateResult',
-                    },
-                  },
-                },
-              },
-              400: {
-                description: 'Invalid workflow type',
-              },
-              500: {
-                description: 'Server error during generation',
-              },
-            },
-          },
-        },
-        '/api/v1/practices': {
-          get: {
-            summary: 'List Best Practices',
-            description: 'List best practices, optionally filtered by workflow or category',
-            operationId: 'listPractices',
-            tags: ['Practices'],
-            parameters: [
-              {
-                name: 'workflow',
-                in: 'query',
-                description: 'Filter by workflow type',
-                schema: {
-                  type: 'string',
-                  enum: [
-                    'r-script',
-                    'quarto',
-                    'shiny',
-                    'package',
-                    'rmarkdown',
-                    'renv',
-                    'targets',
-                    'plumber',
-                    'analysis',
-                    'bookdown',
-                    'blogdown',
-                    'shinytest',
-                  ],
-                },
-              },
-              {
-                name: 'category',
-                in: 'query',
-                description: 'Filter by practice category',
-                schema: {
-                  type: 'string',
-                },
-              },
-              {
-                name: 'limit',
-                in: 'query',
-                description: 'Maximum number of results (default: 50)',
-                schema: {
-                  type: 'integer',
-                  minimum: 1,
-                  maximum: 100,
-                },
-              },
-              {
-                name: 'offset',
-                in: 'query',
-                description: 'Number of results to skip (default: 0)',
-                schema: {
-                  type: 'integer',
-                  minimum: 0,
-                },
-              },
-            ],
-            responses: {
-              200: {
-                description: 'List of practices',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/PracticesListResult',
-                    },
-                  },
-                },
-              },
-              400: {
-                description: 'Invalid filter parameters',
-              },
-              500: {
-                description: 'Server error',
-              },
-            },
-          },
-        },
-        '/api/v1/practice/{id}': {
-          get: {
-            summary: 'Get Practice Details',
-            description: 'Get detailed information about a specific best practice',
-            operationId: 'getPractice',
-            tags: ['Practices'],
-            parameters: [
-              {
-                name: 'id',
-                in: 'path',
-                required: true,
-                description: 'Practice ID',
-                schema: {
-                  type: 'string',
-                },
-              },
-            ],
-            responses: {
-              200: {
-                description: 'Practice details',
-                content: {
-                  'application/json': {
-                    schema: {
-                      $ref: '#/components/schemas/Practice',
-                    },
-                  },
-                },
-              },
-              404: {
-                description: 'Practice not found',
-              },
-              500: {
-                description: 'Server error',
-              },
-            },
-          },
-        },
+        ...buildToolPaths(),
         '/metrics': {
           get: {
             summary: 'Get Metrics',
@@ -357,17 +208,7 @@ export class OpenAPIGenerator {
       },
       components: {
         schemas: {
-          DetectWorkflowRequest: {
-            type: 'object',
-            required: ['path'],
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Directory path to analyze',
-                example: '/path/to/my-project',
-              },
-            },
-          },
+          ...buildRequestSchemas(),
           DetectionResult: {
             type: 'object',
             properties: {
@@ -397,52 +238,6 @@ export class OpenAPIGenerator {
               },
             },
           },
-          ValidateProjectRequest: {
-            type: 'object',
-            required: ['path'],
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Project directory path',
-              },
-              workflow: {
-                type: 'string',
-                description: 'Optional workflow type (auto-detected if not provided)',
-              },
-            },
-          },
-          ValidateFileRequest: {
-            type: 'object',
-            required: ['path'],
-            properties: {
-              path: {
-                type: 'string',
-                description: 'File path to validate',
-              },
-            },
-          },
-          GenerateTemplateRequest: {
-            type: 'object',
-            required: ['workflow'],
-            properties: {
-              workflow: {
-                type: 'string',
-                description: 'Workflow type for template',
-              },
-              projectName: {
-                type: 'string',
-                description: 'Optional project name',
-              },
-              authorName: {
-                type: 'string',
-                description: 'Optional author name',
-              },
-              authorEmail: {
-                type: 'string',
-                description: 'Optional author email',
-              },
-            },
-          },
           ValidationResult: {
             type: 'object',
             properties: {
@@ -461,6 +256,9 @@ export class OpenAPIGenerator {
                       $ref: '#/components/schemas/Finding',
                     },
                   },
+                  summary: {
+                    $ref: '#/components/schemas/FindingSummary',
+                  },
                   duration: {
                     type: 'number',
                   },
@@ -468,6 +266,21 @@ export class OpenAPIGenerator {
               },
               timestamp: {
                 type: 'number',
+              },
+            },
+          },
+          FindingSummary: {
+            type: 'object',
+            description: 'Counts of all findings before filters were applied',
+            properties: {
+              total: { type: 'integer' },
+              bySeverity: {
+                type: 'object',
+                properties: Object.fromEntries(SEVERITIES.map((k) => [k, { type: 'integer' }])),
+              },
+              byCategory: {
+                type: 'object',
+                properties: Object.fromEntries(CATEGORIES.map((k) => [k, { type: 'integer' }])),
               },
             },
           },
@@ -488,6 +301,9 @@ export class OpenAPIGenerator {
                     items: {
                       $ref: '#/components/schemas/Finding',
                     },
+                  },
+                  summary: {
+                    $ref: '#/components/schemas/FindingSummary',
                   },
                 },
               },
@@ -547,6 +363,7 @@ export class OpenAPIGenerator {
               },
               category: {
                 type: 'string',
+                enum: [...CATEGORIES],
               },
               message: {
                 type: 'string',
@@ -576,6 +393,13 @@ export class OpenAPIGenerator {
               },
               severity: {
                 type: 'string',
+                enum: [...SEVERITIES],
+              },
+              enforcement: {
+                type: 'string',
+                enum: [...ENFORCEMENTS],
+                description:
+                  "'automated' = a validator rule reports violations; 'guidance' = advice only",
               },
               description: {
                 type: 'string',

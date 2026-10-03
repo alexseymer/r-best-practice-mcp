@@ -1,7 +1,8 @@
 import { Severity, Category } from './finding.js';
 import { Workflow } from './workflow.js';
 
-export type Enforcement = 'automated' | 'guidance';
+export const ENFORCEMENTS = ['automated', 'guidance'] as const;
+export type Enforcement = (typeof ENFORCEMENTS)[number];
 
 export interface Practice {
   id: string;
@@ -23,7 +24,12 @@ export interface Practice {
 export interface PracticeListOptions {
   workflow?: Workflow;
   category?: Category;
-  severity?: Severity;
+  /** Keep practices at least this severe. */
+  minSeverity?: Severity;
+  enforcement?: Enforcement;
+  /** Case-insensitive substring over id, title, description, details and tags. */
+  query?: string;
+  /** Keep practices having at least one of these tags. */
   tags?: string[];
   limit?: number;
 }

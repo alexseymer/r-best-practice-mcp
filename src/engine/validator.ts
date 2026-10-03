@@ -1,14 +1,11 @@
-import { Finding, Severity, ValidationResult } from '../types/finding.js';
+import { FileValidationResult, Finding, ValidationResult } from '../types/finding.js';
 import { Workflow } from '../types/workflow.js';
 import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
 import { runRegisteredRules } from './rules/index.js';
+import { applyFindingFilters, FindingFilterOptions, summarizeFindings } from './finding-filters.js';
 
-export interface ValidatorOptions {
-  maxFindings?: number;
-  minSeverity?: Severity;
-  categories?: string[];
-}
+export type ValidatorOptions = FindingFilterOptions;
 
 export class Validator {
   async validateProject(
@@ -63,17 +60,9 @@ export class Validator {
 
       findings.push(...(await runRegisteredRules({ dirPath, workflow })));
 
-      // Filter findings
-      let filtered = findings;
-      if (options.minSeverity) {
-        filtered = this.filterBySeverity(filtered, options.minSeverity);
-      }
-      if (options.categories && options.categories.length > 0) {
-        filtered = filtered.filter((f) => options.categories!.includes(f.category));
-      }
-      if (options.maxFindings) {
-        filtered = filtered.slice(0, options.maxFindings);
-      }
+      // Summary counts everything found; filters only narrow the returned list.
+      const summary = summarizeFindings(findings);
+      const filtered = applyFindingFilters(findings, options);
 
       const duration = Date.now() - startTime;
       logger.info(`Found ${filtered.length} issues in ${duration}ms`);
@@ -82,29 +71,50 @@ export class Validator {
         filePath: dirPath,
         workflow,
         findings: filtered,
+        summary,
         timestamp: Date.now(),
         duration,
       };
     } catch (error) {
       logger.error(`Error validating ${workflow}`, error);
+      const errorFindings: Finding[] = [
+        {
+          id: 'validation-error',
+          severity: 'critical' as const,
+          category: 'structure',
+          message: `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ];
       return {
         filePath: dirPath,
         workflow,
-        findings: [
-          {
-            id: 'validation-error',
-            severity: 'critical' as const,
-            category: 'structure',
-            message: `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
+        findings: errorFindings,
+        summary: summarizeFindings(errorFindings),
         timestamp: Date.now(),
         duration: Date.now() - startTime,
       };
     }
   }
 
-  async validateFile(filePath: string): Promise<Finding[]> {
+  /** Validate one file; optional filters narrow the returned findings. */
+  async validateFile(filePath: string, options: ValidatorOptions = {}): Promise<Finding[]> {
+    return applyFindingFilters(await this.collectFileFindings(filePath), options);
+  }
+
+  /** Like validateFile, but also returns the pre-filter summary ("N of M"). */
+  async validateFileWithSummary(
+    filePath: string,
+    options: ValidatorOptions = {}
+  ): Promise<FileValidationResult> {
+    const all = await this.collectFileFindings(filePath);
+    return {
+      path: filePath,
+      findings: applyFindingFilters(all, options),
+      summary: summarizeFindings(all),
+    };
+  }
+
+  private async collectFileFindings(filePath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
     const ext = FileUtils.getExtension(filePath);
 
@@ -147,11 +157,7 @@ export class Validator {
           file: mainFile,
           line: 1,
           message: 'Script should start with header comment',
-          suggestions: [
-            '# Purpose: [description]',
-            '# Author: [name]',
-            '# Date: [date]',
-          ],
+          suggestions: ['# Purpose: [description]', '# Author: [name]', '# Date: [date]'],
         });
       }
 
@@ -614,9 +620,10 @@ export class Validator {
     }
 
     // Check for test setup file
-    const testSetup = await FileUtils.exists(`${dirPath}/tests/testthat/setup-shinytest.R`) ||
-                      await FileUtils.exists(`${dirPath}/tests/setup.R`) ||
-                      await FileUtils.exists(`${dirPath}/tests/shinytest/setup.R`);
+    const testSetup =
+      (await FileUtils.exists(`${dirPath}/tests/testthat/setup-shinytest.R`)) ||
+      (await FileUtils.exists(`${dirPath}/tests/setup.R`)) ||
+      (await FileUtils.exists(`${dirPath}/tests/shinytest/setup.R`));
 
     if (!testSetup && shinytestDir) {
       findings.push({
@@ -628,17 +635,5 @@ export class Validator {
     }
 
     return findings;
-  }
-
-  private filterBySeverity(findings: Finding[], minSeverity: Severity): Finding[] {
-    const severityOrder: Record<Severity, number> = {
-      critical: 4,
-      important: 3,
-      recommended: 2,
-      info: 1,
-    };
-
-    const minValue = severityOrder[minSeverity];
-    return findings.filter((f) => severityOrder[f.severity] >= minValue);
   }
 }

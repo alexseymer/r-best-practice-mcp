@@ -11,6 +11,8 @@ import { SecurityUtils } from './utils/security.js';
 import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
+import { toRestToolsPayload } from './tools/schemas.js';
+import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
@@ -227,7 +229,7 @@ export class RPracticesWebServer {
           'detection',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in detect-workflow', error);
@@ -239,141 +241,15 @@ export class RPracticesWebServer {
       }
     });
 
-    // Validate project
-    this.app.post('/api/validate-project', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath, workflow } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        if (workflow && !SecurityUtils.isValidWorkflow(workflow)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_WORKFLOW',
-            message: `Invalid workflow type: ${workflow}`,
-          });
-        }
-
-        const exists = await FileUtils.isDirectory(inputPath);
-        if (!exists) {
-          return res.status(404).json({
-            error: true,
-            code: 'PATH_NOT_FOUND',
-            message: `Directory not found: ${inputPath}`,
-          });
-        }
-
-        // Auto-detect workflow if not specified
-        let detectedWorkflow = workflow || 'unknown';
-        if (!workflow) {
-          const detection = await this.detector.detect(inputPath);
-          detectedWorkflow = detection.workflow;
-        }
-
-        const result = await this.validator.validateProject(inputPath, detectedWorkflow as any);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('validation', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'validation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error',
-        );
-
-        logger.error('Error in validate-project', error);
-        res.status(500).json({
-          error: true,
-          code: 'VALIDATION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Validate file
-    this.app.post('/api/validate-file', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        const exists = await FileUtils.exists(inputPath);
-        if (!exists) {
-          return res.status(404).json({
-            error: true,
-            code: 'FILE_NOT_FOUND',
-            message: `File not found: ${inputPath}`,
-          });
-        }
-
-        const findings = await this.validator.validateFile(inputPath);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('validation', duration, true);
-
-        res.json({
-          error: false,
-          data: {
-            path: inputPath,
-            findings,
-          },
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'validation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error',
-        );
-
-        logger.error('Error in validate-file', error);
-        res.status(500).json({
-          error: true,
-          code: 'VALIDATION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
+    // Validate project and file (v0 + v1 share one implementation)
+    for (const prefix of ['/api', '/api/v1']) {
+      this.app.post(`${prefix}/validate-project`, (req: Request, res: Response) =>
+        this.handleValidateProject(req, res)
+      );
+      this.app.post(`${prefix}/validate-file`, (req: Request, res: Response) =>
+        this.handleValidateFile(req, res)
+      );
+    }
 
     // Get practice
     this.app.get('/api/practice/:id', (req: Request, res: Response) => {
@@ -405,7 +281,7 @@ export class RPracticesWebServer {
           'practice-lookup',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in get-practice', error);
@@ -450,9 +326,15 @@ export class RPracticesWebServer {
         }
 
         // Sanitize optional string inputs
-        const sanitizedProjectName = projectName ? SecurityUtils.sanitizeInput(projectName) : undefined;
-        const sanitizedAuthorName = authorName ? SecurityUtils.sanitizeInput(authorName) : undefined;
-        const sanitizedAuthorEmail = authorEmail ? SecurityUtils.sanitizeInput(authorEmail) : undefined;
+        const sanitizedProjectName = projectName
+          ? SecurityUtils.sanitizeInput(projectName)
+          : undefined;
+        const sanitizedAuthorName = authorName
+          ? SecurityUtils.sanitizeInput(authorName)
+          : undefined;
+        const sanitizedAuthorEmail = authorEmail
+          ? SecurityUtils.sanitizeInput(authorEmail)
+          : undefined;
 
         const result = await this.templateGenerator.generate(workflow as any, {
           projectName: sanitizedProjectName,
@@ -476,7 +358,7 @@ export class RPracticesWebServer {
           'template-generation',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in generate-template', error);
@@ -527,148 +409,13 @@ export class RPracticesWebServer {
           'detection',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in detect-workflow', error);
         res.status(500).json({
           error: true,
           code: 'DETECTION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Validate project (v1)
-    this.app.post('/api/v1/validate-project', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath, workflow } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        if (workflow && !SecurityUtils.isValidWorkflow(workflow)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_WORKFLOW',
-            message: `Invalid workflow type: ${workflow}`,
-          });
-        }
-
-        const exists = await FileUtils.isDirectory(inputPath);
-        if (!exists) {
-          return res.status(404).json({
-            error: true,
-            code: 'PATH_NOT_FOUND',
-            message: `Directory not found: ${inputPath}`,
-          });
-        }
-
-        let detectedWorkflow = workflow || 'unknown';
-        if (!workflow) {
-          const detection = await this.detector.detect(inputPath);
-          detectedWorkflow = detection.workflow;
-        }
-
-        const result = await this.validator.validateProject(inputPath, detectedWorkflow as any);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('validation', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'validation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error',
-        );
-
-        logger.error('Error in validate-project', error);
-        res.status(500).json({
-          error: true,
-          code: 'VALIDATION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Validate file (v1)
-    this.app.post('/api/v1/validate-file', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        const exists = await FileUtils.exists(inputPath);
-        if (!exists) {
-          return res.status(404).json({
-            error: true,
-            code: 'FILE_NOT_FOUND',
-            message: `File not found: ${inputPath}`,
-          });
-        }
-
-        const findings = await this.validator.validateFile(inputPath);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('validation', duration, true);
-
-        res.json({
-          error: false,
-          data: {
-            path: inputPath,
-            findings,
-          },
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'validation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error',
-        );
-
-        logger.error('Error in validate-file', error);
-        res.status(500).json({
-          error: true,
-          code: 'VALIDATION_ERROR',
           message: error instanceof Error ? error.message : 'Unknown error',
         });
       }
@@ -704,7 +451,7 @@ export class RPracticesWebServer {
           'practice-lookup',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in get-practice', error);
@@ -738,9 +485,15 @@ export class RPracticesWebServer {
           });
         }
 
-        const sanitizedProjectName = projectName ? SecurityUtils.sanitizeInput(projectName) : undefined;
-        const sanitizedAuthorName = authorName ? SecurityUtils.sanitizeInput(authorName) : undefined;
-        const sanitizedAuthorEmail = authorEmail ? SecurityUtils.sanitizeInput(authorEmail) : undefined;
+        const sanitizedProjectName = projectName
+          ? SecurityUtils.sanitizeInput(projectName)
+          : undefined;
+        const sanitizedAuthorName = authorName
+          ? SecurityUtils.sanitizeInput(authorName)
+          : undefined;
+        const sanitizedAuthorEmail = authorEmail
+          ? SecurityUtils.sanitizeInput(authorEmail)
+          : undefined;
 
         const result = await this.templateGenerator.generate(workflow as any, {
           projectName: sanitizedProjectName,
@@ -764,7 +517,7 @@ export class RPracticesWebServer {
           'template-generation',
           duration,
           false,
-          error instanceof Error ? error.message : 'Unknown error',
+          error instanceof Error ? error.message : 'Unknown error'
         );
 
         logger.error('Error in generate-template', error);
@@ -776,100 +529,164 @@ export class RPracticesWebServer {
       }
     });
 
-    // List all tools (for introspection)
+    // List all tools (for introspection); derived from tools/schemas.ts like the MCP tool list
     this.app.get('/api/tools', (req: Request, res: Response) => {
       res.json({
         error: false,
-        data: [
-          {
-            name: 'detect_workflow',
-            method: 'POST',
-            path: '/api/detect-workflow',
-            description: 'Detect the R workflow type from a directory path',
-            parameters: {
-              path: { type: 'string', description: 'Directory path to analyze', required: true },
-            },
-          },
-          {
-            name: 'validate_project',
-            method: 'POST',
-            path: '/api/validate-project',
-            description: 'Validate an R project against best practices',
-            parameters: {
-              path: { type: 'string', description: 'Directory path to validate', required: true },
-              workflow: { type: 'string', description: 'Optional workflow type', required: false },
-            },
-          },
-          {
-            name: 'validate_file',
-            method: 'POST',
-            path: '/api/validate-file',
-            description: 'Validate a single R or Quarto file',
-            parameters: {
-              path: { type: 'string', description: 'File path to validate', required: true },
-            },
-          },
-          {
-            name: 'get_practice',
-            method: 'GET',
-            path: '/api/practice/:id',
-            description: 'Get details about a specific best practice',
-            parameters: {
-              id: { type: 'string', description: 'Practice ID', required: true },
-            },
-          },
-          {
-            name: 'list_practices',
-            method: 'GET',
-            path: '/api/practices',
-            description: 'List best practices for a workflow type or category',
-            parameters: {
-              workflow: { type: 'string', description: 'Optional workflow type', required: false },
-              category: { type: 'string', description: 'Optional category', required: false },
-            },
-          },
-          {
-            name: 'generate_template',
-            method: 'POST',
-            path: '/api/generate-template',
-            description: 'Generate a project template for a specific R workflow',
-            parameters: {
-              workflow: { type: 'string', description: 'Workflow type', required: true },
-              projectName: { type: 'string', description: 'Optional project name', required: false },
-              authorName: { type: 'string', description: 'Optional author name', required: false },
-              authorEmail: { type: 'string', description: 'Optional author email', required: false },
-            },
-          },
-        ],
+        data: toRestToolsPayload(),
         timestamp: Date.now(),
       });
+    });
+  }
+
+  private sendInvalidParameter(res: Response, code: string, message: string): Response {
+    return res.status(400).json({ error: true, code, message });
+  }
+
+  private async handleValidateProject(req: Request, res: Response): Promise<void> {
+    const startTime = process.hrtime();
+    try {
+      const body = req.body ?? {};
+      const { path: inputPath, workflow } = body;
+      if (!inputPath) {
+        this.sendInvalidParameter(res, 'MISSING_PARAMETER', 'path parameter is required');
+        return;
+      }
+
+      if (!SecurityUtils.isValidFilePath(inputPath)) {
+        this.sendInvalidParameter(res, 'INVALID_PATH', 'Invalid path format');
+        return;
+      }
+
+      if (workflow && !SecurityUtils.isValidWorkflow(workflow)) {
+        this.sendInvalidParameter(res, 'INVALID_WORKFLOW', `Invalid workflow type: ${workflow}`);
+        return;
+      }
+
+      const filters = parseFindingFilters(body);
+      if (!filters.ok) {
+        this.sendInvalidParameter(res, filters.code, filters.message);
+        return;
+      }
+
+      const exists = await FileUtils.isDirectory(inputPath);
+      if (!exists) {
+        res.status(404).json({
+          error: true,
+          code: 'PATH_NOT_FOUND',
+          message: `Directory not found: ${inputPath}`,
+        });
+        return;
+      }
+
+      // Auto-detect workflow if not specified
+      let detectedWorkflow = workflow || 'unknown';
+      if (!workflow) {
+        const detection = await this.detector.detect(inputPath);
+        detectedWorkflow = detection.workflow;
+      }
+
+      const result = await this.validator.validateProject(
+        inputPath,
+        detectedWorkflow as any,
+        filters.value
+      );
+      const hrTime = process.hrtime(startTime);
+      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+      metricsCollector.recordOperation('validation', duration, true);
+
+      res.json({
+        error: false,
+        data: result,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      this.sendValidationFailure(res, startTime, error, 'validate-project');
+    }
+  }
+
+  private async handleValidateFile(req: Request, res: Response): Promise<void> {
+    const startTime = process.hrtime();
+    try {
+      const body = req.body ?? {};
+      const { path: inputPath } = body;
+      if (!inputPath) {
+        this.sendInvalidParameter(res, 'MISSING_PARAMETER', 'path parameter is required');
+        return;
+      }
+
+      if (!SecurityUtils.isValidFilePath(inputPath)) {
+        this.sendInvalidParameter(res, 'INVALID_PATH', 'Invalid path format');
+        return;
+      }
+
+      const filters = parseFindingFilters(body);
+      if (!filters.ok) {
+        this.sendInvalidParameter(res, filters.code, filters.message);
+        return;
+      }
+
+      const exists = await FileUtils.exists(inputPath);
+      if (!exists) {
+        res.status(404).json({
+          error: true,
+          code: 'FILE_NOT_FOUND',
+          message: `File not found: ${inputPath}`,
+        });
+        return;
+      }
+
+      const data = await this.validator.validateFileWithSummary(inputPath, filters.value);
+      const hrTime = process.hrtime(startTime);
+      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+      metricsCollector.recordOperation('validation', duration, true);
+
+      res.json({
+        error: false,
+        data,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      this.sendValidationFailure(res, startTime, error, 'validate-file');
+    }
+  }
+
+  private sendValidationFailure(
+    res: Response,
+    startTime: [number, number],
+    error: unknown,
+    route: string
+  ): void {
+    const hrTime = process.hrtime(startTime);
+    const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
+    metricsCollector.recordOperation(
+      'validation',
+      duration,
+      false,
+      error instanceof Error ? error.message : 'Unknown error'
+    );
+
+    logger.error(`Error in ${route}`, error);
+    res.status(500).json({
+      error: true,
+      code: 'VALIDATION_ERROR',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 
   private handleListPractices(req: Request, res: Response, withPagination: boolean): any {
     const startTime = process.hrtime();
     try {
-      const { workflow } = req.query;
-      let { category } = req.query;
-
-      // Validate workflow if provided
-      if (workflow && !SecurityUtils.isValidWorkflow(workflow as string)) {
-        return res.status(400).json({
-          error: true,
-          code: 'INVALID_WORKFLOW',
-          message: `Invalid workflow type: ${workflow}`,
-        });
+      const options = parsePracticeFilters(req.query as Record<string, unknown>);
+      if (!options.ok) {
+        return this.sendInvalidParameter(res, options.code, options.message);
       }
 
-      // Sanitize category if provided
-      if (category && typeof category === 'string') {
-        category = SecurityUtils.sanitizeInput(category);
-      }
-
-      const result = kb.listPractices({
-        workflow: workflow as any,
-        category: category as any,
-      });
+      // On v1 `limit` is the page size (handled by pagination below), so the filter limit is
+      // only applied to the unpaginated v0 response.
+      const filterOptions = { ...options.value };
+      if (withPagination) delete filterOptions.limit;
+      const result = kb.listPractices(filterOptions);
 
       const hrTime = process.hrtime(startTime);
       const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
@@ -877,7 +694,11 @@ export class RPracticesWebServer {
 
       if (withPagination) {
         const paginationParams = PaginationUtils.parsePaginationParams(req.query);
-        const paginatedData = PaginationUtils.paginate(result.practices, paginationParams.limit, paginationParams.offset);
+        const paginatedData = PaginationUtils.paginate(
+          result.practices,
+          paginationParams.limit,
+          paginationParams.offset
+        );
         const paginatedResponse = PaginationUtils.createResponse(
           paginatedData,
           result.practices.length,
@@ -905,7 +726,7 @@ export class RPracticesWebServer {
         'practice-lookup',
         duration,
         false,
-        error instanceof Error ? error.message : 'Unknown error',
+        error instanceof Error ? error.message : 'Unknown error'
       );
 
       logger.error('Error in list-practices', error);

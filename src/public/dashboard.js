@@ -26,10 +26,28 @@
     { id: 'blogdown', label: 'blogdown site' },
     { id: 'shinytest', label: 'shinytest2 tests' },
   ];
+  var CATEGORIES = ['structure', 'naming', 'documentation', 'performance', 'security', 'testing', 'dependency', 'style'];
+  var SEVERITY_OPTIONS = [
+    { value: '', label: 'All severities' },
+    { value: 'info', label: 'Info and up' },
+    { value: 'recommended', label: 'Recommended and up' },
+    { value: 'important', label: 'Important and up' },
+    { value: 'critical', label: 'Critical only' },
+  ];
+  var ENFORCEMENT = {
+    automated: { label: 'Automated check', cls: 'bg-emerald-100 text-emerald-900', hint: 'A validator rule reports violations of this practice.' },
+    guidance: { label: 'Guidance only', cls: 'bg-slate-100 text-slate-700', hint: 'Advice only; this practice is not checked automatically.' },
+  };
+  var MAX_FINDINGS_LIMIT = 1000;
+  var PRACTICE_DEBOUNCE_MS = 250;
   var RECENT_KEY = 'rbp.recentPaths';
 
   var state = {
     practices: [],
+    shownPractices: [],
+    practiceSeq: 0,
+    practiceAbort: null,
+    practiceTimer: null,
     audit: null,
     sevFilter: {},
     template: null,
@@ -151,8 +169,9 @@
     }
   }
 
-  function api(method, url, body) {
+  function api(method, url, body, signal) {
     var opts = { method: method, headers: {} };
+    if (signal) opts.signal = signal;
     if (body !== undefined) {
       opts.headers['Content-Type'] = 'application/json';
       opts.body = JSON.stringify(body);
@@ -177,7 +196,12 @@
           return json.data;
         });
       },
-      function () {
+      function (err) {
+        if (err && err.name === 'AbortError') {
+          var aborted = new Error('Request cancelled');
+          aborted.aborted = true;
+          throw aborted;
+        }
         throw new Error('Cannot reach the server. Is it still running?');
       },
     );
@@ -223,8 +247,8 @@
     return h('div', { class: 'text-center py-12 text-secondary border border-dashed border-border-strong rounded-xl', text: text });
   }
 
-  function badge(text, cls) {
-    return h('span', { class: 'px-2 py-0.5 rounded text-[11px] font-semibold ' + cls, text: text });
+  function badge(text, cls, title) {
+    return h('span', { class: 'px-2 py-0.5 rounded text-[11px] font-semibold ' + cls, title: title, text: text });
   }
 
   /* ---------- tabs ---------- */
@@ -342,7 +366,8 @@
             var p = t.parameters[k];
             return h('li', null, [
               h('code', { class: 'font-code-sm', text: k }),
-              ' (' + p.type + (p.required ? ', required' : '') + '): ' + (p.description || ''),
+              ' (' + p.type + (p.required ? ', required' : '') + '): ' + (p.description || '') +
+                (p.enum ? ' [' + p.enum.join(' | ') + ']' : ''),
             ]);
           });
           list.appendChild(
@@ -406,6 +431,71 @@
       gen.appendChild(h('option', { value: w.id, text: w.label }));
     });
     $('stat-workflows').textContent = String(WORKFLOWS.length);
+    populateSeveritySelect($('filter-min-severity'));
+    populateSeveritySelect($('practice-severity'));
+    var box = $('filter-categories');
+    CATEGORIES.forEach(function (c) {
+      var id = 'filter-cat-' + c;
+      box.appendChild(
+        h('label', { for: id, class: 'inline-flex items-center gap-1.5 text-label-md font-label-md text-on-surface' }, [
+          h('input', { type: 'checkbox', id: id, value: c, 'data-filter-category': '', class: 'rounded border-border-strong' }),
+          c,
+        ]),
+      );
+    });
+  }
+
+  function populateSeveritySelect(select) {
+    SEVERITY_OPTIONS.forEach(function (o) {
+      select.appendChild(h('option', { value: o.value, text: o.label }));
+    });
+  }
+
+  /* Server-side filters from the "Filters" block; applied to project audits and single files.
+   * Returns { filters: {...} } or { error: 'message' }. */
+  function readAuditFilters() {
+    var filters = {};
+    var sev = $('filter-min-severity').value;
+    if (sev) filters.minSeverity = sev;
+    var cats = [];
+    document.querySelectorAll('[data-filter-category]').forEach(function (cb) {
+      if (cb.checked) cats.push(cb.value);
+    });
+    if (cats.length) filters.categories = cats;
+    var raw = $('filter-max').value.trim();
+    if (raw) {
+      var n = Number(raw);
+      if (!/^\d+$/.test(raw) || n < 1 || n > MAX_FINDINGS_LIMIT) {
+        return { error: 'Max findings must be a whole number between 1 and ' + MAX_FINDINGS_LIMIT + ', or left blank for no limit.' };
+      }
+      filters.maxFindings = n;
+    }
+    return { filters: filters };
+  }
+
+  function describeFilters(f) {
+    var parts = [];
+    if (f.minSeverity) parts.push('minimum severity ' + f.minSeverity);
+    if (f.categories) parts.push('categories ' + f.categories.join(', '));
+    if (f.maxFindings) parts.push('max ' + f.maxFindings + ' findings');
+    return parts.length ? parts.join('; ') : 'none';
+  }
+
+  function updateFiltersBadge() {
+    var read = readAuditFilters();
+    var n = read.filters ? Object.keys(read.filters).length : 0;
+    var el = $('filters-badge');
+    el.textContent = n ? n + ' active' : '';
+    el.classList.toggle('hidden', !n);
+  }
+
+  function resetAuditFilters() {
+    $('filter-min-severity').value = '';
+    $('filter-max').value = '';
+    document.querySelectorAll('[data-filter-category]').forEach(function (cb) {
+      cb.checked = false;
+    });
+    updateFiltersBadge();
   }
 
   function runAudit(path, workflow) {
@@ -414,14 +504,19 @@
       showAlert('Enter the path of the project folder first.');
       return Promise.resolve();
     }
+    var read = readAuditFilters();
+    if (read.error) {
+      showAlert(read.error);
+      return Promise.resolve();
+    }
     var btn = $('audit-btn');
     setBusy(btn, true, 'Auditing…');
-    var body = { path: path };
+    var body = Object.assign({ path: path }, read.filters);
     if (workflow) body.workflow = workflow;
     return api('POST', '/api/validate-project', body).then(
       function (result) {
         rememberPath(path);
-        state.audit = { kind: 'project', target: path, result: result };
+        state.audit = { kind: 'project', target: path, result: result, filters: read.filters };
         state.sevFilter = {};
         $('finding-category').value = '';
         $('finding-text').value = '';
@@ -441,18 +536,25 @@
       showAlert('Enter the path of the file first.');
       return Promise.resolve();
     }
+    var read = readAuditFilters();
+    if (read.error) {
+      showAlert(read.error);
+      return Promise.resolve();
+    }
     var btn = $('file-btn');
     var started = window.performance.now();
     setBusy(btn, true, 'Validating…');
-    return api('POST', '/api/validate-file', { path: path }).then(
+    return api('POST', '/api/validate-file', Object.assign({ path: path }, read.filters)).then(
       function (data) {
         state.audit = {
           kind: 'file',
           target: data.path || path,
+          filters: read.filters,
           result: {
             filePath: data.path || path,
             workflow: 'file',
             findings: data.findings || [],
+            summary: data.summary,
             duration: window.performance.now() - started,
           },
         };
@@ -502,6 +604,7 @@
     var audit = state.audit;
     var result = audit.result;
     var all = result.findings || [];
+    var totalFound = result.summary && typeof result.summary.total === 'number' ? result.summary.total : all.length;
     var counts = {};
     all.forEach(function (f) {
       counts[f.severity] = (counts[f.severity] || 0) + 1;
@@ -512,7 +615,11 @@
         ? 'File ' + audit.target
         : workflowLabel(result.workflow) + ' project · ' + audit.target;
     $('findings-summary').textContent =
-      summary + ' · ' + plural(all.length, 'finding') + ' · ' + formatMs(result.duration);
+      summary +
+      ' · ' +
+      (result.summary ? 'Showing ' + all.length + ' of ' + plural(totalFound, 'finding') : plural(all.length, 'finding')) +
+      ' · ' +
+      formatMs(result.duration);
     $('findings-actions').classList.remove('hidden');
     $('findings-filters').classList.toggle('hidden', all.length === 0);
 
@@ -524,7 +631,12 @@
       ? SEVERITIES.filter(function (s) { return counts[s]; })
           .map(function (s) { return counts[s] + ' ' + s; })
           .join(' · ')
-      : 'no issues found';
+      : totalFound
+        ? 'none shown (' + totalFound + ' hidden by filters)'
+        : 'no issues found';
+    if (all.length && totalFound > all.length) {
+      $('stat-audit-sub').textContent += ' · ' + (totalFound - all.length) + ' hidden by filters';
+    }
 
     var chips = $('severity-chips');
     clear(chips);
@@ -567,6 +679,10 @@
   function renderFindingList(total) {
     var list = $('findings');
     clear(list);
+    if (total === 0 && state.audit.result.summary && state.audit.result.summary.total > 0) {
+      list.appendChild(emptyBox('All ' + plural(state.audit.result.summary.total, 'finding') + ' were hidden by the audit filters. Adjust or reset the filters and run the audit again.'));
+      return;
+    }
     if (total === 0) {
       list.appendChild(
         h('div', { class: 'text-center py-12 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900' }, [
@@ -631,6 +747,8 @@
         kind: a.kind,
         workflow: a.result.workflow,
         durationMs: a.result.duration,
+        filters: a.filters || {},
+        summary: a.result.summary || null,
         findings: a.result.findings,
       },
       null,
@@ -649,10 +767,21 @@
       '- Target: `' + a.target + '`',
       '- Workflow: ' + (a.kind === 'file' ? 'single file' : workflowLabel(a.result.workflow)),
       '- Generated: ' + new Date().toISOString(),
-      '- Findings: ' + findings.length,
-      '',
+      '- Findings: ' +
+        (a.result.summary ? findings.length + ' shown of ' + a.result.summary.total : findings.length),
+      '- Filters: ' + describeFilters(a.filters || {}),
     ];
-    if (!findings.length) lines.push('No issues found.');
+    if (a.result.summary) {
+      var sm = a.result.summary;
+      lines.push(
+        '- Summary (all findings before filters): ' +
+          SEVERITIES.map(function (sv) { return (sm.bySeverity[sv] || 0) + ' ' + sv; }).join(', '),
+      );
+    }
+    lines.push('');
+    if (!findings.length) {
+      lines.push(a.result.summary && a.result.summary.total ? 'No findings match the filters used.' : 'No issues found.');
+    }
     findings.forEach(function (f) {
       var where = f.file ? ' (`' + relativeTo(a.target, f.file) + (f.line ? ':' + f.line : '') + '`)' : '';
       lines.push('## [' + f.severity.toUpperCase() + '] ' + f.message + where, '');
@@ -954,6 +1083,8 @@
 
   /* ---------- practices ---------- */
 
+  /* One unfiltered load feeds the dropdown options, the stat card and "View practice" links.
+   * The visible list is filtered by the server (see refreshPractices). */
   function loadPractices() {
     if (state.practicesPromise) return state.practicesPromise;
     state.practicesPromise = api('GET', '/api/practices').then(
@@ -961,9 +1092,13 @@
         state.practices = data.practices || [];
         var wfs = [];
         var cats = [];
+        var automated = 0;
+        var guidance = 0;
         state.practices.forEach(function (p) {
           if (wfs.indexOf(p.workflow) < 0) wfs.push(p.workflow);
           if (cats.indexOf(p.category) < 0) cats.push(p.category);
+          if (p.enforcement === 'automated') automated++;
+          else if (p.enforcement === 'guidance') guidance++;
         });
         wfs.sort().forEach(function (w) {
           $('practice-workflow').appendChild(h('option', { value: w, text: workflowLabel(w) }));
@@ -972,8 +1107,16 @@
           $('practice-category').appendChild(h('option', { value: c, text: c }));
         });
         $('stat-practices').textContent = String(state.practices.length);
-        $('stat-practices-sub').textContent = 'across ' + plural(cats.length, 'category', 'categories');
-        renderPractices();
+        $('stat-practices-sub').textContent =
+          automated || guidance
+            ? automated + ' automated · ' + guidance + ' guidance'
+            : 'across ' + plural(cats.length, 'category', 'categories');
+        if (practiceFilterParams()) {
+          refreshPractices();
+        } else {
+          state.shownPractices = state.practices;
+          renderPractices();
+        }
         if (state.audit) renderAudit();
       },
       function (err) {
@@ -985,19 +1128,63 @@
     return state.practicesPromise;
   }
 
-  function filteredPractices() {
-    var q = $('practice-text').value.trim().toLowerCase();
-    var wf = $('practice-workflow').value;
-    var cat = $('practice-category').value;
-    var sev = $('practice-severity').value;
-    return state.practices.filter(function (p) {
-      if (wf && p.workflow !== wf) return false;
-      if (cat && p.category !== cat) return false;
-      if (sev && p.severity !== sev) return false;
-      if (!q) return true;
-      var hay = [p.id, p.title, p.description, p.details, (p.tags || []).join(' ')].join(' ').toLowerCase();
-      return hay.indexOf(q) >= 0;
+  /* Query string for /api/practices from the filter controls, or '' when nothing is set. */
+  function practiceFilterParams() {
+    var pairs = [];
+    [
+      ['workflow', 'practice-workflow'],
+      ['category', 'practice-category'],
+      ['minSeverity', 'practice-severity'],
+      ['enforcement', 'practice-enforcement'],
+    ].forEach(function (m) {
+      var v = $(m[1]).value;
+      if (v) pairs.push(m[0] + '=' + encodeURIComponent(v));
     });
+    var q = $('practice-text').value.trim();
+    if (q) pairs.push('q=' + encodeURIComponent(q));
+    return pairs.join('&');
+  }
+
+  /* Ask the server for the filtered list. Only the newest request may update the page. */
+  function refreshPractices() {
+    window.clearTimeout(state.practiceTimer);
+    var seq = ++state.practiceSeq;
+    if (state.practiceAbort) state.practiceAbort.abort();
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    state.practiceAbort = ctrl;
+    var params = practiceFilterParams();
+    $('practice-list').setAttribute('aria-busy', 'true');
+    return api('GET', '/api/practices' + (params ? '?' + params : ''), undefined, ctrl ? ctrl.signal : undefined).then(
+      function (data) {
+        if (seq !== state.practiceSeq) return;
+        $('practice-list').removeAttribute('aria-busy');
+        state.shownPractices = data.practices || [];
+        renderPractices();
+      },
+      function (err) {
+        if (err.aborted || seq !== state.practiceSeq) return;
+        $('practice-list').removeAttribute('aria-busy');
+        showAlert(err.message);
+      },
+    );
+  }
+
+  function schedulePracticeRefresh() {
+    window.clearTimeout(state.practiceTimer);
+    state.practiceTimer = window.setTimeout(refreshPractices, PRACTICE_DEBOUNCE_MS);
+  }
+
+  /* Clear every practice filter without a server round trip (an empty filter is the full list). */
+  function resetPracticeFilters() {
+    ['practice-text', 'practice-workflow', 'practice-category', 'practice-severity', 'practice-enforcement'].forEach(function (n) {
+      $(n).value = '';
+    });
+    window.clearTimeout(state.practiceTimer);
+    state.practiceSeq++;
+    if (state.practiceAbort) state.practiceAbort.abort();
+    $('practice-list').removeAttribute('aria-busy');
+    state.shownPractices = state.practices;
+    renderPractices();
   }
 
   function codeBlock(label, code, tone) {
@@ -1010,7 +1197,7 @@
   function renderPractices() {
     var list = $('practice-list');
     clear(list);
-    var items = filteredPractices();
+    var items = state.shownPractices;
     $('practice-count').textContent = 'Showing ' + items.length + ' of ' + state.practices.length + ' practices';
     if (!items.length) {
       list.appendChild(emptyBox('No practices match your filters.'));
@@ -1028,6 +1215,9 @@
             ]),
             h('div', { class: 'flex flex-wrap gap-1.5 mt-2' }, [
               badge(style.label, style.badge),
+              ENFORCEMENT[p.enforcement]
+                ? badge(ENFORCEMENT[p.enforcement].label, ENFORCEMENT[p.enforcement].cls, ENFORCEMENT[p.enforcement].hint)
+                : null,
               badge(workflowLabel(p.workflow), 'bg-slate-100 text-slate-700'),
               badge(p.category, 'bg-slate-100 text-slate-700'),
             ]),
@@ -1059,10 +1249,7 @@
   function openPractice(id) {
     showTab('practices');
     loadPractices().then(function () {
-      ['practice-text', 'practice-workflow', 'practice-category', 'practice-severity'].forEach(function (n) {
-        $(n).value = '';
-      });
-      renderPractices();
+      resetPracticeFilters();
       var card = null;
       document.querySelectorAll('[data-practice-id]').forEach(function (el) {
         if (el.getAttribute('data-practice-id') === id) card = el;
@@ -1134,9 +1321,14 @@
     $('finding-text').addEventListener('input', function () {
       if (state.audit) renderFindingList(state.audit.result.findings.length);
     });
-    ['practice-text', 'practice-workflow', 'practice-category', 'practice-severity'].forEach(function (n) {
-      $(n).addEventListener(n === 'practice-text' ? 'input' : 'change', renderPractices);
+    $('practice-text').addEventListener('input', schedulePracticeRefresh);
+    ['practice-workflow', 'practice-category', 'practice-severity', 'practice-enforcement'].forEach(function (n) {
+      $(n).addEventListener('change', refreshPractices);
     });
+    ['filter-min-severity', 'filter-max'].forEach(function (n) {
+      $(n).addEventListener('input', updateFiltersBadge);
+    });
+    $('filter-categories').addEventListener('change', updateFiltersBadge);
 
     var actions = {
       'dismiss-alert': clearAlert,
@@ -1162,12 +1354,8 @@
         var f = state.selectedFile;
         if (f) download(f.path.split('/').pop(), f.content, 'text/plain');
       },
-      'reset-practices': function () {
-        ['practice-text', 'practice-workflow', 'practice-category', 'practice-severity'].forEach(function (n) {
-          $(n).value = '';
-        });
-        renderPractices();
-      },
+      'reset-practices': resetPracticeFilters,
+      'reset-filters': resetAuditFilters,
     };
     document.addEventListener('click', function (e) {
       var el = e.target.closest ? e.target.closest('[data-action]') : null;

@@ -12,6 +12,12 @@ import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
+import { toMcpTools } from './tools/schemas.js';
+import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+
+function invalidParameter(message: string): { error: true; code: string; message: string } {
+  return { error: true, code: 'INVALID_PARAMETER', message };
+}
 
 export class RPracticesMCPServer {
   private server: Server;
@@ -20,10 +26,14 @@ export class RPracticesMCPServer {
   private templateGenerator: TemplateGenerator;
 
   constructor() {
-    this.server = new Server({
-      name: 'r-best-practices-mcp',
-      version: '1.0.0',
-    });
+    this.server = new Server(
+      {
+        name: 'r-best-practices-mcp',
+        version: '1.0.0',
+      },
+      // Without this capability the SDK refuses to register the tools handlers.
+      { capabilities: { tools: {} } }
+    );
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
@@ -31,9 +41,7 @@ export class RPracticesMCPServer {
   }
 
   private setupHandlers(): void {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () =>
-      this.handleListTools()
-    );
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => this.handleListTools());
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) =>
       this.handleCallTool(request)
@@ -41,116 +49,8 @@ export class RPracticesMCPServer {
   }
 
   private handleListTools(): { tools: Tool[] } {
-    return {
-      tools: [
-        {
-          name: 'detect_workflow',
-          description: 'Detect the R workflow type from a directory path',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Directory path to analyze',
-              },
-            },
-            required: ['path'],
-          },
-        },
-        {
-          name: 'validate_project',
-          description: 'Validate an R project against best practices',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              path: {
-                type: 'string',
-                description: 'Directory path to validate',
-              },
-              workflow: {
-                type: 'string',
-                description: 'Optional workflow type (auto-detected if omitted)',
-              },
-            },
-            required: ['path'],
-          },
-        },
-        {
-          name: 'validate_file',
-          description: 'Validate a single R or Quarto file',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              path: {
-                type: 'string',
-                description: 'File path to validate',
-              },
-            },
-            required: ['path'],
-          },
-        },
-        {
-          name: 'get_practice',
-          description: 'Get details about a specific best practice',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              id: {
-                type: 'string',
-                description: 'Practice ID',
-              },
-            },
-            required: ['id'],
-          },
-        },
-        {
-          name: 'list_practices',
-          description: 'List best practices for a workflow type or category',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              workflow: {
-                type: 'string',
-                description:
-                  'Optional workflow type (r-script, quarto, shiny, package, etc.)',
-              },
-              category: {
-                type: 'string',
-                description:
-                  'Optional category (structure, naming, documentation, etc.)',
-              },
-            },
-          },
-        },
-        {
-          name: 'generate_template',
-          description: 'Generate a project template for a specific R workflow',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              workflow: {
-                type: 'string',
-                description:
-                  'Workflow type (r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis)',
-              },
-              projectName: {
-                type: 'string',
-                description: 'Optional name for the project',
-              },
-              authorName: {
-                type: 'string',
-                description: 'Optional author name',
-              },
-              authorEmail: {
-                type: 'string',
-                description: 'Optional author email',
-              },
-            },
-            required: ['workflow'],
-          },
-        },
-      ],
-    };
+    // Tool names, descriptions and parameters come from tools/schemas.ts (shared with REST).
+    return { tools: toMcpTools() as Tool[] };
   }
 
   private async handleCallTool(request: {
@@ -229,6 +129,9 @@ export class RPracticesMCPServer {
     const path = args.path as string;
     const specifiedWorkflow = args.workflow as string | undefined;
 
+    const filters = parseFindingFilters(args);
+    if (!filters.ok) return invalidParameter(filters.message);
+
     const exists = await FileUtils.isDirectory(path);
     if (!exists) {
       return {
@@ -246,7 +149,7 @@ export class RPracticesMCPServer {
     }
 
     // Validate project
-    const result = await this.validator.validateProject(path, workflow as any);
+    const result = await this.validator.validateProject(path, workflow as any, filters.value);
 
     return {
       error: false,
@@ -258,6 +161,9 @@ export class RPracticesMCPServer {
   private async validateFile(args: Record<string, unknown>): Promise<unknown> {
     const path = args.path as string;
 
+    const filters = parseFindingFilters(args);
+    if (!filters.ok) return invalidParameter(filters.message);
+
     const exists = await FileUtils.exists(path);
     if (!exists) {
       return {
@@ -268,14 +174,11 @@ export class RPracticesMCPServer {
     }
 
     // Validate file
-    const findings = await this.validator.validateFile(path);
+    const data = await this.validator.validateFileWithSummary(path, filters.value);
 
     return {
       error: false,
-      data: {
-        path,
-        findings,
-      },
+      data,
       timestamp: Date.now(),
     };
   }
@@ -300,17 +203,14 @@ export class RPracticesMCPServer {
   }
 
   private listPractices(args: Record<string, unknown>): unknown {
-    const workflow = args.workflow as string | undefined;
-    const category = args.category as string | undefined;
-
-    const result = kb.listPractices({
-      workflow: workflow as any,
-      category: category as any,
-    });
+    const options = parsePracticeFilters(args);
+    if (!options.ok) {
+      return { error: true, code: options.code, message: options.message };
+    }
 
     return {
       error: false,
-      data: result,
+      data: kb.listPractices(options.value),
       timestamp: Date.now(),
     };
   }
