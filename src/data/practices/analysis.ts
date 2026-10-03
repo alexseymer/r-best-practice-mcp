@@ -8,9 +8,10 @@ export const analysisPractices: Practice[] = [
     category: 'structure',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Create data/, R/, output/, scripts/ directories',
+    description:
+      'Create data/, R/ and output/ directories (scripts/ is a common extra, not checked)',
     details:
-      'A predictable layout separates raw data, reusable code and generated results, so collaborators (and you in six months) know where everything lives. The check reports a finding for each of data/, R/ and output/ that is missing from the project root. Keep raw data read-only in data/, put functions in R/, and write every generated file to output/.',
+      'A predictable layout separates raw data, reusable code and generated results, so collaborators (and you in six months) know where everything lives. The check reports one finding for each of data/, R/ and output/ that is missing from the project root (directory names are matched exactly, including the capital R); it does not look inside them and does not require scripts/. Keep raw data read-only in data/, put functions in R/, and write every generated file to output/.',
     badExample: `my-analysis/
   analysis.R
   data.csv
@@ -38,7 +39,7 @@ export const analysisPractices: Practice[] = [
     enforcement: 'automated',
     description: 'Document goals, data sources, methodology, findings',
     details:
-      'A README is the first thing a reader opens, so it should state the question, where the data came from, how to rerun the analysis and what was found. The check looks for a README.md in the project root. Include the R version or a pointer to the renv lockfile so results can be reproduced.',
+      'A README is the first thing a reader opens, so it should state the question, where the data came from, how to rerun the analysis and what was found. The check (part of the analysis project validation) passes when the project root contains a file named README.md, README.Rmd or README; it does not read the content, so the advice about what to include is not verified. Names are matched exactly, so readme.md does not count on case-sensitive file systems. Include the R version or a pointer to the renv lockfile so results can be reproduced.',
     badExample: `my-analysis/
   analysis.R
   data/
@@ -63,14 +64,14 @@ See output/report.html.`,
   },
   {
     id: 'analysis-versioning',
-    title: 'Version all data and outputs',
+    title: 'Put the analysis under version control',
     workflow: 'analysis',
     category: 'structure',
     severity: 'important',
     enforcement: 'automated',
-    description: 'Track data versions and regenerate outputs reproducibly',
+    description: 'Track code, raw-data provenance and renv.lock; ignore large or generated outputs',
     details:
-      'Version control records how code and results changed, lets you undo mistakes and makes it clear which commit produced a given output. The check looks for a .git entry in the project directory or any parent directory and reports when none is found; it does not verify what is committed. Use usethis::use_git(), commit small data files and code, and keep large data under Git LFS or DVC with outputs regenerated from scripts.',
+      'Version control records how code changed, lets you undo mistakes and makes it clear which commit produced a given result. The check looks for a .git entry (directory or file) in the project directory or any parent directory and reports when none is found; it does not verify what is committed or ignored. Use usethis::use_git(), then commit code, renv.lock and either small raw data or a note recording where each raw file came from (source, date, checksum). Ignore large or generated outputs, which scripts can regenerate, and keep large data under Git LFS or DVC.',
     badExample: `my-analysis/
   analysis.R
   analysis_v2.R
@@ -81,11 +82,12 @@ See output/report.html.`,
 usethis::use_git()
 
 # then, in a shell
-git add R/ scripts/ data/raw/ README.md
-git commit -m "Add cleaning script and raw data"
+git add R/ scripts/ README.md renv.lock data/README.md
+git commit -m "Add cleaning script and data provenance notes"
 
-# .gitignore: regenerate large outputs instead of committing them
-output/*.rds`,
+# .gitignore: regenerate large or generated files instead of committing them
+output/
+data/raw/*.parquet`,
     tags: ['versioning', 'reproducibility'],
     references: ['https://happygitwithr.com/', 'https://usethis.r-lib.org/reference/use_git.html'],
   },

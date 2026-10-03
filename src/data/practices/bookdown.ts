@@ -3,14 +3,14 @@ import { Practice } from '../../types/practice.js';
 export const bookdownPractices: Practice[] = [
   {
     id: 'bookdown-config',
-    title: 'Create _bookdown.yaml configuration',
+    title: 'Create a _bookdown.yml configuration file',
     workflow: 'bookdown',
     category: 'structure',
     severity: 'important',
     enforcement: 'automated',
-    description: 'Define book structure, output directory, and options in _bookdown.yaml',
+    description: 'Define the book file name, output directory and chapter list in _bookdown.yml',
     details:
-      'The `_bookdown.yml` file controls the book title, chapter order, output directory and label prefixes, so `bookdown::render_book()` behaves the same on every machine. Create it in the project root and set at least `book_filename` and `output_dir`. The check looks for `_bookdown.yml` or `_bookdown.yaml` in the project root.',
+      '`_bookdown.yml` is the file bookdown reads for the output file name (`book_filename`), output directory (`output_dir`), explicit chapter list (`rmd_files`), UI strings and label prefixes, so `bookdown::render_book()` behaves the same on every machine. Create it in the project root. The check only tests that `_bookdown.yml` (or the alternative spelling `_bookdown.yaml`) exists in the project root; it does not read the file or verify any key.',
     badExample: `my-book/
   index.Rmd
   01-intro.Rmd
@@ -40,7 +40,7 @@ rmd_files:
     enforcement: 'automated',
     description: 'Place introduction content in index.Rmd (first chapter)',
     details:
-      'bookdown treats `index.Rmd` as the first file of the book and reads the book-wide YAML metadata from it; it also becomes the home page of the HTML output. Keep the title, author and output settings in its YAML header and write the preface or introduction below. The check looks for `index.Rmd` in the project root.',
+      'bookdown treats `index.Rmd` as the first file of the book and reads the book-wide YAML metadata from it; it also becomes the home page of the HTML output. Keep the title, author and output settings in its YAML header and write the preface or introduction below. The check only tests that a file named exactly `index.Rmd` exists in the project root; the content of its YAML header is not verified.',
     badExample: `my-book/
   _bookdown.yml
   01-intro.Rmd
@@ -69,7 +69,7 @@ This book explains how we analyse flight delays.`,
     enforcement: 'automated',
     description: 'Name chapters as 01-title.Rmd, 02-title.Rmd for proper ordering',
     details:
-      'bookdown merges .Rmd files in alphabetical order, so a numeric prefix is the simplest way to control chapter order. Use two digits, a lowercase title and hyphens, for example `03-results.Rmd`. The check inspects .Rmd files in the project root, ignoring `index.Rmd`, `README.Rmd` and files starting with an underscore, and flags names not matching `NN-lowercase-title.Rmd`.',
+      'By default bookdown merges the .Rmd files of the project root in alphabetical order (index.Rmd first), so a numeric prefix is the simplest way to control chapter order; an explicit `rmd_files:` list in `_bookdown.yml` overrides that order, in which case the prefix is only a naming convention. Use two digits, a lowercase title and hyphens, for example `03-results.Rmd`. The check inspects only the .Rmd files directly in the project root, exempts `index.Rmd`, `README.Rmd` and files starting with an underscore (which bookdown ignores), and flags every other name that does not match `NN-lowercase-title.Rmd` (two digits, then lowercase letters, digits and hyphens). It does not read `rmd_files`.',
     badExample: `my-book/
   index.Rmd
   Intro.Rmd
@@ -93,13 +93,12 @@ This book explains how we analyse flight delays.`,
     category: 'structure',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Define HTML, PDF, and EPUB outputs in _output.yml',
+    description: 'Define HTML, PDF and optionally EPUB outputs in _output.yml',
     details:
-      'Readers want the same book as a web page, a PDF and an e-book, and keeping each format in `_output.yml` avoids cluttering index.Rmd. List `bookdown::gitbook`, `bookdown::pdf_book` and optionally `bookdown::epub_book` there. The check passes when `_output.yml` exists; otherwise it counts distinct `bookdown::` formats in the index.Rmd YAML and flags fewer than two.',
+      'Readers want the same book as a web page, a PDF and an e-book, and keeping each format in `_output.yml` avoids cluttering index.Rmd. List `bookdown::gitbook`, `bookdown::pdf_book` and optionally `bookdown::epub_book` there. This is a heuristic: the check passes whenever `_output.yml` or `_output.yaml` exists in the project root, whatever it contains. Without one, it counts the distinct `bookdown::name` strings in the YAML header of index.Rmd (so `site: bookdown::bookdown_site` counts as one of them) and flags fewer than two. It stays silent when index.Rmd is missing.',
     badExample: `---
 title: "My Book"
-site: bookdown::bookdown_site
-output: bookdown::gitbook
+output: bookdown::gitbook   # HTML only, and no _output.yml
 ---`,
     goodExample: `# _output.yml
 bookdown::gitbook:
@@ -124,9 +123,10 @@ bookdown::epub_book: default`,
     category: 'documentation',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Use (\\#ref:label) for cross-referencing sections and figures',
+    description:
+      'Use \\@ref(fig:label), \\@ref(tab:label) and \\@ref(section-id) instead of hand-typed numbers',
     details:
-      'Cross-references stay correct when figures or chapters are renumbered, unlike hand-typed numbers. Label a figure through its chunk label, a table the same way, a section with `{#label}`, and cite them with `\\@ref(fig:label)`, `\\@ref(tab:label)` or `\\@ref(label)`. This is a heuristic: it flags books where some chunk has `fig.cap`, `plot(`, `ggplot(` or `kable(` but no `\\@ref(` appears in any .Rmd.',
+      'Cross-references stay correct when figures, tables or chapters are renumbered, unlike hand-typed numbers. A figure needs a chunk label and a `fig.cap`, and is cited with `\\@ref(fig:label)`; a table needs a chunk label and a caption (`knitr::kable(caption = ...)` or the `tab.cap` chunk option) before `\\@ref(tab:label)` resolves; a section is given an id with `{#section-id}` and cited with `\\@ref(section-id)`. This is a heuristic: it scans .Rmd files in the project (recursively) and flags the book when some chunk has `fig.cap`/`fig-cap` or calls `plot(`, `ggplot(` or `kable(`, yet no .Rmd file contains the literal text `\\@ref(` anywhere. A single `\\@ref(` in any file satisfies it, and its target is not validated.',
     badExample: `\`\`\`{r cars-plot, fig.cap="Speed and stopping distance"}
 plot(cars)
 \`\`\`
@@ -139,11 +139,18 @@ plot(cars)
 As Figure \\@ref(fig:cars-plot) shows, stopping distance
 grows with speed. See also Chapter \\@ref(methods).
 
+\`\`\`{r cars-table}
+knitr::kable(head(cars), caption = "First rows of the cars data")
+\`\`\`
+
+Table \\@ref(tab:cars-table) lists the first observations.
+
 # Methods {#methods}`,
     tags: ['bookdown', 'documentation'],
     references: [
       'https://bookdown.org/yihui/bookdown/cross-references.html',
       'https://bookdown.org/yihui/bookdown/figures.html',
+      'https://bookdown.org/yihui/bookdown/tables.html',
     ],
   },
   {
@@ -155,7 +162,7 @@ grows with speed. See also Chapter \\@ref(methods).
     enforcement: 'automated',
     description: 'Include build instructions and dependencies in README.md',
     details:
-      'Contributors need to know which packages and system tools (such as LaTeX) are required and which command builds the book. Add a README.md that lists dependencies and the build command, for example `bookdown::render_book("index.Rmd")`. The check looks for `README.md` in the project root.',
+      'Contributors need to know which packages and system tools (such as LaTeX) are required and which command builds the book. Add a README.md that lists dependencies and the build command, for example `bookdown::render_book("index.Rmd")`. The check only tests that a file named exactly `README.md` exists in the project root (`README.Rmd` does not satisfy it) and does not read its content.',
     badExample: `my-book/
   index.Rmd
   _bookdown.yml

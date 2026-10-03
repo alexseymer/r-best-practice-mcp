@@ -32,7 +32,7 @@ export const analysisRules: RuleDef[] = [
           message: 'Analysis is not under version control (no .git directory found)',
           suggestions: [
             'Run usethis::use_git() (or the git init command) in the project directory and commit your code',
-            'Track small data files and outputs in git, or use Git LFS/DVC for large data',
+            'Commit code, a data provenance note and renv.lock; git-ignore large or generated outputs (use Git LFS or DVC for large data)',
           ],
         },
       ];
