@@ -14,6 +14,26 @@
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-types": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_"
+      }
+    ],
     "no-console": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/public/**/*.js"],
+      "env": {
+        "browser": true,
+        "node": false
+      },
+      "parserOptions": {
+        "sourceType": "script"
+      }
+    }
+  ]
 }

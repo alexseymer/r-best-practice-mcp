@@ -1,5 +1,21 @@
 import path from 'path';
 
+/** Workflow types accepted by the API (excludes the internal 'unknown'). */
+export const VALID_WORKFLOWS = [
+  'r-script',
+  'quarto',
+  'shiny',
+  'package',
+  'rmarkdown',
+  'renv',
+  'targets',
+  'plumber',
+  'analysis',
+  'bookdown',
+  'blogdown',
+  'shinytest',
+] as const;
+
 export class SecurityUtils {
   /**
    * Validate and normalize file paths to prevent directory traversal attacks.
@@ -58,21 +74,7 @@ export class SecurityUtils {
    * Check if a string is a valid workflow type.
    */
   static isValidWorkflow(workflow: string): boolean {
-    const validWorkflows = [
-      'r-script',
-      'quarto',
-      'shiny',
-      'package',
-      'rmarkdown',
-      'renv',
-      'targets',
-      'plumber',
-      'analysis',
-      'bookdown',
-      'blogdown',
-      'shinytest',
-    ];
-    return validWorkflows.includes(workflow);
+    return (VALID_WORKFLOWS as readonly string[]).includes(workflow);
   }
 
   /**

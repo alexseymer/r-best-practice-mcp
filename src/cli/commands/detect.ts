@@ -1,6 +1,6 @@
-import { WorkflowDetector } from '../../engine/detector';
-import { FileUtils } from '../../utils/file';
-import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
+import { WorkflowDetector } from '../../engine/detector.js';
+import { FileUtils } from '../../utils/file.js';
+import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
 
 export async function detectCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);

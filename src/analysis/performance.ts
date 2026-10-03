@@ -1,5 +1,3 @@
-import { logger } from '../utils/logger.js';
-
 export interface PerformanceMetrics {
   name: string;
   duration: number; // milliseconds
@@ -136,14 +134,10 @@ export class ValidationPerformanceTracker {
 
   trackSync<T>(operation: string, fn: () => T): T {
     const start = performance.now();
-    try {
-      const result = fn();
-      const duration = performance.now() - start;
-      this.profiler.mark(operation, duration);
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    const result = fn();
+    const duration = performance.now() - start;
+    this.profiler.mark(operation, duration);
+    return result;
   }
 
   getProfile(): ProfileResult {

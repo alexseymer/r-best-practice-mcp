@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 
 export const createTempDir = (): string => {
-  const tempDir = path.join(process.cwd(), 'tests', '.temp', `test-${Date.now()}`);
-  fs.mkdirSync(tempDir, { recursive: true });
-  return tempDir;
+  const baseDir = path.join(process.cwd(), 'tests', '.temp');
+  fs.mkdirSync(baseDir, { recursive: true });
+  return fs.mkdtempSync(path.join(baseDir, 'test-'));
 };
 
 export const cleanupTempDir = (dir: string): void => {

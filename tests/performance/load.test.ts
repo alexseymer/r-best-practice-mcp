@@ -2,10 +2,11 @@ import { WorkflowDetector } from '../../src/engine/detector.js';
 import { Validator } from '../../src/engine/validator.js';
 import { TemplateGenerator } from '../../src/engine/template-generator.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { promises as fs } from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+if (typeof __dirname === 'undefined') {
+  (global as any).__dirname = path.join(process.cwd(), 'tests', 'performance');
+}
 
 describe('Performance and Load Tests', () => {
   const detector = new WorkflowDetector();

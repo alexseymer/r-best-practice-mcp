@@ -2,9 +2,9 @@ name: Docker Build & Test
 
 on:
   push:
-    branches: [main, develop, claude/development-assistance-e1oir2]
+    branches: [main, develop, 'claude/**']
   pull_request:
-    branches: [main, develop, claude/development-assistance-e1oir2]
+    branches: [main, develop, 'claude/**']
 
 jobs:
   build:
@@ -96,7 +96,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
@@ -115,8 +115,8 @@ jobs:
       - name: Start services with docker-compose
         run: |
           # Build and start services
-          docker-compose build
-          docker-compose up -d
+          docker compose build
+          docker compose up -d
 
           # Wait for services to be ready
           echo "Waiting for services to start..."
@@ -127,8 +127,8 @@ jobs:
           echo "✓ MCP server is responding"
 
           # Stop services
-          docker-compose down
+          docker compose down
 
       - name: Clean up
         if: always()
-        run: docker-compose down -v
+        run: docker compose down -v

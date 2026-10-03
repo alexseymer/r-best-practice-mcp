@@ -18,14 +18,15 @@ export class Logger {
     const levelValue = Logger.levels[level];
     const minLevelValue = Logger.levels[this.minLevel];
 
+    // stderr only: stdout carries the MCP stdio protocol and machine-readable CLI output
     if (levelValue >= minLevelValue) {
       const timestamp = new Date().toISOString();
       const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
 
       if (data !== undefined) {
-        console.log(`${prefix} ${message}`, data);
+        console.error(`${prefix} ${message}`, data);
       } else {
-        console.log(`${prefix} ${message}`);
+        console.error(`${prefix} ${message}`);
       }
     }
   }

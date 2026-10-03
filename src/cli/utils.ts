@@ -129,7 +129,7 @@ export class ConfigLoader {
   static loadConfig(startPath: string = process.cwd()): Partial<CLIOptions> {
     let currentPath = startPath;
 
-    while (true) {
+    for (;;) {
       for (const configName of this.CONFIG_NAMES) {
         const configPath = path.join(currentPath, configName);
         if (fs.existsSync(configPath)) {
@@ -201,11 +201,13 @@ export function parseArgs(args: string[]): { command: string; args: string[]; op
     const arg = args[i];
 
     if (arg.startsWith('--')) {
-      const [key, value] = arg.slice(2).split('=');
-      options[key] = value || true;
+      const [key, ...valueParts] = arg.slice(2).split('=');
+      const value = valueParts.join('=') || (i + 1 < args.length && !args[i + 1].startsWith('-') ? args[++i] : true);
+      options[key] = value;
     } else if (arg.startsWith('-')) {
       const key = arg.slice(1);
-      options[key] = true;
+      const value = i + 1 < args.length && !args[i + 1].startsWith('-') ? args[++i] : true;
+      options[key] = value;
     } else {
       commandArgs.push(arg);
     }

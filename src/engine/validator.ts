@@ -1,13 +1,15 @@
-import { Finding, Severity, ValidationResult } from '../types/finding.js';
+import path from 'path';
+import { FileValidationResult, Finding, ValidationResult } from '../types/finding.js';
 import { Workflow } from '../types/workflow.js';
 import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
+import { runRegisteredRules } from './rules/index.js';
+import { compareNames, findFiles, maskRSource, readText, stripBom } from './rules/helpers.js';
+import { applyFindingFilters, FindingFilterOptions, summarizeFindings } from './finding-filters.js';
 
-export interface ValidatorOptions {
-  maxFindings?: number;
-  minSeverity?: Severity;
-  categories?: string[];
-}
+const RSCRIPT_GLOBALS_THRESHOLD = 15;
+
+export type ValidatorOptions = FindingFilterOptions;
 
 export class Validator {
   async validateProject(
@@ -60,17 +62,11 @@ export class Validator {
           break;
       }
 
-      // Filter findings
-      let filtered = findings;
-      if (options.minSeverity) {
-        filtered = this.filterBySeverity(filtered, options.minSeverity);
-      }
-      if (options.categories && options.categories.length > 0) {
-        filtered = filtered.filter((f) => options.categories!.includes(f.category));
-      }
-      if (options.maxFindings) {
-        filtered = filtered.slice(0, options.maxFindings);
-      }
+      findings.push(...(await runRegisteredRules({ dirPath, workflow })));
+
+      // Summary counts everything found; filters only narrow the returned list.
+      const summary = summarizeFindings(findings);
+      const filtered = applyFindingFilters(findings, options);
 
       const duration = Date.now() - startTime;
       logger.info(`Found ${filtered.length} issues in ${duration}ms`);
@@ -79,29 +75,51 @@ export class Validator {
         filePath: dirPath,
         workflow,
         findings: filtered,
+        summary,
         timestamp: Date.now(),
         duration,
       };
     } catch (error) {
       logger.error(`Error validating ${workflow}`, error);
+      const errorFindings: Finding[] = [
+        {
+          id: 'validation-error',
+          severity: 'critical' as const,
+          category: 'structure',
+          message: `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          suggestions: ['Check that the path exists and is readable'],
+        },
+      ];
       return {
         filePath: dirPath,
         workflow,
-        findings: [
-          {
-            id: 'validation-error',
-            severity: 'critical' as const,
-            category: 'structure',
-            message: `Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
+        findings: errorFindings,
+        summary: summarizeFindings(errorFindings),
         timestamp: Date.now(),
         duration: Date.now() - startTime,
       };
     }
   }
 
-  async validateFile(filePath: string): Promise<Finding[]> {
+  /** Validate one file; optional filters narrow the returned findings. */
+  async validateFile(filePath: string, options: ValidatorOptions = {}): Promise<Finding[]> {
+    return applyFindingFilters(await this.collectFileFindings(filePath), options);
+  }
+
+  /** Like validateFile, but also returns the pre-filter summary ("N of M"). */
+  async validateFileWithSummary(
+    filePath: string,
+    options: ValidatorOptions = {}
+  ): Promise<FileValidationResult> {
+    const all = await this.collectFileFindings(filePath);
+    return {
+      path: filePath,
+      findings: applyFindingFilters(all, options),
+      summary: summarizeFindings(all),
+    };
+  }
+
+  private async collectFileFindings(filePath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
     const ext = FileUtils.getExtension(filePath);
 
@@ -129,50 +147,75 @@ export class Validator {
     const findings: Finding[] = [];
     const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
 
-    // Check for header
-    if (rFiles.length > 0) {
-      const mainFile = rFiles[0];
-      const content = await FileUtils.readFile(mainFile);
-      const lines = content.split('\n');
-
-      // Check header comment
-      if (!lines[0]?.startsWith('#')) {
+    // Check for a header comment: one finding, for the first script (sorted) that lacks one
+    const scripts = (await findFiles(dirPath, /\.[Rr]$/, { recursive: false })).sort((x, y) =>
+      compareNames(path.basename(x), path.basename(y))
+    );
+    for (const file of scripts) {
+      const text = await readText(file);
+      if (text === null) continue;
+      if (!stripBom(text).startsWith('#')) {
         findings.push({
           id: 'rscript-header',
           severity: 'recommended',
           category: 'documentation',
-          file: mainFile,
+          file,
           line: 1,
           message: 'Script should start with header comment',
+          suggestions: ['# Purpose: [description]', '# Author: [name]', '# Date: [date]'],
+        });
+        break;
+      }
+    }
+
+    // One finding for the project: the first long root script without any function
+    for (const file of scripts) {
+      const text = await readText(file);
+      if (text === null) continue;
+      const found = this.validateRFile(file, stripBom(text).split('\n'));
+      if (found.length > 0) {
+        findings.push(...found);
+        break;
+      }
+    }
+
+    // One finding for the project: the first root script that is mostly top-level assignments
+    for (const file of rFiles) {
+      const content = await FileUtils.readFile(file);
+      const globals = this.findTopLevelAssignments(content.split(/\r?\n/));
+      if (globals.length > RSCRIPT_GLOBALS_THRESHOLD) {
+        findings.push({
+          id: 'rscript-globals',
+          severity: 'important',
+          category: 'structure',
+          file,
+          line: globals[0],
+          message: `Consider wrapping logic in functions: ${globals.length} top-level assignments create many global variables`,
           suggestions: [
-            '# Purpose: [description]',
-            '# Author: [name]',
-            '# Date: [date]',
+            'Wrap logic in functions with parameters',
+            'Add a main() entry point and call it at the end of the script',
+            'Use local scope for intermediate variables',
           ],
         });
+        break;
       }
-
-      // Check for global variables
-      const globalVarPattern = /^\w+\s*<-\s*(?!function)/;
-      lines.forEach((line, idx) => {
-        if (globalVarPattern.test(line) && !line.trim().startsWith('#')) {
-          findings.push({
-            id: 'rscript-globals',
-            severity: 'important',
-            category: 'structure',
-            file: mainFile,
-            line: idx + 1,
-            message: 'Avoid global variables - use functions instead',
-            suggestions: [
-              'Wrap logic in functions with parameters',
-              'Use local scope for variables',
-            ],
-          });
-        }
-      });
     }
 
     return findings;
+  }
+
+  /** Line numbers (1-based) of column-0 assignments whose value is not a function. */
+  private findTopLevelAssignments(lines: string[]): number[] {
+    const result: number[] = [];
+    const assignment = /^[A-Za-z_.][\w.]*\s*(<-|=)(?!=)\s*(.*)$/;
+    lines.forEach((line, idx) => {
+      if (line.trim().startsWith('#')) return;
+      const match = assignment.exec(line);
+      if (match && !/^(function\b|\\\()/.test(match[2])) {
+        result.push(idx + 1);
+      }
+    });
+    return result;
   }
 
   // ============== QUARTO VALIDATORS ==============
@@ -183,17 +226,6 @@ export class Validator {
     for (const file of qmdFiles) {
       const fileFindings = await this.validateFile(file);
       findings.push(...fileFindings);
-    }
-
-    // Check for README
-    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
-    if (!readmeExists && qmdFiles.length > 0) {
-      findings.push({
-        id: 'analysis-readme',
-        severity: 'recommended',
-        category: 'documentation',
-        message: 'Add README.md to document the analysis',
-      });
     }
 
     return findings;
@@ -222,13 +254,16 @@ export class Validator {
     }
 
     // Check for README
-    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
+    const readmeExists =
+      (await FileUtils.exists(`${dirPath}/README.md`)) ||
+      (await FileUtils.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'shiny-readme',
         severity: 'recommended',
         category: 'documentation',
         message: 'Add README.md with Shiny app documentation',
+        suggestions: ['Create README.md describing the app, how to run it and its deployment'],
       });
     }
 
@@ -247,25 +282,33 @@ export class Validator {
         severity: 'critical',
         category: 'structure',
         message: 'Package must have DESCRIPTION file',
+        suggestions: ['Run usethis::use_description() to create DESCRIPTION'],
       });
       return findings;
     }
 
     const desc = await FileUtils.readFile(`${dirPath}/DESCRIPTION`);
-    const descLines = desc.split('\n');
 
-    // Check required fields
-    const requiredFields = ['Package', 'Version', 'Title', 'Author', 'Maintainer', 'License'];
-    requiredFields.forEach((field) => {
-      if (!desc.includes(`${field}:`)) {
-        findings.push({
-          id: 'pkg-description',
-          severity: 'important',
-          category: 'structure',
-          message: `DESCRIPTION missing required field: ${field}`,
-        });
-      }
-    });
+    // Check required fields (matched at line start, not as substrings)
+    const hasField = (field: string) => new RegExp(`^${field}:`, 'm').test(desc.replace(/\r/g, ''));
+    const missing = ['Package', 'Version', 'Title', 'Description', 'License'].filter(
+      (f) => !hasField(f)
+    );
+    if (!hasField('Authors@R') && !(hasField('Author') && hasField('Maintainer'))) {
+      missing.push('Authors@R (or both Author and Maintainer)');
+    }
+    if (missing.length > 0) {
+      findings.push({
+        id: 'pkg-description',
+        severity: 'critical',
+        category: 'structure',
+        message: `DESCRIPTION missing required field(s): ${missing.join(', ')}`,
+        suggestions: [
+          'Add the missing fields to DESCRIPTION',
+          'Use usethis::use_description() to generate a complete DESCRIPTION',
+        ],
+      });
+    }
 
     // Check for R directory
     const rDirExists = await FileUtils.isDirectory(`${dirPath}/R`);
@@ -275,6 +318,7 @@ export class Validator {
         severity: 'important',
         category: 'structure',
         message: 'Package should have R/ directory for source files',
+        suggestions: ['Create an R/ directory and move source files into it'],
       });
     }
 
@@ -290,15 +334,39 @@ export class Validator {
       });
     }
 
-    // Check for LICENSE
-    const licenseExists = await FileUtils.exists(`${dirPath}/LICENSE`);
-    if (!licenseExists) {
+    // Check license declaration
+    const licenseMatch = /^License:[ \t]*(.*(?:\r?\n[ \t]+.*)*)/m.exec(desc);
+    if (!licenseMatch) {
       findings.push({
         id: 'pkg-license',
         severity: 'critical',
         category: 'structure',
-        message: 'Package must have LICENSE file',
+        message: 'DESCRIPTION must declare a License field',
+        suggestions: [
+          'Add a License: field to DESCRIPTION',
+          'Run usethis::use_mit_license() or another usethis::use_*_license() helper',
+        ],
       });
+    } else if (/file\s+LICEN[CS]E/.test(licenseMatch[1])) {
+      let licenseFileExists = false;
+      for (const name of ['LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md']) {
+        if (await FileUtils.exists(`${dirPath}/${name}`)) {
+          licenseFileExists = true;
+          break;
+        }
+      }
+      if (!licenseFileExists) {
+        findings.push({
+          id: 'pkg-license',
+          severity: 'critical',
+          category: 'structure',
+          message: 'DESCRIPTION references "file LICENSE" but no LICENSE file exists',
+          suggestions: [
+            'Create the LICENSE file referenced by DESCRIPTION',
+            'Or use a standard license such as License: MIT + file LICENSE via usethis::use_mit_license()',
+          ],
+        });
+      }
     }
 
     return findings;
@@ -330,22 +398,26 @@ export class Validator {
     if (!targetsExists) {
       findings.push({
         id: 'targets-structure',
-        severity: 'important',
+        severity: 'recommended',
         category: 'structure',
         message: 'targets project must have _targets.R file',
+        suggestions: ['Run targets::use_targets() to create _targets.R'],
       });
       return findings;
     }
 
     const content = await FileUtils.readFile(`${dirPath}/_targets.R`);
 
-    // Check for list() call
-    if (!content.includes('list(')) {
+    // Check for a target list: list() or tarchetypes::tar_plan() (comments do not count)
+    if (!/(^|[^A-Za-z0-9_.])(list|tar_plan)\s*\(/.test(maskRSource(content, true))) {
       findings.push({
         id: 'targets-structure',
-        severity: 'important',
+        severity: 'recommended',
         category: 'structure',
-        message: '_targets.R should define targets using list()',
+        message: '_targets.R should define targets using list() or tar_plan()',
+        suggestions: [
+          'End _targets.R with list(tar_target(name, command), ...) or use tarchetypes::tar_plan(...)',
+        ],
       });
     }
 
@@ -355,13 +427,18 @@ export class Validator {
   // ============== PLUMBER VALIDATORS ==============
   private async validatePlumber(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+    const rFiles = await findFiles(dirPath, /\.[Rr]$/);
+
+    const endpoint = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b/im;
 
     for (const file of rFiles) {
-      const content = await FileUtils.readFile(file);
+      const raw = await readText(file);
+      if (raw === null || !endpoint.test(raw)) continue;
+      // Comments (including annotations) and string contents must not satisfy the checks
+      const content = maskRSource(raw, true);
 
-      // Check for input validation
-      const hasValidation = /validate|check|if\s*\(/.test(content);
+      // Check for input validation: a validation/check helper call, stopifnot(), req(), or a conditional
+      const hasValidation = /\b(validate\w*|check\w*|stopifnot|req)\s*\(|\bif\s*\(/.test(content);
       if (!hasValidation) {
         findings.push({
           id: 'plumber-validation',
@@ -374,14 +451,18 @@ export class Validator {
       }
 
       // Check for error handling
-      const hasErrorHandling = /tryCatch|stop|warning/.test(content);
+      const hasErrorHandling = /\b(tryCatch|stop|warning)\s*\(/.test(content);
       if (!hasErrorHandling) {
         findings.push({
           id: 'plumber-error',
-          severity: 'recommended',
+          severity: 'important',
           category: 'structure',
           file: file,
           message: 'Add error handling to API endpoints',
+          suggestions: [
+            'Wrap endpoint logic in tryCatch()',
+            'Return meaningful HTTP status codes with res$status',
+          ],
         });
       }
     }
@@ -406,6 +487,25 @@ export class Validator {
   private async validateAnalysis(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
 
+    // Check for README
+    const readmeNames = ['README.md', 'README.Rmd', 'README'];
+    let readmeExists = false;
+    for (const name of readmeNames) {
+      if (await FileUtils.exists(`${dirPath}/${name}`)) {
+        readmeExists = true;
+        break;
+      }
+    }
+    if (!readmeExists) {
+      findings.push({
+        id: 'analysis-readme',
+        severity: 'recommended',
+        category: 'documentation',
+        message: 'Add README.md to document the analysis',
+        suggestions: ['Create README.md describing the question, data sources and how to run it'],
+      });
+    }
+
     // Check directory structure
     const dirs = ['data', 'R', 'output'];
     for (const dir of dirs) {
@@ -416,6 +516,7 @@ export class Validator {
           severity: 'recommended',
           category: 'structure',
           message: `Analysis project should have ${dir}/ directory`,
+          suggestions: [`Create a ${dir}/ directory`],
         });
       }
     }
@@ -428,7 +529,9 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for functions
-    const hasFunctions = lines.some((l) => /^[a-zA-Z_]\w*\s*<-\s*function/.test(l));
+    const masked = maskRSource(lines.join('\n'), true);
+    const hasFunctions =
+      /(^|[\n;])[ \t]*[A-Za-z_.][\w.]*[ \t]*(<-|=)[ \t]*(function\b|\\[ \t]*\()/.test(masked);
     if (!hasFunctions && lines.length > 50) {
       findings.push({
         id: 'rscript-functions',
@@ -436,6 +539,7 @@ export class Validator {
         category: 'structure',
         file: filePath,
         message: 'Large scripts should contain functions for reusable logic',
+        suggestions: ['Extract repeated logic into named functions'],
       });
     }
 
@@ -454,30 +558,51 @@ export class Validator {
         file: filePath,
         line: 1,
         message: 'Quarto document should have YAML frontmatter',
+        suggestions: ['Start the document with a --- YAML block containing title and format'],
       });
     }
 
     // Check for labeled chunks
-    const unlabeledChunks: number[] = [];
-    lines.forEach((line, idx) => {
-      if (line.includes('```{r}') && !line.includes('label:')) {
-        unlabeledChunks.push(idx + 1);
-      }
-    });
-
-    if (unlabeledChunks.length > 0) {
+    const firstUnlabeled = this.findFirstUnlabeledRChunk(lines);
+    if (firstUnlabeled !== undefined) {
       findings.push({
         id: 'quarto-labels',
         severity: 'recommended',
         category: 'structure',
         file: filePath,
-        line: unlabeledChunks[0],
+        line: firstUnlabeled,
         message: 'Code chunks should have descriptive labels',
-        suggestions: ['Use #| label: chunk-name in each code block'],
+        suggestions: ['Add #| label: chunk-name as the first line inside each R code chunk'],
       });
     }
 
     return findings;
+  }
+
+  /** 1-based line of the first R chunk without a label, or undefined. */
+  private findFirstUnlabeledRChunk(rawLines: string[]): number | undefined {
+    const lines = rawLines.map((l) => l.replace(/\r$/, ''));
+    const fence = /^\s*`{3,}\s*\{\s*[rR](?=[\s,}])([^}]*)\}/;
+    for (let i = 0; i < lines.length; i++) {
+      const match = fence.exec(lines[i]);
+      if (!match) continue;
+      const header = match[1];
+      const firstItem = header.split(',')[0].trim();
+      const labelledInFence =
+        /label\s*:/.test(header) ||
+        /(^|[\s,])label\s*=/.test(header) ||
+        /^[\w.-]+$/.test(firstItem);
+      if (labelledInFence) continue;
+      let labelledInOptions = false;
+      for (let j = i + 1; j < lines.length && lines[j].trimStart().startsWith('#|'); j++) {
+        if (/^\s*#\|\s*label\s*:/.test(lines[j])) {
+          labelledInOptions = true;
+          break;
+        }
+      }
+      if (!labelledInOptions) return i + 1;
+    }
+    return undefined;
   }
 
   private validateRmdFile(filePath: string, lines: string[]): Finding[] {
@@ -492,6 +617,7 @@ export class Validator {
         file: filePath,
         line: 1,
         message: 'R Markdown should have YAML header',
+        suggestions: ['Start the document with a --- YAML block containing title and output'],
       });
     }
 
@@ -509,10 +635,10 @@ export class Validator {
     if (!bookdownYml && !bookdownYaml) {
       findings.push({
         id: 'bookdown-config',
-        severity: 'critical',
+        severity: 'important',
         category: 'structure',
-        message: 'Bookdown project must have _bookdown.yml or _bookdown.yaml',
-        suggestions: ['Create _bookdown.yaml with book configuration'],
+        message: 'Bookdown project should have _bookdown.yml',
+        suggestions: ['Create _bookdown.yml with book configuration'],
       });
     }
 
@@ -524,17 +650,21 @@ export class Validator {
         severity: 'critical',
         category: 'structure',
         message: 'Bookdown book must have index.Rmd',
+        suggestions: ['Create index.Rmd with the book YAML header and introduction'],
       });
     }
 
     // Check for README
-    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
+    const readmeExists =
+      (await FileUtils.exists(`${dirPath}/README.md`)) ||
+      (await FileUtils.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'bookdown-readme',
         severity: 'recommended',
         category: 'documentation',
-        message: 'Add README.md to document the book',
+        message: 'Add README.md (or README.Rmd) to document the book',
+        suggestions: ['Create README.md explaining how to build and contribute to the book'],
       });
     }
 
@@ -545,16 +675,28 @@ export class Validator {
   private async validateBlogdown(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    // Check for config file
-    const configToml = await FileUtils.exists(`${dirPath}/config.toml`);
-    const configYaml = await FileUtils.exists(`${dirPath}/config.yaml`);
+    // Check for config file (Hugo accepts several names and a config directory)
+    let hasConfig = await FileUtils.isDirectory(`${dirPath}/config/_default`);
+    for (const name of [
+      'config.toml',
+      'config.yaml',
+      'config.yml',
+      'hugo.toml',
+      'hugo.yaml',
+      'hugo.yml',
+      'config.json',
+      'hugo.json',
+    ]) {
+      if (!hasConfig && (await FileUtils.exists(`${dirPath}/${name}`))) hasConfig = true;
+    }
 
-    if (!configToml && !configYaml) {
+    if (!hasConfig) {
       findings.push({
         id: 'blogdown-config',
         severity: 'critical',
         category: 'structure',
-        message: 'Blogdown site must have config.toml or config.yaml',
+        message:
+          'Blogdown site must have a Hugo config (config.toml, hugo.toml, config.yaml, ... or config/_default/)',
         suggestions: ['Create config.toml with site configuration'],
       });
     }
@@ -563,10 +705,11 @@ export class Validator {
     const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
     if (!contentDir) {
       findings.push({
-        id: 'blogdown-content',
+        id: 'blogdown-content-structure',
         severity: 'important',
         category: 'structure',
         message: 'Blogdown site should have content/ directory',
+        suggestions: ['Create a content/ directory for posts and pages'],
       });
     }
 
@@ -574,10 +717,11 @@ export class Validator {
     const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
     if (!themesDir) {
       findings.push({
-        id: 'blogdown-themes',
+        id: 'blogdown-theme',
         severity: 'recommended',
         category: 'structure',
         message: 'Blogdown site should have themes/ directory for custom theme',
+        suggestions: ['Install a Hugo theme, e.g. blogdown::install_theme()'],
       });
     }
 
@@ -588,55 +732,63 @@ export class Validator {
   private async validateShinytest(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    // Check for test directory
+    // Check for test directory (shinytest2 runs through testthat)
     const shinytestDir = await FileUtils.isDirectory(`${dirPath}/tests/shinytest`);
-    if (!shinytestDir) {
+    const testthatDir = await FileUtils.isDirectory(`${dirPath}/tests/testthat`);
+    const testDir = shinytestDir || testthatDir;
+    if (!testDir) {
       findings.push({
         id: 'shinytest-structure',
         severity: 'important',
         category: 'structure',
-        message: 'Shinytest project should have tests/shinytest/ directory',
-        suggestions: ['Create tests/shinytest/ directory for test recordings'],
+        message: 'Shinytest project should have tests/shinytest/ or tests/testthat/ directory',
+        suggestions: [
+          'Create tests/testthat/ for shinytest2 tests (shinytest2::use_shinytest2())',
+          'Or create tests/shinytest/ for legacy shinytest recordings',
+        ],
       });
     }
 
-    // Check for app.R
+    // Check for app.R or ui.R/server.R
     const appR = await FileUtils.exists(`${dirPath}/app.R`);
-    if (!appR) {
+    const uiServer =
+      (await FileUtils.exists(`${dirPath}/ui.R`)) &&
+      (await FileUtils.exists(`${dirPath}/server.R`));
+    if (!appR && !uiServer) {
       findings.push({
         id: 'shinytest-app',
         severity: 'important',
         category: 'structure',
         message: 'Shinytest requires Shiny app.R or ui.R/server.R',
+        suggestions: ['Create app.R containing the Shiny app', 'Or create ui.R and server.R'],
       });
     }
 
     // Check for test setup file
-    const testSetup = await FileUtils.exists(`${dirPath}/tests/testthat/setup-shinytest.R`) ||
-                      await FileUtils.exists(`${dirPath}/tests/setup.R`) ||
-                      await FileUtils.exists(`${dirPath}/tests/shinytest/setup.R`);
+    let testSetup = false;
+    for (const rel of [
+      'tests/testthat/setup-shinytest2.R',
+      'tests/testthat/setup-shinytest.R',
+      'tests/testthat/setup.R',
+      'tests/setup.R',
+      'tests/shinytest/setup.R',
+    ]) {
+      if (await FileUtils.exists(`${dirPath}/${rel}`)) {
+        testSetup = true;
+        break;
+      }
+    }
 
-    if (!testSetup && shinytestDir) {
+    if (!testSetup && testDir) {
       findings.push({
         id: 'shinytest-setup',
         severity: 'recommended',
         category: 'structure',
         message: 'Shinytest project should have test setup configuration',
+        suggestions: ['Create tests/testthat/setup-shinytest2.R to configure the app under test'],
       });
     }
 
     return findings;
-  }
-
-  private filterBySeverity(findings: Finding[], minSeverity: Severity): Finding[] {
-    const severityOrder: Record<Severity, number> = {
-      critical: 4,
-      important: 3,
-      recommended: 2,
-      info: 1,
-    };
-
-    const minValue = severityOrder[minSeverity];
-    return findings.filter((f) => severityOrder[f.severity] >= minValue);
   }
 }

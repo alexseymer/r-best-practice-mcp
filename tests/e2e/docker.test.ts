@@ -1,10 +1,11 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { promises as fs } from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+if (typeof __dirname === 'undefined') {
+  (global as any).__dirname = path.join(process.cwd(), 'tests', 'e2e');
+}
 const execAsync = promisify(exec);
 
 describe('Docker End-to-End Tests', () => {
@@ -34,7 +35,8 @@ describe('Docker End-to-End Tests', () => {
         timeout: testTimeout,
       });
 
-      expect(stdout).toContain('Successfully built') || expect(stdout).toContain('successfully tagged');
+      const hasSuccess = stdout.includes('Successfully built') || stdout.includes('successfully tagged');
+      expect(hasSuccess).toBe(true);
     }, testTimeout);
 
     it.skip('should have correct image metadata', async () => {
@@ -289,7 +291,7 @@ describe('Docker End-to-End Tests', () => {
       });
 
       if (response.status === 200) {
-        const data = await response.json();
+        const data = await response.json() as any;
         expect(data).toHaveProperty('error', false);
         expect(data.data).toHaveProperty('workflow');
       }
@@ -310,7 +312,7 @@ describe('Docker End-to-End Tests', () => {
       });
 
       if (response.status === 200) {
-        const data = await response.json();
+        const data = await response.json() as any;
         expect(data).toHaveProperty('error', false);
         expect(data.data).toHaveProperty('findings');
       }
@@ -330,7 +332,7 @@ describe('Docker End-to-End Tests', () => {
       });
 
       if (response.status === 200) {
-        const data = await response.json();
+        const data = await response.json() as any;
         expect(data).toHaveProperty('error', false);
         expect(data.data).toHaveProperty('files');
       }

@@ -5,7 +5,7 @@
 The **R Best Practices MCP Server** is a comprehensive tool for enforcing best practices across R development workflows. It integrates with Claude via the Model Context Protocol (MCP) to provide:
 
 1. **Workflow Detection** — Identify R project types automatically
-2. **Project Validation** — Check projects against 52+ best practices
+2. **Project Validation** — Check projects against 70 best practices
 3. **Template Generation** — Create scaffold projects for any workflow
 4. **Knowledge Base** — Access comprehensive practice documentation
 
@@ -65,7 +65,7 @@ R developers often work across diverse project types (scripts, packages, Shiny a
 
 #### 3. **TemplateGenerator** (`src/engine/template-generator.ts`)
 - Generates complete project scaffolds
-- Supports 9 workflow types
+- Supports 12 workflow types
 - Creates files with realistic content and examples
 - Returns `GeneratedTemplate` with files and directories
 
@@ -74,7 +74,7 @@ R developers often work across diverse project types (scripts, packages, Shiny a
 - Workflow generators: `generatePackage()`, `generateShiny()`, etc.
 
 #### 4. **KnowledgeBase** (`src/data/knowledge-base.ts`)
-- Contains 52 best practices across 9 workflows
+- Contains 70 best practices across 12 workflows (59 automated, 11 guidance-only)
 - Dual indexing: by ID and by workflow
 - Supports filtering and searching
 - Returns `Practice[]` with detailed information
@@ -100,8 +100,8 @@ R developers often work across diverse project types (scripts, packages, Shiny a
 ### Type System
 
 ```typescript
-// Workflows - 9 types covering all standard R development approaches
-type Workflow = 'r-script' | 'quarto' | 'shiny' | 'package' | 'rmarkdown' | 'renv' | 'targets' | 'plumber' | 'analysis'
+// Workflows - 12 types covering all standard R development approaches
+type Workflow = 'r-script' | 'quarto' | 'shiny' | 'package' | 'rmarkdown' | 'renv' | 'targets' | 'plumber' | 'analysis' | 'bookdown' | 'blogdown' | 'shinytest'
 
 // Severity - Indicates impact of findings
 type Severity = 'critical' | 'important' | 'recommended' | 'info'
@@ -127,8 +127,13 @@ interface Practice {
   workflow: Workflow
   category: Category
   severity: Severity
+  enforcement: 'automated' | 'guidance'  // automated: a rule with the same id reports violations
   description: string
-  examples: string[]
+  details?: string       // why it matters and what the check looks at
+  badExample?: string
+  goodExample?: string
+  references?: string[]  // https URLs
+  tags?: string[]
 }
 ```
 
@@ -152,7 +157,7 @@ The server layer (`src/server.ts`) translates MCP tool calls to internal methods
 - Consistent error handling across all tools
 
 ### 4. **Knowledge Base as First-Class Data**
-The knowledge base is baked into the server (52 practices):
+The knowledge base is baked into the server (70 practices in `src/data/practices/<workflow>.ts`):
 - No external dependencies for best practices
 - Practices versioned with the code
 - Can be easily extended or customized
@@ -167,7 +172,7 @@ Rather than shell commands, templates are generated as data structures:
 
 ### Code Quality
 - **TypeScript with strict mode** — Catches type errors at compile time
-- **Comprehensive testing** — 91 tests, 90%+ code coverage
+- **Comprehensive testing** — ~1,000 unit, regression and rule tests
 - **Async/await** — Better error handling and readability
 - **Clear naming** — Functions and variables clearly express intent
 
@@ -187,42 +192,50 @@ Rather than shell commands, templates are generated as data structures:
 
 ### Adding a Best Practice
 
-Edit `src/data/knowledge-base.ts`:
+Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `details`, `badExample`,
+`goodExample` and at least one verified `https` reference (`tests/unit/practice-content.test.ts` enforces this).
 
 ```typescript
 {
-  id: 'new-practice-id',
+  id: 'pkg-example',
   title: 'Practice Title',
   workflow: 'package',
   category: 'documentation',
   severity: 'important',
-  description: 'Detailed description...',
-  examples: ['example code...'],
+  enforcement: 'guidance', // 'automated' once a rule with this id exists
+  description: 'Short description...',
+  details: 'Why it matters and, for automated practices, exactly what the check looks at.',
+  badExample: '...',
+  goodExample: '...',
+  references: ['https://r-pkgs.org/'],
+  tags: ['example'],
 }
 ```
 
-### Adding a Workflow Validator
+### Adding a Rule (automated check)
 
-In `src/engine/validator.ts`:
+1. Add the practice (above) with `enforcement: 'automated'`; the rule `id` must equal the practice `id`.
+2. Add a `RuleDef` to `src/engine/rules/<workflow>.ts` (see `package.ts` / `pkg-readme` for the pattern;
+   helpers such as `findFiles`, `readText` are in `src/engine/rules/helpers.ts` and cap file count and size):
 
 ```typescript
-private async validateNewWorkflow(dirPath: string): Promise<Finding[]> {
-  const findings: Finding[] = []
-  
-  // Check for required files/structure
-  const requiredFile = await FileUtils.exists(`${dirPath}/required-file`)
-  if (!requiredFile) {
-    findings.push({
-      id: 'workflow-required-file',
-      severity: 'critical',
-      category: 'structure',
-      message: 'Workflow requires specific file...',
-    })
-  }
-  
-  return findings
+{
+  id: 'pkg-example',
+  workflows: ['package'],
+  async run({ dirPath }) {
+    // return [] when satisfied, otherwise findings whose severity/category match the practice
+    return [{ id: 'pkg-example', severity: 'important', category: 'documentation',
+              message: '...', suggestions: ['...'] }]
+  },
 }
 ```
+
+3. Add tests in `tests/unit/rules/<workflow>.test.ts`: a triggering fixture, a clean fixture and, for heuristics,
+   a near-miss that must not trigger. Heuristic (content-based) rules cap severity at `recommended` and say "Consider ...".
+4. `tests/unit/rule-consistency.test.ts` fails if a rule has no practice, an automated practice has no rule,
+   or a guidance practice has one.
+
+The original inline rules still live in `src/engine/validator.ts` (`validatePackage()`, ...).
 
 ### Adding a Template
 
