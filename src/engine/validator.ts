@@ -3,6 +3,7 @@ import { Workflow } from '../types/workflow.js';
 import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
 import { runRegisteredRules } from './rules/index.js';
+import { findFiles, maskRSource, readText } from './rules/helpers.js';
 import { applyFindingFilters, FindingFilterOptions, summarizeFindings } from './finding-filters.js';
 
 const RSCRIPT_GLOBALS_THRESHOLD = 15;
@@ -409,21 +410,18 @@ export class Validator {
   // ============== PLUMBER VALIDATORS ==============
   private async validatePlumber(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+    const rFiles = await findFiles(dirPath, /\.[Rr]$/);
 
     const endpoint = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b/im;
 
     for (const file of rFiles) {
-      const raw = await FileUtils.readFile(file);
-      if (!endpoint.test(raw)) continue;
-      // Full-line comments (including annotations) must not satisfy the checks
-      const content = raw
-        .split(/\r?\n/)
-        .filter((l) => !l.trim().startsWith('#'))
-        .join('\n');
+      const raw = await readText(file);
+      if (raw === null || !endpoint.test(raw)) continue;
+      // Comments (including annotations) and string contents must not satisfy the checks
+      const content = maskRSource(raw, true);
 
-      // Check for input validation
-      const hasValidation = /validate|check|if\s*\(/.test(content);
+      // Check for input validation: a validation/check helper call, stopifnot(), req(), or a conditional
+      const hasValidation = /\b(validate\w*|check\w*|stopifnot|req)\s*\(|\bif\s*\(/.test(content);
       if (!hasValidation) {
         findings.push({
           id: 'plumber-validation',

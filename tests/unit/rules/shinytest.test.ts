@@ -95,8 +95,8 @@ describe('shinytest rules', () => {
     });
 
     it.each([
-      'shinytest',
-      'shinytest2',
+      'shinytest::testApp(".")',
+      'shinytest2::test_app()',
       'testthat::test_dir("tests")',
       'devtools::test()',
       'rcmdcheck::rcmdcheck()',
@@ -115,6 +115,20 @@ describe('shinytest rules', () => {
         'steps:\n  - run: Rscript -e \'install.packages("testthat")\'\n  - run: lintr\n'
       );
       expect(await idsFor(dir, 'shinytest')).toContain('shinytest-ci-integration');
+    });
+
+    it('is not satisfied by merely installing shinytest2', async () => {
+      createFile(
+        dir,
+        '.github/workflows/check.yaml',
+        'steps:\n  - uses: r-lib/actions/setup-r-dependencies@v2\n    with:\n      extra-packages: any::shinytest2\n'
+      );
+      expect(await idsFor(dir, 'shinytest')).toContain('shinytest-ci-integration');
+    });
+
+    it('is satisfied by a workflow that runs shinytest2::test_app()', async () => {
+      createFile(dir, '.github/workflows/app.yaml', "run: Rscript -e 'shinytest2::test_app()'\n");
+      expect(await idsFor(dir, 'shinytest')).not.toContain('shinytest-ci-integration');
     });
 
     it('ignores commented-out test steps in a workflow', async () => {

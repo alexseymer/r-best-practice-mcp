@@ -28,8 +28,9 @@ const RECORDING_PATTERN =
   /AppDriver\$new\(|\btest_app\(|\brecordTest\(|\brecord_test\(|ShinyDriver\$new\(|\btestApp\(/;
 
 // Evidence that tests are actually run; the bare word "testthat" (e.g. in an install step) is not.
+// Installing the package (e.g. `extra-packages: any::shinytest2`) is not evidence either.
 const CI_PATTERN =
-  /shinytest2?|testthat::test_|devtools::test|rcmdcheck|check-r-package|R CMD check|test_dir|test_app/i;
+  /shinytest2?::|shinytest2?\.R|testthat::test_|devtools::test|rcmdcheck|check-r-package|R CMD check|\btest_dir\b|\btest_app\b|\btestApp\b/i;
 
 export const shinytestRules: RuleDef[] = [
   {
