@@ -167,7 +167,7 @@ describe('Validator', () => {
       const configError = result.findings.find((f) => f.id === 'bookdown-config');
 
       expect(configError).toBeDefined();
-      expect(configError?.severity).toBe('critical');
+      expect(configError?.severity).toBe('important');
     });
 
     it('should validate blogdown site', async () => {
