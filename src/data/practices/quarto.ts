@@ -8,9 +8,9 @@ export const quartoPractices: Practice[] = [
     category: 'structure',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Every code chunk needs a clear label (e.g., #| label: load-data)',
+    description: 'Give every R code chunk a short descriptive label (e.g., #| label: load-data)',
     details:
-      'Labels make chunks easy to find in error messages, name the generated figure files, and are required for cross-references and caching. Put `#| label: name` as the first line of each chunk, using lowercase words separated by hyphens. The check is a simple line test: it flags any line opening a bare ```{r} fence without `label:` on that same line, so it also flags chunks labeled with `#| label:` on the following line.',
+      'Labels let you cross-reference figures and tables (`@fig-...` and `@tbl-...` need chunks labelled with those prefixes), make render logs and error messages point at a named chunk, and give figure files and cache entries stable names instead of auto-generated `unnamed-chunk-N` names that shift when chunks are reordered. Labels are not required for caching to work, because knitr labels unlabelled chunks automatically. Put `#| label: name` as the first line of each chunk, using lowercase words separated by hyphens. The check scans the .qmd files in the project root (subdirectories are not scanned) and reports the first unlabelled R chunk of each file; python or other engines are ignored. A label counts when given as a `#| label:` option line directly after the fence, as a bare label in the header (```{r mylabel}```) or as `label=` in the header.',
     badExample: `\`\`\`{r}
 library(dplyr)
 flights <- read.csv("flights.csv")
@@ -42,9 +42,10 @@ summary(flights)
     category: 'structure',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Use #| echo, #| eval, #| warning, #| message for clarity',
+    description:
+      'Set options such as echo, warning and message explicitly, per chunk with #| lines or project-wide with execute:',
     details:
-      'Explicit options document what readers should see and keep warnings and package start-up messages out of the rendered output. Set defaults once in an `execute:` block in `_quarto.yml` or the document YAML, and override per chunk with `#|` lines. This is a heuristic: it flags projects that have R chunks, no chunk with a `#|` option line, and no `execute:` block in the .qmd YAML or `_quarto.yml`.',
+      'Explicit options document what readers should see and keep warnings and package start-up messages out of the rendered output. Set defaults once in an `execute:` block in `_quarto.yml` or the document YAML, and override per chunk with `#|` lines. This is a heuristic that does not verify which options are set. It scans .qmd files in the project (recursively) and passes as soon as any one R chunk has any `#|` option line (even just `#| label:`), any chunk header sets echo, eval, include, warning, message or a fig.* option, any chunk calls `knitr::opts_chunk$set(`, or an `execute:` key exists in a .qmd YAML header or in `_quarto.yml`/`_quarto.yaml` in the project root. It reports only when none of these is found.',
     badExample: `---
 title: "Flight delays"
 format: html
@@ -83,7 +84,7 @@ flights |> count(carrier)
     enforcement: 'automated',
     description: 'Include title, author, date, format, and other metadata',
     details:
-      'The YAML front matter identifies the document and chooses the output format, so a reader or a build script knows what the file produces. Start every .qmd with a `---` block containing at least title, author, date and format. The check flags .qmd files whose first line does not start the front matter with `---`.',
+      'The YAML front matter identifies the document and chooses the output format, so a reader or a build script knows what the file produces. Start every .qmd with a `---` block containing at least title, author, date and format. The check only looks at the first line of each .qmd file in the project root (and of a single validated file) and flags files that do not begin with `---`; it does not verify that title, author, date or format are present.',
     badExample: `\`\`\`{r}
 #| label: setup
 library(ggplot2)
@@ -118,9 +119,9 @@ Delays increased in 2023.`,
     category: 'performance',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Use #| cache: true for expensive calculations',
+    description: 'Use #| cache: true on expensive chunks or freeze: auto for project renders',
     details:
-      'Re-running every chunk on each render wastes time in documents with heavy computations. Use `#| cache: true` on slow chunks, or `freeze: auto` in `_quarto.yml` so unchanged documents are skipped when rendering a project. The check flags projects with at least three R chunks and no `cache:` or `freeze:` setting in YAML or chunk options.',
+      'Re-running every chunk on each render wastes time in documents with heavy computations. Use `#| cache: true` on slow chunks, or `freeze: auto` in `_quarto.yml` so unchanged documents are skipped when rendering a project. Note that `freeze` only takes effect when rendering a Quarto project, and `cache` needs the knitr engine. This is a coarse heuristic: it counts R chunks over all .qmd files in the project (recursively) and, when there are at least three, passes if a `cache` or `freeze` setting appears anywhere (a .qmd YAML header, `_quarto.yml`/`_quarto.yaml` in the project root, a chunk option line or header option, or a `cache =` argument such as in `opts_chunk$set()`). It does not check that the cached chunks are the slow ones.',
     badExample: `\`\`\`{r}
 #| label: fit-model
 model <- lm(delay ~ ., data = big_flights)
@@ -162,7 +163,7 @@ model <- lm(delay ~ ., data = big_flights)
     enforcement: 'automated',
     description: 'Explain analysis steps, findings, and conclusions',
     details:
-      'A document that is only code gives readers no context for why each step exists or what the output means. Add a sentence or two before and after each chunk to state the question, the method and the finding. This is a heuristic: it flags .qmd files with at least two R chunks and fewer than three non-empty prose lines outside the YAML, fenced blocks and headings.',
+      'A document that is only code gives readers no context for why each step exists or what the output means. Add a sentence or two before and after each chunk to state the question, the method and the finding. This is a heuristic that only counts lines: it scans .qmd files in the project (recursively) and flags a file with at least two R chunks and fewer than three non-empty lines outside the YAML header, fenced code blocks, `:::` div fences and lines starting with `#` (headings). Any such line counts as narrative, including list items and table rows, and the quality of the prose is not assessed.',
     badExample: `---
 title: "Delays"
 ---
@@ -213,7 +214,7 @@ fit <- lm(delay ~ distance, d)
     enforcement: 'automated',
     description: 'Use #| fig-cap for meaningful figure descriptions',
     details:
-      'Captions tell readers what a plot shows, and a `fig-` prefixed label lets you cross-reference it with `@fig-name`. Add `#| label: fig-...` and `#| fig-cap:` to every chunk that draws a plot. This is a heuristic: it flags chunks calling `ggplot(`, `plot(`, `hist(`, `barplot(` or `boxplot(` with no `fig-cap` option, ignoring chunks with `eval: false` or `include: false`.',
+      'Captions tell readers what a plot shows, and a `fig-` prefixed label lets you cross-reference it with `@fig-name`. Add `#| label: fig-...` and `#| fig-cap:` to every chunk that draws a plot. This is a heuristic: it scans .qmd files in the project (recursively) and flags R chunks whose code (comments and strings ignored) calls `ggplot(`, `plot(`, `hist(`, `barplot(` or `boxplot(` and that set no caption, meaning neither a `#| fig-cap:` option line nor `fig-cap=`/`fig.cap=` in the chunk header. Chunks with `eval` or `include` set to false (`#| eval: false` or `eval=FALSE`) are skipped, other plotting functions are not recognised, and the `fig-` label prefix is not checked. One finding lists the first few chunks.',
     badExample: `\`\`\`{r}
 #| label: delays-plot
 ggplot(flights, aes(distance, delay)) +
@@ -242,7 +243,7 @@ As @fig-delays shows, the trend is weak.`,
     enforcement: 'automated',
     description: 'Use knitr::kable() or gt for publication-quality tables',
     details:
-      'Tables built with `knitr::kable()` or `gt` render cleanly in every format, and a `tbl-` label with `tbl-cap` makes them numbered and referenceable. Set `#| label: tbl-...` and `#| tbl-cap:` on the chunk. This is a heuristic: it flags chunks calling `kable(`, `gt(` or kableExtra functions that have neither a `tbl-cap` option nor a `caption =` argument.',
+      'Tables built with `knitr::kable()` or `gt` render cleanly in every format, and a `tbl-` label with `tbl-cap` makes them numbered and referenceable. Set `#| label: tbl-...` and `#| tbl-cap:` on the chunk. This is a heuristic: it scans .qmd files in the project (recursively) and flags R chunks whose code (comments and strings ignored) calls `kable(`, `kbl(`, `gt(` or a kableExtra function such as `kable_styling(`, and that have no `#| tbl-cap:` option line, no `tbl-cap=`/`tbl.cap=` header option and no `caption =` argument anywhere in the chunk code (which also accepts an unrelated `caption =`, for example in `labs()`). Chunks with `eval` or `include` set to false are skipped, other table functions are not recognised, and the `tbl-` label prefix is not checked.',
     badExample: `\`\`\`{r}
 #| label: carrier-table
 knitr::kable(head(carriers))

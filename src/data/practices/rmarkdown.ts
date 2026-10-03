@@ -10,7 +10,7 @@ export const rmarkdownPractices: Practice[] = [
     enforcement: 'automated',
     description: 'Specify output format (html_document, pdf_document, etc.)',
     details:
-      'The YAML header names the document and selects the output format, so `rmarkdown::render()` knows what to build without extra arguments. Begin every .Rmd with a `---` block that has title, author, date and an `output:` entry. The check looks at the first line of each .Rmd file in the project root and flags files that do not start with `---`.',
+      'The YAML header names the document and selects the output format, so `rmarkdown::render()` knows what to build without extra arguments. Begin every .Rmd with a `---` block that has title, author, date and an `output:` entry. The check only looks at the first line of each .Rmd file in the project root (and of a single validated file) and flags files that do not begin with `---`; it does not verify that title, author, date or `output:` are present.',
     badExample: `# Flight delays
 
 \`\`\`{r setup}
@@ -43,7 +43,7 @@ library(dplyr)
     enforcement: 'automated',
     description: 'Name each chunk for navigation (e.g., ```{r load-data})',
     details:
-      'Chunk labels appear in the RStudio outline, in knitr progress output and in error messages, and they name the generated figure files. Give every chunk a unique short label right after `r`, before any options. The check flags .Rmd chunk headers such as ```{r} or ```{r, echo=FALSE} where the first item is missing or is an option containing `=`; a `label=` option or `#| label:` line counts as a label.',
+      'Chunk labels appear in the RStudio outline, in knitr progress output and in error messages, and they name the generated figure files. Give every chunk a unique short label right after `r`, before any options. The check scans .Rmd files in the project (recursively, skipping directories such as renv, docs, public and _book) and flags R chunk headers such as ```{r} or ```{r, echo=FALSE} where the first item is missing or is an option containing `=`; a `label=` option or a `#| label:` line also counts as a label. Only R chunks are checked and one finding lists the first few unlabelled chunks.',
     badExample: `\`\`\`{r}
 flights <- read.csv("flights.csv")
 \`\`\`
@@ -73,7 +73,7 @@ hist(flights$delay)
     enforcement: 'automated',
     description: 'Use echo, eval, include, warning, message options appropriately',
     details:
-      'Default knitr options print all code, warnings and messages, which clutters reports. Set shared defaults once in a setup chunk with `knitr::opts_chunk$set()` and override them on individual chunks. This is a heuristic: it flags projects with R chunks where no `opts_chunk$set(` call exists and no chunk header or `#|` line uses echo, eval, include, warning, message or fig.* options.',
+      'Default knitr options print all code, warnings and messages, which clutters reports. Set shared defaults once in a setup chunk with `knitr::opts_chunk$set()` and override them on individual chunks. This is a heuristic that does not verify which options are set: it scans .Rmd files in the project (recursively) and passes as soon as any one R chunk has a header option or `#|` option line named echo, eval, include, warning, message or fig.*, or calls `opts_chunk$set(`, or when `opts_chunk$set(` appears in any .R or .r file in the project (for example a sourced setup script). It reports only when none of these is found.',
     badExample: `\`\`\`{r setup}
 library(dplyr)
 \`\`\`

@@ -3,14 +3,15 @@ import { Practice } from '../../types/practice.js';
 export const rScriptPractices: Practice[] = [
   {
     id: 'rscript-header',
-    title: 'Include header comment with metadata',
+    title: 'Start scripts with a header comment',
     workflow: 'r-script',
     category: 'documentation',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Script should start with header including purpose, author, date',
+    description:
+      'Begin each script with a comment block saying what it does (purpose, author, date)',
     details:
-      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check looks at the first .R file in the project root (not subdirectories) and reports when its first line is not a comment. Keep the header to a few lines and update it when the purpose changes.',
+      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check is deliberately minimal: it looks only at the first `.R` file found in the project root (subdirectories and lowercase `.r` files are not examined, and the file order is whatever the file system lists) and reports when its first line does not start with `#`. A shebang line or any comment passes; the purpose, author and date suggested in the advice are not verified. Keep the header to a few lines and update it when the purpose changes.',
     badExample: `library(dplyr)
 data <- read.csv("data/sales.csv")
 summary(data)`,
@@ -36,7 +37,7 @@ summary(sales)`,
     enforcement: 'automated',
     description: 'Script filenames should use snake_case (e.g., data_cleaning.R)',
     details:
-      'Meaningful, lowercase file names sort predictably and work on case-sensitive and case-insensitive file systems; spaces and hyphens complicate shell use. The check inspects .R files in the project root and one level of subdirectories and reports names that do not match lowercase snake_case, such as MyScript.R, my-script.R or Analysis 1.R (_targets.R is exempt). Numeric prefixes like 01_clean.R are fine for ordering.',
+      'Meaningful, lowercase file names sort predictably and work on case-sensitive and case-insensitive file systems; spaces and hyphens complicate shell use. The check inspects `.R` and `.r` files in the project root and in each first-level subdirectory (hidden directories and renv, node_modules, _book, _site, public and docs are skipped; at most 200 files are scanned) and reports names that do not match lowercase snake_case, such as MyScript.R, my-script.R or Analysis 1.R (`_targets.R` is exempt). Numeric prefixes like 01_clean.R are fine for ordering.',
     badExample: `MyScript.R
 my-script.R
 Analysis 1.R
@@ -60,8 +61,9 @@ data_cleaning.R
     enforcement: 'automated',
     description: 'Avoid code duplication; extract repeated logic into functions',
     details:
-      'Copy-pasted code drifts apart and hides mistakes, while a named function documents intent and can be tested once. The check is a heuristic applied when a single .R file is validated: it reports a script of more than 50 lines that defines no top-level function (name <- function). Move repeated blocks into functions with explicit arguments and, as a rule of thumb, extract after copying code twice.',
-    badExample: `a <- read.csv("data/a.csv")
+      'Copy-pasted code drifts apart and hides mistakes, while a named function documents intent and can be tested once. This is a coarse heuristic that does not detect duplication. It runs only when a single `.R` file is validated (validate_file), not during project validation, and reports a file of more than 50 lines that has no line starting at column 0 with `name <- function`. Functions assigned with `=` or written as `\\(x)` lambdas are not recognised. Move repeated blocks into functions with explicit arguments and, as a rule of thumb, extract after copying code twice.',
+    badExample: `# (the automated check fires once a file exceeds 50 lines with no function)
+a <- read.csv("data/a.csv")
 a$total <- a$price * a$qty
 a <- a[a$total > 0, ]
 
@@ -88,14 +90,14 @@ b <- load_orders("data/b.csv")`,
     enforcement: 'automated',
     description: 'Use comment headers to divide script into logical sections',
     details:
-      'Labelled sections let readers skim a long script and let RStudio build a clickable outline. This is a heuristic check: it reports the first .R file (root or one subdirectory level) with more than 80 lines and no section marker such as "# Title ----", a row of #### or a row of ====. Use one section per stage, for example load, clean, model and export.',
+      'Labelled sections let readers skim a long script and let RStudio build a clickable outline. This is a heuristic check: it scans `.R` and `.r` files in the project root and one subdirectory level and reports the first one with more than 80 lines (blank lines included) and no section marker, meaning a comment that ends in `----`, `####` or `====`, or starts with `####` or `# ====`. It does not check that sections are sensibly named or spaced. Use one section per stage, for example load, clean, model and export.',
     badExample: `library(dplyr)
 raw <- read.csv("data/sales.csv")
 raw$date <- as.Date(raw$date)
 clean <- filter(raw, !is.na(total))
 fit <- lm(total ~ region, data = clean)
 write.csv(clean, "output/clean.csv")
-# ... 80+ more lines with no structure`,
+# ... imagine 80+ lines like this with no section headers`,
     goodExample: `# Load data ----------------------------------------------------
 library(dplyr)
 raw <- read.csv("data/sales.csv")
@@ -116,19 +118,24 @@ write.csv(clean, "output/clean.csv")`,
   },
   {
     id: 'rscript-globals',
-    title: 'Minimize global variables',
+    title: 'Wrap script logic in functions instead of piling up globals',
     workflow: 'r-script',
     category: 'structure',
     severity: 'important',
     enforcement: 'automated',
-    description: 'Avoid relying on global state; use function parameters instead',
+    description:
+      'Avoid long runs of top-level assignments; use functions with parameters and a main() entry point',
     details:
-      'Functions that read global variables are hard to test and break when run in a different order. The check looks at the first .R file in the project root and reports each top-level line of the form name <- value (other than function definitions). Pass inputs as arguments, return results, and keep configuration in one clearly named object at the top of the script.',
-    badExample: `threshold <- 10
+      'Functions that read global variables are hard to test, and scripts that are one long list of top-level assignments break when run out of order. This is a heuristic nudge, not a scope analysis: it looks at the `.R` files in the project root and reports one finding for the first script with more than 15 top-level assignments, meaning lines that start at column 0 with `name <- value` or `name = value` where the value is not a function (comment lines are ignored, indented lines are not counted). It cannot tell whether a function actually reads a global. Pass inputs as arguments, return results, put the steps in functions called from a main() entry point, and keep configuration in one clearly named object at the top of the script.',
+    badExample: `# Flagged once a script has more than 15 top-level assignments like these
+threshold <- 10
 scale_it <- function(x) {
   x / threshold   # silently depends on a global
 }
-result <- scale_it(25)`,
+raw <- read.csv("data/raw.csv")
+clean <- raw[raw$value > threshold, ]
+result <- scale_it(25)
+# ... and a dozen more top-level steps`,
     goodExample: `scale_it <- function(x, threshold = 10) {
   x / threshold
 }
@@ -149,10 +156,11 @@ main()`,
     enforcement: 'automated',
     description: 'Use tryCatch for error handling in production scripts',
     details:
-      'Unhandled errors stop a script halfway and leave partial output behind, whereas tryCatch lets you log a clear message and clean up. This is a heuristic check: it reports the first .R file of more than 60 lines in which no uncommented tryCatch(, try(, stopifnot(, stop( or withCallingHandlers( call appears. Wrap fragile steps (file reads, downloads, database calls) and validate inputs early.',
-    badExample: `df <- read.csv("data/input.csv")
-resp <- httr::GET("https://example.com/api")
-df$score <- jsonlite::fromJSON(rawToChar(resp$content))$score
+      'Unhandled errors stop a script halfway and leave partial output behind, whereas tryCatch lets you log a clear message and clean up. This is a heuristic check: it scans `.R` and `.r` files in the project root and one subdirectory level and reports the first file of more than 60 lines in which no line (other than full-line comments) contains tryCatch(, try(, stopifnot(, stop( or withCallingHandlers(. Other styles such as rlang::abort() or cli::cli_abort() are not recognised, and it cannot tell whether the risky steps are the ones wrapped. Wrap fragile steps (file reads, downloads, database calls) and validate inputs early.',
+    badExample: `# (flagged once the script exceeds 60 lines without any error handling)
+df <- read.csv("data/input.csv")
+scores <- jsonlite::fromJSON(readLines("https://example.com/api/scores.json"))
+df$score <- scores$score
 write.csv(df, "output/scored.csv")`,
     goodExample: `df <- tryCatch(
   read.csv("data/input.csv"),
@@ -177,7 +185,7 @@ write.csv(df, "output/scored.csv")`,
     enforcement: 'automated',
     description: 'Close database connections and file handles at script end',
     details:
-      'Open database connections, file connections, sinks and graphics devices leak resources and can leave files unreadable if never released. This is a heuristic check: for each script it ignores comment lines and reports a dbConnect(, an assigned file( or url( connection, sink(file) or a pdf/png/jpeg/svg device when the matching dbDisconnect(, close(, sink() or dev.off( call is absent from the same file. Release resources with on.exit() or withr::defer() so cleanup also happens after errors.',
+      'Open database connections, file connections, sinks and graphics devices leak resources and can leave files unreadable if never released. This is a heuristic check: it scans `.R` and `.r` files in the project root and one subdirectory level, ignores comments and string contents, and reports a file that calls dbConnect(, assigns a file( or url( connection (file("stdin") is exempt), calls sink() with a target, or opens a pdf/png/jpeg/svg device when no matching dbDisconnect(, close(, sink() or dev.off( call appears anywhere in the same file. It does not pair each opener with its own release, and it cannot see cleanup done in another file. Release resources with on.exit() or withr::defer() so cleanup also happens after errors.',
     badExample: `con <- DBI::dbConnect(RSQLite::SQLite(), "data/app.sqlite")
 orders <- DBI::dbGetQuery(con, "SELECT * FROM orders")
 png("output/orders.png")
