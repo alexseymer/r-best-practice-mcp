@@ -132,13 +132,42 @@ const PLOT_CALL = /(^|[^A-Za-z0-9_.])(ggplot|plot|hist|barplot|boxplot)\s*\(/;
 const TABLE_CALL =
   /(^|[^A-Za-z0-9_.])(kable|kbl|gt|kable_styling|kable_classic|kable_paper|kable_minimal|add_header_above)\s*\(|kableExtra::/;
 
+/** Text between `{r` and the closing brace of a chunk header, e.g. ` setup, include=FALSE`. */
+export function headerBody(header: string): string {
+  const end = header.lastIndexOf('}');
+  return header.slice(2, end === -1 ? undefined : end);
+}
+
+const OPTION_NAME = '(echo|eval|include|warning|message|fig[.-][A-Za-z]+)';
+const HEADER_OPTION = new RegExp(`(^|[\\s,])${OPTION_NAME}\\s*=`);
+const CHUNK_OPTION_LINE = new RegExp(`^#\\|\\s*${OPTION_NAME}\\s*:`);
+const HIDDEN_HEADER_OPTION = /(^|[\s,])(eval|include)\s*=\s*(FALSE|F)(?![\w.])/;
+
+/** True if a knitr-style header option (`{r, echo=FALSE}`) is set explicitly. */
+export function hasHeaderOption(chunk: Chunk): boolean {
+  return HEADER_OPTION.test(headerBody(chunk.header));
+}
+
+/** True if the chunk has a `#| echo|eval|include|warning|message|fig-*:` option line. */
+export function hasOptionLine(chunk: Chunk): boolean {
+  return chunk.optionLines.some((o) => CHUNK_OPTION_LINE.test(o));
+}
+
+/** True if the chunk sets options through knitr::opts_chunk$set() (code is comment-stripped). */
+export function callsOptsChunkSet(text: string): boolean {
+  return /opts_chunk\$set\s*\(/.test(text);
+}
+
 function hasOption(chunk: Chunk, ...keys: string[]): boolean {
   return chunk.optionKeys.some((k) => keys.includes(k));
 }
 
 /** Chunks that are not evaluated or not shown produce no figure/table in the output. */
 function isHidden(chunk: Chunk): boolean {
-  return chunk.optionLines.some((o) => /^#\|\s*(eval|include)\s*:\s*(false|no)\b/i.test(o));
+  if (chunk.optionLines.some((o) => /^#\|\s*(eval|include)\s*:\s*(false|no)\b/i.test(o))) {
+    return true;
+  }
+  return HIDDEN_HEADER_OPTION.test(headerBody(chunk.header));
 }
 
 export const quartoRules: RuleDef[] = [
@@ -150,6 +179,8 @@ export const quartoRules: RuleDef[] = [
       const chunks = docs.flatMap((d) => d.chunks);
       if (chunks.length === 0) return [];
       if (chunks.some((c) => c.optionLines.length > 0)) return [];
+      // knitr-style explicit options: {r, echo=FALSE} and knitr::opts_chunk$set()
+      if (chunks.some((c) => hasHeaderOption(c) || callsOptsChunkSet(c.code))) return [];
       const execRe = /^execute\s*:/m;
       if (docs.some((d) => execRe.test(d.frontMatter))) return [];
       if (execRe.test(await readProjectConfig(dirPath))) return [];
@@ -162,7 +193,7 @@ export const quartoRules: RuleDef[] = [
           file: first.file,
           line: first.chunks[0].line,
           message:
-            'Consider setting chunk options explicitly: no code chunk has a #| option and no execute: block was found',
+            'Consider setting chunk options explicitly: no code chunk has a #| or header option, no opts_chunk$set() call and no execute: block was found',
           suggestions: [
             'Add options such as #| echo: false or #| warning: false at the top of chunks',
             'Or set project-wide defaults with an execute: block in _quarto.yml or the document YAML',

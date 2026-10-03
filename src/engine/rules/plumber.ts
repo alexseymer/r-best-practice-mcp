@@ -1,9 +1,10 @@
 import path from 'path';
 import { RuleDef } from './types.js';
-import { findFiles, readText } from './helpers.js';
+import { findFiles, maskRSource, readText } from './helpers.js';
 
-const ENDPOINT = /^\s*#\*\s*@(get|post|put|delete|patch|head)\b[ \t]*(\S*)/i;
-const PLUMBER_COMMENT = /^\s*#\*/;
+// plumber accepts both #* and #' annotations.
+const ENDPOINT = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b[ \t]*(\S*)/i;
+const PLUMBER_COMMENT = /^\s*#[*']/;
 const VERB_PREFIX = /^(get|create|delete|update|set|add|remove)([A-Z_-])/;
 
 interface Endpoint {
@@ -28,12 +29,12 @@ function parseEndpoints(file: string, text: string): Endpoint[] {
       i++;
       continue;
     }
-    // Contiguous block of #* lines.
+    // Contiguous block of #* / #' lines.
     const start = i;
     while (i < lines.length && PLUMBER_COMMENT.test(lines[i])) i++;
     const block = lines.slice(start, i);
     const documented = block.some((l) => {
-      const body = l.replace(/^\s*#\*/, '').trim();
+      const body = l.replace(/^\s*#[*']/, '').trim();
       return body.length > 0 && !body.startsWith('@');
     });
     block.forEach((l, idx) => {
@@ -57,7 +58,7 @@ async function loadPlumberFiles(dirPath: string): Promise<PlumberFile[]> {
   const out: PlumberFile[] = [];
   for (const file of files) {
     const text = await readText(file);
-    if (text === null || !text.includes('#*')) continue;
+    if (text === null || !(text.includes('#*') || text.includes("#'"))) continue;
     const endpoints = parseEndpoints(file, text);
     if (endpoints.length > 0) out.push({ file, endpoints });
   }
@@ -65,15 +66,12 @@ async function loadPlumberFiles(dirPath: string): Promise<PlumberFile[]> {
 }
 
 function stripComments(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .filter((line) => !/^\s*#/.test(line))
-    .join('\n');
+  return maskRSource(text, false);
 }
 
 function pathIssue(route: string): boolean {
   // Dynamic segments like <id> or <id:int> and {} placeholders are fine.
-  const stripped = route.replace(/<[^>]*>/g, '').replace(/\{[^}]*\}/g, '');
+  const stripped = route.replace(/<[^<>]*>/g, '').replace(/\{[^{}]*\}/g, '');
   if (/[A-Z_]/.test(stripped)) return true;
   const first = stripped.split('/').find((s) => s.length > 0) ?? '';
   return VERB_PREFIX.test(first);
@@ -103,7 +101,7 @@ export const plumberRules: RuleDef[] = [
           file: first.file,
           line: first.line,
           message: `Consider documenting ${undocumented.length} endpoint(s): the #* annotation block has no description line`,
-          details: `Undocumented: ${list}. A description is a #* line that does not start with @ in the same comment block as the endpoint annotation.`,
+          details: `Undocumented: ${list}. A description is a #* or #' line that does not start with @ in the same comment block as the endpoint annotation.`,
           suggestions: [
             'Add a plain description line such as "#* Return the current server time" above the @get/@post annotation',
             'Document inputs with "#* @param name Description" so they appear in the generated OpenAPI docs',

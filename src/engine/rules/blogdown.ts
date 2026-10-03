@@ -1,12 +1,40 @@
 import path from 'path';
 import { RuleDef } from './types.js';
-import { findFiles, readText, pathExists, anyExists } from './helpers.js';
+import { findFiles, readText, anyExists } from './helpers.js';
+
+// `content/` is the search root, so a root-level public/ (build output) is never reached; nested
+// sections such as content/docs/ are legitimate Hugo content and must be checked.
+const CONTENT_SKIPPED_DIRS = ['node_modules', '.git', 'resources'];
+
+const HUGO_CONFIGS = [
+  'config.toml',
+  'config.yaml',
+  'config.yml',
+  'config.json',
+  'hugo.toml',
+  'hugo.yaml',
+  'hugo.yml',
+  'hugo.json',
+];
+const PUBLISH_DIR = /^\s*["']?publishDir["']?\s*[:=]/im;
+
+async function hasPublishDir(dirPath: string): Promise<boolean> {
+  const files = [
+    ...HUGO_CONFIGS.map((n) => path.join(dirPath, n)),
+    ...(await findFiles(path.join(dirPath, 'config'), /\.(toml|ya?ml|json)$/i)),
+  ];
+  for (const file of files) {
+    const text = await readText(file);
+    if (text !== null && PUBLISH_DIR.test(text)) return true;
+  }
+  return false;
+}
 
 const POST_FILE = /\.(md|Rmd|Rmarkdown)$/;
 
 function hasFrontMatter(content: string): boolean {
-  const text = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-  const first = text.split(/\r?\n/, 1)[0].trim();
+  // trimStart drops a BOM and any leading blank lines/whitespace.
+  const first = content.trimStart().split(/\r?\n/, 1)[0].trim();
   return first === '---' || first === '+++' || first.startsWith('{');
 }
 
@@ -15,7 +43,9 @@ export const blogdownRules: RuleDef[] = [
     id: 'blogdown-metadata',
     workflows: ['blogdown'],
     async run({ dirPath }) {
-      const files = await findFiles(path.join(dirPath, 'content'), POST_FILE);
+      const files = await findFiles(path.join(dirPath, 'content'), POST_FILE, {
+        skipDirs: CONTENT_SKIPPED_DIRS,
+      });
       const missing: string[] = [];
       for (const file of files) {
         const content = await readText(file);
@@ -48,11 +78,20 @@ export const blogdownRules: RuleDef[] = [
     workflows: ['blogdown'],
     async run({ dirPath }) {
       if (
-        await anyExists(dirPath, ['netlify.toml', 'vercel.json', 'render.yaml', '.gitlab-ci.yml'])
+        await anyExists(dirPath, [
+          'netlify.toml',
+          'vercel.json',
+          'render.yaml',
+          '.gitlab-ci.yml',
+          '.travis.yml',
+          'azure-pipelines.yml',
+          '.netlify',
+          path.join('.circleci', 'config.yml'),
+        ])
       ) {
         return [];
       }
-      if (await pathExists(path.join(dirPath, '.netlify'))) return [];
+      if (await hasPublishDir(dirPath)) return [];
       const workflows = await findFiles(path.join(dirPath, '.github', 'workflows'), /./, {
         includeHidden: true,
       });
@@ -65,7 +104,7 @@ export const blogdownRules: RuleDef[] = [
           message: 'No deployment configuration found for the site',
           suggestions: [
             'Add netlify.toml with the build command (hugo) and publish directory (public)',
-            'Or add a GitHub Actions workflow in .github/workflows/ that builds and publishes the site',
+            'Or add a GitHub Actions workflow in .github/workflows/ (or another CI config such as .gitlab-ci.yml) that builds and publishes the site',
           ],
         },
       ];

@@ -1,12 +1,14 @@
 import { RuleDef } from './types.js';
 import { findFiles, readText } from './helpers.js';
-import { Chunk, loadDocs, summarize } from './quarto.js';
-
-/** Text between `{r` and the closing brace of a chunk header, e.g. ` setup, include=FALSE`. */
-function headerBody(header: string): string {
-  const end = header.lastIndexOf('}');
-  return header.slice(2, end === -1 ? undefined : end);
-}
+import {
+  Chunk,
+  callsOptsChunkSet,
+  hasHeaderOption,
+  hasOptionLine,
+  headerBody,
+  loadDocs,
+  summarize,
+} from './quarto.js';
 
 function isLabeled(chunk: Chunk): boolean {
   const body = headerBody(chunk.header);
@@ -15,10 +17,6 @@ function isLabeled(chunk: Chunk): boolean {
   const first = body.split(',')[0].trim();
   return first !== '' && !first.includes('=');
 }
-
-const OPTION_NAME = '(echo|eval|include|warning|message|fig[.-][A-Za-z]+)';
-const HEADER_OPTION = new RegExp(`(^|[\\s,])${OPTION_NAME}\\s*=`);
-const CHUNK_OPTION_LINE = new RegExp(`^#\\|\\s*${OPTION_NAME}\\s*:`);
 
 export const rmarkdownRules: RuleDef[] = [
   {
@@ -55,9 +53,9 @@ export const rmarkdownRules: RuleDef[] = [
       const chunks = docs.flatMap((d) => d.chunks);
       if (chunks.length === 0) return [];
       for (const chunk of chunks) {
-        if (HEADER_OPTION.test(headerBody(chunk.header))) return [];
-        if (chunk.optionLines.some((o) => CHUNK_OPTION_LINE.test(o))) return [];
-        if (/opts_chunk\$set\s*\(/.test(chunk.code)) return [];
+        if (hasHeaderOption(chunk) || hasOptionLine(chunk) || callsOptsChunkSet(chunk.code)) {
+          return [];
+        }
       }
       // opts_chunk$set() may live in a sourced setup script
       const scripts = await findFiles(dirPath, /\.[Rr]$/);

@@ -57,7 +57,7 @@ describe('shinytest rules', () => {
       expect(found).toHaveLength(1);
       expect(found[0].severity).toBe('recommended');
       expect(found[0].category).toBe('testing');
-      expect(found[0].message.length).toBeGreaterThan(0);
+      expect(found[0].message).toContain('Consider adding tests/testthat/');
       expect(found[0].suggestions?.length).toBeGreaterThan(0);
     });
 
@@ -94,13 +94,38 @@ describe('shinytest rules', () => {
       expect(await idsFor(dir, 'shinytest')).toContain('shinytest-ci-integration');
     });
 
-    it.each(['shinytest', 'shinytest2', 'testthat', 'test_dir'])(
-      'is satisfied by a GitHub workflow mentioning %s',
-      async (word) => {
-        createFile(dir, '.github/workflows/test.yml', `run: Rscript -e '${word}'\n`);
-        expect(await idsFor(dir, 'shinytest')).not.toContain('shinytest-ci-integration');
-      }
-    );
+    it.each([
+      'shinytest',
+      'shinytest2',
+      'testthat::test_dir("tests")',
+      'devtools::test()',
+      'rcmdcheck::rcmdcheck()',
+      'R CMD check .',
+      'shiny::test_app()',
+      'test_dir',
+    ])('is satisfied by a GitHub workflow that runs %s', async (word) => {
+      createFile(dir, '.github/workflows/test.yml', `run: Rscript -e '${word}'\n`);
+      expect(await idsFor(dir, 'shinytest')).not.toContain('shinytest-ci-integration');
+    });
+
+    it('is not satisfied by a workflow that merely mentions the word testthat', async () => {
+      createFile(
+        dir,
+        '.github/workflows/lint.yaml',
+        'steps:\n  - run: Rscript -e \'install.packages("testthat")\'\n  - run: lintr\n'
+      );
+      expect(await idsFor(dir, 'shinytest')).toContain('shinytest-ci-integration');
+    });
+
+    it('ignores commented-out test steps in a workflow', async () => {
+      createFile(dir, '.github/workflows/ci.yaml', 'steps:\n  # - run: devtools::test()\n');
+      expect(await idsFor(dir, 'shinytest')).toContain('shinytest-ci-integration');
+    });
+
+    it('is satisfied by .travis.yml', async () => {
+      createFile(dir, '.travis.yml', 'language: r\nscript:\n  - Rscript -e "devtools::test()"\n');
+      expect(await idsFor(dir, 'shinytest')).not.toContain('shinytest-ci-integration');
+    });
 
     it('is satisfied by .gitlab-ci.yml', async () => {
       createFile(
