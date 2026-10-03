@@ -1,0 +1,32 @@
+# Changelog
+
+## Unreleased
+
+### Added
+- 4 practices (`pkg-structure`, `shiny-structure`, `shinytest-app`, `shinytest-setup`): 70 practices in total.
+- `Practice.enforcement` (`automated` | `guidance`): 59 practices are checked by a validator rule, 11 are advice only.
+- 32 new validator rules (rule registry in `src/engine/rules/`), one per automated practice that previously had none.
+- Every practice now has `details`, `badExample`, `goodExample` and verified `references`.
+- `minSeverity`, `categories`, `maxFindings` for `validate_project` and `validate_file` (MCP and REST), plus a pre-filter `summary`.
+- `minSeverity`, `tags`, `enforcement`, `query`/`q` and `limit` for `list_practices` and `GET /api/practices` (v0 and v1).
+- Dashboard: server-side filters, "X of Y" counts, automated/guidance badges, JSON/Markdown export, ZIP download of templates, System tab.
+- `tests/unit/rule-consistency.test.ts`, `tests/unit/practice-content.test.ts`, `tests/e2e/dashboard.playwright.cjs`.
+
+### Changed
+- Finding ids `blogdown-content` and `blogdown-themes` are now `blogdown-content-structure` and `blogdown-theme` (they match their practices).
+- `PracticeListOptions.severity` is now `minSeverity` (still "at least this severe").
+- `bookdown-config` severity is `important` (a book builds without `_bookdown.yml`).
+- Tool parameters are defined once in `src/tools/schemas.ts` and shared by the MCP server, `/api/tools` and OpenAPI.
+- Logs go to stderr so stdout stays clean for the MCP stdio protocol and CLI output.
+
+### Fixed
+- `quarto-labels` flagged correctly labelled chunks (`#| label:`); `pkg-description` required the legacy `Author:`/`Maintainer:` fields;
+  `pkg-license` required a `LICENSE` file for every license; shinytest checks only accepted the legacy `shinytest` layout;
+  `analysis-readme` was reported by the Quarto validator instead of the analysis one; `rscript-globals`, `plumber-validation`
+  and `plumber-error` produced noisy or comment-matched results; `blogdown-config` rejected Hugo's `hugo.toml` and `config/_default/`.
+- `validate_file` returned Node's `path` module instead of the file path.
+- The MCP server declared no `tools` capability and failed on construction.
+- CLI: relative ESM imports lacked `.js` extensions, so `dist/bin/cli.js` could not start.
+- Docker image: wrong `dumb-init` path, missing dashboard assets.
+- Tests: shared timestamp temp directories caused random failures.
+- Rules: two quadratic-time regexes (up to ~24 s on adversarial input), multi-line `tar_target(` calls and `#'` plumber annotations were missed.

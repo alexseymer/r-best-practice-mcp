@@ -7,7 +7,7 @@ An **MCP (Model Context Protocol) server** that helps R developers follow best p
 ## Core Capabilities
 
 1. **Workflow Detection** - Automatically identifies R project type (script, package, Shiny, Quarto, etc.)
-2. **Project Validation** - Checks projects against 66+ best practices with severity levels
+2. **Project Validation** - Checks projects against 70 best practices with severity levels
 3. **Template Generation** - Scaffolds new projects with proper structure
 4. **Knowledge Base** - Access comprehensive practice documentation
 
@@ -36,9 +36,9 @@ r-practices template --workflow package --output ./new-pkg
 
 ## Key Statistics
 
-- **9 Workflows Supported**: r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis
-- **66+ Best Practices**: Categorized by severity (critical, important, recommended, info)
-- **279 Unit Tests**: 90%+ coverage of core functionality
+- **12 Workflows Supported**: r-script, quarto, shiny, package, rmarkdown, renv, targets, plumber, analysis, bookdown, blogdown, shinytest
+- **70 Best Practices**: Categorized by severity (critical, important, recommended, info)
+- **~1,000 Tests**: unit, regression and per-rule tests
 - **100% TypeScript**: Full type safety with strict mode
 
 ## Project Structure
@@ -47,7 +47,7 @@ r-practices template --workflow package --output ./new-pkg
 ├── src/
 │   ├── engine/           # Core detection, validation, template logic
 │   ├── cli/              # Command-line interface
-│   ├── data/             # Knowledge base with 66+ practices
+│   ├── data/             # Knowledge base with 70 practices (data/practices/<workflow>.ts)
 │   ├── utils/            # Shared utilities (file ops, logging, etc.)
 │   └── web-server.ts     # Express web dashboard
 ├── tests/
@@ -75,7 +75,7 @@ r-practices template --workflow package --output ./new-pkg
 
 ## Build Status
 
-✅ All tests passing (279/279 unit tests)
+✅ All tests passing
 ✅ Docker containerization ready
 ✅ npm package published
 ✅ Web dashboard deployed
