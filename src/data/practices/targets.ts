@@ -11,7 +11,7 @@ export const targetsPractices: Practice[] = [
     description:
       'Keep the pipeline entry point in _targets.R and have it return the list of targets',
     details:
-      'The targets package reads the pipeline from _targets.R in the project root, so that file is the single entry point for tar_make() and tar_visnetwork(). The check is a heuristic: it reports when `_targets.R` is missing from the project root, or when the file does not contain the text `list(` anywhere (comments are not excluded). It does not parse the file, so a pipeline built with `tarchetypes::tar_plan()` or a target list assembled elsewhere can trigger a false positive. Keep the file short: load packages, source() helper functions from R/, and return the list of tar_target() objects.',
+      'The targets package reads the pipeline from _targets.R in the project root, so that file is the single entry point for tar_make() and tar_visnetwork(). The check is a heuristic: it reports when `_targets.R` is missing from the project root, or when the code (comments and string contents ignored) contains neither `list(` nor `tar_plan(`. It does not parse the file, so a target list assembled in some other way can trigger a false positive. Keep the file short: load packages, source() helper functions from R/, and return the list of tar_target() objects.',
     badExample: `# analysis.R: not read by tar_make()
 library(targets)
 tar_target(raw_data, read.csv("data/raw.csv"))

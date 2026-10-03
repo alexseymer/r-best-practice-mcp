@@ -1,9 +1,10 @@
+import path from 'path';
 import { FileValidationResult, Finding, ValidationResult } from '../types/finding.js';
 import { Workflow } from '../types/workflow.js';
 import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
 import { runRegisteredRules } from './rules/index.js';
-import { findFiles, maskRSource, readText } from './rules/helpers.js';
+import { compareNames, findFiles, maskRSource, readText, stripBom } from './rules/helpers.js';
 import { applyFindingFilters, FindingFilterOptions, summarizeFindings } from './finding-filters.js';
 
 const RSCRIPT_GLOBALS_THRESHOLD = 15;
@@ -146,23 +147,35 @@ export class Validator {
     const findings: Finding[] = [];
     const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
 
-    // Check for header
-    if (rFiles.length > 0) {
-      const mainFile = rFiles[0];
-      const content = await FileUtils.readFile(mainFile);
-      const lines = content.split('\n');
-
-      // Check header comment
-      if (!lines[0]?.startsWith('#')) {
+    // Check for a header comment: one finding, for the first script (sorted) that lacks one
+    const scripts = (await findFiles(dirPath, /\.[Rr]$/, { recursive: false })).sort((x, y) =>
+      compareNames(path.basename(x), path.basename(y))
+    );
+    for (const file of scripts) {
+      const text = await readText(file);
+      if (text === null) continue;
+      if (!stripBom(text).startsWith('#')) {
         findings.push({
           id: 'rscript-header',
           severity: 'recommended',
           category: 'documentation',
-          file: mainFile,
+          file,
           line: 1,
           message: 'Script should start with header comment',
           suggestions: ['# Purpose: [description]', '# Author: [name]', '# Date: [date]'],
         });
+        break;
+      }
+    }
+
+    // One finding for the project: the first long root script without any function
+    for (const file of scripts) {
+      const text = await readText(file);
+      if (text === null) continue;
+      const found = this.validateRFile(file, stripBom(text).split('\n'));
+      if (found.length > 0) {
+        findings.push(...found);
+        break;
       }
     }
 
@@ -241,7 +254,9 @@ export class Validator {
     }
 
     // Check for README
-    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
+    const readmeExists =
+      (await FileUtils.exists(`${dirPath}/README.md`)) ||
+      (await FileUtils.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'shiny-readme',
@@ -393,14 +408,16 @@ export class Validator {
 
     const content = await FileUtils.readFile(`${dirPath}/_targets.R`);
 
-    // Check for list() call
-    if (!content.includes('list(')) {
+    // Check for a target list: list() or tarchetypes::tar_plan() (comments do not count)
+    if (!/(^|[^A-Za-z0-9_.])(list|tar_plan)\s*\(/.test(maskRSource(content, true))) {
       findings.push({
         id: 'targets-structure',
         severity: 'recommended',
         category: 'structure',
-        message: '_targets.R should define targets using list()',
-        suggestions: ['End _targets.R with list(tar_target(name, command), ...)'],
+        message: '_targets.R should define targets using list() or tar_plan()',
+        suggestions: [
+          'End _targets.R with list(tar_target(name, command), ...) or use tarchetypes::tar_plan(...)',
+        ],
       });
     }
 
@@ -512,7 +529,9 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for functions
-    const hasFunctions = lines.some((l) => /^[a-zA-Z_]\w*\s*<-\s*function/.test(l));
+    const masked = maskRSource(lines.join('\n'), true);
+    const hasFunctions =
+      /(^|[\n;])[ \t]*[A-Za-z_.][\w.]*[ \t]*(<-|=)[ \t]*(function\b|\\[ \t]*\()/.test(masked);
     if (!hasFunctions && lines.length > 50) {
       findings.push({
         id: 'rscript-functions',
@@ -636,13 +655,15 @@ export class Validator {
     }
 
     // Check for README
-    const readmeExists = await FileUtils.exists(`${dirPath}/README.md`);
+    const readmeExists =
+      (await FileUtils.exists(`${dirPath}/README.md`)) ||
+      (await FileUtils.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'bookdown-readme',
         severity: 'recommended',
         category: 'documentation',
-        message: 'Add README.md to document the book',
+        message: 'Add README.md (or README.Rmd) to document the book',
         suggestions: ['Create README.md explaining how to build and contribute to the book'],
       });
     }
@@ -663,6 +684,8 @@ export class Validator {
       'hugo.toml',
       'hugo.yaml',
       'hugo.yml',
+      'config.json',
+      'hugo.json',
     ]) {
       if (!hasConfig && (await FileUtils.exists(`${dirPath}/${name}`))) hasConfig = true;
     }

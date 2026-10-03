@@ -11,7 +11,7 @@ export const rScriptPractices: Practice[] = [
     description:
       'Begin each script with a comment block saying what it does (purpose, author, date)',
     details:
-      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check is deliberately minimal: it looks only at the first `.R` file found in the project root (subdirectories and lowercase `.r` files are not examined, and the file order is whatever the file system lists) and reports when its first line does not start with `#`. A shebang line or any comment passes; the purpose, author and date suggested in the advice are not verified. Keep the header to a few lines and update it when the purpose changes.',
+      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check is deliberately minimal: it looks at the `.R` and `.r` files in the project root (subdirectories are not examined), in alphabetical order, and reports one finding for the first script whose first line (after an optional byte order mark) does not start with `#`. A shebang line or any comment passes; the purpose, author and date suggested in the advice are not verified. Keep the header to a few lines and update it when the purpose changes.',
     badExample: `library(dplyr)
 data <- read.csv("data/sales.csv")
 summary(data)`,
@@ -61,7 +61,7 @@ data_cleaning.R
     enforcement: 'automated',
     description: 'Avoid code duplication; extract repeated logic into functions',
     details:
-      'Copy-pasted code drifts apart and hides mistakes, while a named function documents intent and can be tested once. This is a coarse heuristic that does not detect duplication. It runs only when a single `.R` file is validated (validate_file), not during project validation, and reports a file of more than 50 lines that has no line starting at column 0 with `name <- function`. Functions assigned with `=` or written as `\\(x)` lambdas are not recognised. Move repeated blocks into functions with explicit arguments and, as a rule of thumb, extract after copying code twice.',
+      'Copy-pasted code drifts apart and hides mistakes, while a named function documents intent and can be tested once. This is a coarse heuristic that does not detect duplication. It runs on a single `.R` file (validate_file) and on the root `.R`/`.r` scripts during project validation (one finding, for the first script in alphabetical order), and reports a script of more than 50 lines that defines no function, that is, no `name <- function(`, `name = function(` or `name <- \\(x)` lambda assignment (comments and strings are ignored). Move repeated blocks into functions with explicit arguments and, as a rule of thumb, extract after copying code twice.',
     badExample: `# (the automated check fires once a file exceeds 50 lines with no function)
 a <- read.csv("data/a.csv")
 a$total <- a$price * a$qty

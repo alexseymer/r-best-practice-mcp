@@ -40,7 +40,9 @@ export const bookdownRules: RuleDef[] = [
       const indexPath = path.join(dirPath, 'index.Rmd');
       const text = await readText(indexPath);
       if (text === null) return [];
-      const formats = new Set(parseDoc(text).frontMatter.match(/bookdown::[A-Za-z0-9_]+/g) ?? []);
+      const formats = new Set(
+        parseDoc(text).frontMatter.match(/bookdown::(?!bookdown_site\b)[A-Za-z0-9_]+/g) ?? []
+      );
       if (formats.size >= 2) return [];
       return [
         {

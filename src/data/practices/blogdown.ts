@@ -11,7 +11,7 @@ export const blogdownPractices: Practice[] = [
     description:
       'Provide a Hugo config file (hugo.toml, config.toml, config.yaml, ...) with baseURL, title, theme and menus',
     details:
-      "Hugo reads the site-wide settings (baseURL, title, theme, menus, taxonomies) from a single configuration file in the site root, and blogdown cannot build or serve the site without it. The check passes when the project root has config.toml, config.yaml, config.yml, hugo.toml, hugo.yaml or hugo.yml, or a config/_default/ directory (Hugo's split configuration), and reports a critical finding otherwise; JSON config files are not accepted by this check. It only tests existence and does not read the file. Keep baseURL, title and theme set explicitly and add menu entries so navigation is defined in one place.",
+      "Hugo reads the site-wide settings (baseURL, title, theme, menus, taxonomies) from a single configuration file in the site root, and blogdown cannot build or serve the site without it. The check passes when the project root has config.toml, config.yaml, config.yml, config.json, hugo.toml, hugo.yaml, hugo.yml or hugo.json, or a config/_default/ directory (Hugo's split configuration), and reports a critical finding otherwise. It only tests existence and does not read the file. Keep baseURL, title and theme set explicitly and add menu entries so navigation is defined in one place.",
     badExample: `my-site/
   content/
     post/
