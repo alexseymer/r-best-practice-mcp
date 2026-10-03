@@ -6,7 +6,7 @@ export const bookdownPractices: Practice[] = [
     title: 'Create _bookdown.yaml configuration',
     workflow: 'bookdown',
     category: 'structure',
-    severity: 'critical',
+    severity: 'important',
     enforcement: 'automated',
     description: 'Define book structure, output directory, and options in _bookdown.yaml',
     details:
