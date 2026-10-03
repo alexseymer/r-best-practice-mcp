@@ -15,12 +15,20 @@
  *
  * The Tailwind CDN and Google Fonts are blocked on purpose; the dashboard logic does not need them.
  * Downloads are written to a temporary directory. Exit code 0 = all checks passed.
- * Run it from the repository root: the example projects under ./examples are used as audit targets.
+ * Run it from the repository root (the Shiny example under ./examples is used for workflow detection).
+ * The audit target is a deliberately incomplete R package created in a temporary directory, so the
+ * checks do not depend on how many findings the bundled examples currently produce.
  */
 'use strict';
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+
+const FIXTURE = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-e2e-'));
+fs.mkdirSync(path.join(FIXTURE, 'R'));
+fs.writeFileSync(path.join(FIXTURE, 'DESCRIPTION'), 'Package: demo\nVersion: 0.1.0\n');
+fs.writeFileSync(path.join(FIXTURE, 'R', 'statistics.R'), 'mean2 <- function(x) {\n  sum(x) / length(x)\n}\n');
+process.on('exit', () => fs.rmSync(FIXTURE, { recursive: true, force: true }));
 
 function loadPlaywright() {
   const candidates = [process.env.PLAYWRIGHT_MODULE, '/opt/node22/lib/node_modules/playwright', 'playwright'];
@@ -63,7 +71,7 @@ function check(name, ok, extra) {
   check('copyright', (await page.textContent('footer')).includes('Alexander Seymer') && !/Enterprise R Foundation/.test(await page.textContent('footer')), (await page.textContent('footer')).replace(/\s+/g, ' ').slice(-60));
 
   // ---- Validate project
-  await page.fill('#audit-path', './examples/example-package');
+  await page.fill('#audit-path', FIXTURE);
   await page.click('[data-el="audit-btn"]');
   await page.waitForSelector('[data-el="findings"] article', { timeout: 8000 });
   const nFind = await page.locator('[data-el="findings"] article').count();
@@ -116,7 +124,7 @@ function check(name, ok, extra) {
   await page.click('[data-action="dismiss-alert"]');
 
   // ---- single file
-  await page.fill('#file-path', './examples/example-package/R/statistics.R');
+  await page.fill('#file-path', path.join(FIXTURE, 'R', 'statistics.R'));
   await page.click('[data-el="file-btn"]');
   await page.waitForFunction(() => /^File /.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
   check('file validation', /statistics\.R/.test(await page.textContent('[data-el="findings-summary"]')), await page.textContent('[data-el="findings-summary"]'));
@@ -133,7 +141,7 @@ function check(name, ok, extra) {
   check('8 category checkboxes with labels', (await page.locator('[data-el="filter-categories"] input[type=checkbox]').count()) === 8 && (await page.locator('label[for="filter-cat-testing"]').count()) === 1);
   check('max findings input labelled', (await page.locator('label[for="filter-max"]').count()) === 1 && (await page.getAttribute('#filter-max', 'placeholder')).length > 0);
 
-  await page.fill('#audit-path', './examples/example-package');
+  await page.fill('#audit-path', FIXTURE);
   // unfiltered total for comparison
   await page.click('[data-el="audit-btn"]');
   await page.waitForFunction(() => /project .*Showing \d+ of \d+ findings?/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
@@ -174,7 +182,7 @@ function check(name, ok, extra) {
   check('filtered Markdown report lists filters and X shown of Y', /- Filters: categories structure; max 1 findings/.test(fMd) && new RegExp('1 shown of ' + totalAll).test(fMd));
 
   // single file uses the same filters
-  await page.fill('#file-path', './examples/example-package/R/statistics.R');
+  await page.fill('#file-path', path.join(FIXTURE, 'R', 'statistics.R'));
   [req] = await Promise.all([page.waitForRequest((r) => r.url().endsWith('/api/validate-file')), page.click('[data-el="file-btn"]')]);
   check('filters sent to validate-file', req.postDataJSON().maxFindings === 1 && req.postDataJSON().categories[0] === 'structure', req.postData());
   await page.waitForFunction(() => /^File /.test(document.querySelector('[data-el="findings-summary"]').textContent) && /Showing \d+ of \d+/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
@@ -331,7 +339,7 @@ function check(name, ok, extra) {
 
   // ---- deep link via finding
   await page.click('#tab-validate');
-  await page.fill('#audit-path', './examples/example-package');
+  await page.fill('#audit-path', FIXTURE);
   await page.click('[data-el="audit-btn"]');
   await page.waitForSelector('[data-el="findings"] article');
   const vb = page.locator('[data-el="findings"] button', { hasText: 'View practice' }).first();
