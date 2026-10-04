@@ -210,6 +210,30 @@ curl http://localhost:3000/health
 - Performance tuning
 - Security best practices
 
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | Port of the web server. |
+| `NODE_ENV` | unset | `production` confines paths to `/projects` and disables `/metrics*` unless configured. |
+| `ALLOWED_PROJECT_ROOTS` | `/projects` in production | Comma separated directories the web server may analyse. |
+| `ALLOW_ANY_PATH` | `false` | `true` allows any absolute path (never on a public server). |
+| `METRICS_TOKEN` | unset | Bearer token required for `/metrics*`. |
+| `METRICS_PUBLIC` | `false` | `true` serves `/metrics*` without credentials (default outside production). |
+| `TRUST_PROXY` | unset (trust nothing) | Reverse proxy hops whose `X-Forwarded-*` headers are trusted: a number (`1`) or an Express value (`loopback`). Needed behind a proxy for per-client rate limits and HSTS. |
+| `MAX_BODY_BYTES` | `1048576` | Maximum JSON/form request body. |
+| `GIT_SHA`, `BUILD_TIME` | unset | Build information returned by `/health` and `/api/config` (Docker build args of the same name). |
+
+`LOG_LEVEL` appears in `docker-compose.yml` but is not read by the server.
+
+### Verifying a deployment
+
+```bash
+curl -s https://your-host/health        # status, version, build.commit, build.builtAt
+curl -s https://your-host/api/config    # active path roots, metrics mode, upload limits
+curl -sI https://your-host/dashboard    # security headers (CSP, X-Frame-Options, HSTS over HTTPS)
+```
+
 ## Usage
 
 ### Via MCP Server (Claude & other clients)

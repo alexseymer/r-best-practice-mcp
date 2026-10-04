@@ -115,7 +115,8 @@ export class RPracticesWebServer {
       res.json({
         status: 'ok',
         service: 'r-best-practices-mcp',
-        version: '1.0.0',
+        version: this.runtime.version,
+        build: this.runtime.build,
         timestamp: new Date().toISOString(),
         metrics: {
           uptime: metrics.uptime,
@@ -157,7 +158,7 @@ export class RPracticesWebServer {
     // OpenAPI spec endpoint
     this.app.get('/openapi.json', (req: Request, res: Response) => {
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const spec = OpenAPIGenerator.generateSpec('0.2.0', baseUrl);
+      const spec = OpenAPIGenerator.generateSpec(this.runtime.version, baseUrl);
       res.json(spec);
     });
 
