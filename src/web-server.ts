@@ -1,11 +1,12 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
+import type { Server } from 'http';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
-import { getRuntimeConfig } from './config/runtime.js';
+import { getRuntimeConfig, RuntimeConfig } from './config/runtime.js';
 import { FileUtils } from './utils/file.js';
 import { metricsCollector } from './utils/metrics.js';
 import { SecurityUtils } from './utils/security.js';
@@ -13,10 +14,15 @@ import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
+import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
+}
+
+export interface WebServerOptions {
+  env?: NodeJS.ProcessEnv;
 }
 
 export class RPracticesWebServer {
@@ -26,9 +32,15 @@ export class RPracticesWebServer {
   private validator: Validator;
   private templateGenerator: TemplateGenerator;
   private rateLimiter: RateLimiter;
+  private httpServer?: Server;
+  private env: NodeJS.ProcessEnv;
+  private runtime: RuntimeConfig;
 
-  constructor(port: number = 3000) {
+  /** `options.env` replaces `process.env` for deployment settings (used by tests). */
+  constructor(port: number = 3000, options: WebServerOptions = {}) {
     this.port = port;
+    this.env = options.env ?? process.env;
+    this.runtime = getRuntimeConfig(this.env);
     this.app = express();
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
@@ -754,20 +766,30 @@ export class RPracticesWebServer {
       });
     });
 
-    // Error handler
-    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-      logger.error('Unhandled error', err);
-      res.status(500).json({
-        error: true,
-        code: 'INTERNAL_ERROR',
-        message: 'Internal server error',
-      });
+    // Error handler (status-aware: malformed JSON -> 400, oversized body -> 413, ...)
+    this.app.use(errorHandler);
+  }
+
+  /** Port the server is actually listening on (useful when constructed with port 0). */
+  listeningPort(): number | undefined {
+    const address = this.httpServer?.address();
+    return address && typeof address === 'object' ? address.port : undefined;
+  }
+
+  async stop(): Promise<void> {
+    this.rateLimiter.stop();
+    const server = this.httpServer;
+    this.httpServer = undefined;
+    if (!server) return;
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections?.();
     });
   }
 
   async start(): Promise<void> {
     return new Promise((resolve) => {
-      this.app.listen(this.port, '0.0.0.0', () => {
+      this.httpServer = this.app.listen(this.port, '0.0.0.0', () => {
         logger.info(`R Best Practices Web Server running on port ${this.port}`);
         logger.info(`Dashboard available at http://localhost:${this.port}/dashboard`);
         logger.info(`API documentation available at http://localhost:${this.port}/api/tools`);

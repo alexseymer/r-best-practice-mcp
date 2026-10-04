@@ -11,6 +11,7 @@ export class RateLimiter {
   private windowMs: number; // Time window in milliseconds
   private maxRequests: number; // Max requests per window
   private message: string;
+  private cleanupTimer?: NodeJS.Timeout;
 
   constructor(windowMs: number = 60000, maxRequests: number = 100, message?: string) {
     this.windowMs = windowMs;
@@ -21,7 +22,7 @@ export class RateLimiter {
   }
 
   private cleanupStaleEntries(): void {
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       const now = Date.now();
       const keysToDelete: string[] = [];
 
@@ -33,6 +34,12 @@ export class RateLimiter {
 
       keysToDelete.forEach((key) => this.store.delete(key));
     }, this.windowMs);
+    this.cleanupTimer.unref();
+  }
+
+  stop(): void {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+    this.cleanupTimer = undefined;
   }
 
   middleware() {
