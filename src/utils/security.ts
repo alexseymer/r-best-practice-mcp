@@ -78,16 +78,11 @@ export class SecurityUtils {
   }
 
   /**
-   * Rate limit key generator for IP-based rate limiting.
-   * Extract client IP from request (handling proxies).
+   * Client address for rate limiting: Express's `req.ip`, which only honours X-Forwarded-For when
+   * the app's `trust proxy` setting (env TRUST_PROXY) allows it. Forwarded headers are never read here.
    */
-  static getClientIp(req: any): string {
-    return (
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
-      (req.headers['x-real-ip'] as string) ||
-      req.socket?.remoteAddress ||
-      'unknown'
-    );
+  static getClientIp(req: { ip?: string; socket?: { remoteAddress?: string } }): string {
+    return req.ip || req.socket?.remoteAddress || 'unknown';
   }
 
   /**

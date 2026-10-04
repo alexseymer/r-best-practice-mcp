@@ -1,3 +1,4 @@
+import { logger } from '../../src/utils/logger';
 import { RPracticesWebServer, WebServerOptions } from '../../src/web-server';
 
 export interface TestServer {
@@ -11,6 +12,7 @@ export async function startTestServer(
   env: NodeJS.ProcessEnv = {},
   options: Omit<WebServerOptions, 'env'> = {}
 ): Promise<TestServer> {
+  logger.setLevel('warn');
   const server = new RPracticesWebServer(0, { ...options, env });
   await server.start();
   const port = server.listeningPort();

@@ -14,6 +14,7 @@ import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
+import { parseTrustProxy } from './middleware/trust-proxy.js';
 import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
@@ -23,6 +24,8 @@ if (typeof __dirname === 'undefined') {
 
 export interface WebServerOptions {
   env?: NodeJS.ProcessEnv;
+  /** Override the per-client rate limit (default 100 requests per 60 s). */
+  rateLimit?: { windowMs: number; maxRequests: number };
 }
 
 export class RPracticesWebServer {
@@ -45,7 +48,13 @@ export class RPracticesWebServer {
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
-    this.rateLimiter = new RateLimiter(60000, 100); // 100 requests per 60 seconds per IP
+    // 100 requests per 60 seconds per client (req.ip)
+    this.rateLimiter = new RateLimiter(
+      options.rateLimit?.windowMs ?? 60000,
+      options.rateLimit?.maxRequests ?? 100
+    );
+    // Never trust X-Forwarded-For unless TRUST_PROXY says so
+    this.app.set('trust proxy', parseTrustProxy(this.env.TRUST_PROXY));
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -55,8 +64,8 @@ export class RPracticesWebServer {
     this.app.use(express.json({ limit: '50mb' }));
     this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-    // Rate limiting middleware - apply to all routes
-    this.app.use(this.rateLimiter.middleware());
+    // Rate limiting middleware - apply to all routes except /health (monitoring must not use up budget)
+    this.app.use(this.rateLimiter.middleware({ skip: (req) => req.path === '/health' }));
 
     // Request size validation
     this.app.use((req: Request, res: Response, next: NextFunction) => {
