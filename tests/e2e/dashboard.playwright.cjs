@@ -599,15 +599,22 @@ function check(name, ok, extra) {
       }
     }
     await lp.setViewportSize({ width: 1400, height: 1000 });
-    let axeLoaded = false;
+    // axe-core comes from the devDependency (injected as inline content), not from a CDN: the dashboard's
+    // CSP does not allow third-party scripts, and a check that silently skips itself is worthless.
+    let axePath = null;
     try {
-      await lp.addScriptTag({ url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js' });
-      axeLoaded = await lp.evaluate(() => typeof window.axe !== 'undefined');
+      axePath = require.resolve('axe-core/axe.min.js');
     } catch (e) {
-      axeLoaded = false;
+      axePath = null;
+    }
+    let axeLoaded = false;
+    if (axePath) {
+      await lp.addScriptTag({ path: axePath });
+      axeLoaded = await lp.evaluate(() => typeof window.axe !== 'undefined');
+      check('axe-core loaded into the page', axeLoaded, 'inline injection blocked?');
     }
     if (!axeLoaded) {
-      console.log('SKIP axe-core checks: axe-core 4.9.1 could not be loaded from cdnjs.cloudflare.com');
+      console.log('SKIP axe-core checks: the axe-core package is not installed (npm ci installs it)');
     } else {
       for (const t of TABS) {
         await lp.click('#tab-' + t);
