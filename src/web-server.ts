@@ -18,6 +18,7 @@ import { toRestToolsPayload } from './tools/schemas.js';
 import { parseTrustProxy, proxyMisconfigurationWarning } from './middleware/trust-proxy.js';
 import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
 import { securityHeaders, noStore } from './middleware/security-headers.js';
+import { isStaticAssetPath } from './middleware/static-assets.js';
 import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
 import { metricsAccess } from './middleware/metrics-access.js';
 import { errorHandler } from './middleware/errors.js';
@@ -76,7 +77,12 @@ export class RPracticesWebServer {
 
     // Rate limiting middleware - apply to all routes except /health (monitoring must not use up budget).
     // Mounted before the body parsers so rejected clients cost no parsing work.
-    this.app.use(this.rateLimiter.middleware({ skip: (req) => req.path === '/health' }));
+    // The self-hosted front-end files (CSS, fonts, icons, Swagger UI) are exempt too, see isStaticAssetPath().
+    this.app.use(
+      this.rateLimiter.middleware({
+        skip: (req) => req.path === '/health' || isStaticAssetPath(req.method, req.path),
+      })
+    );
 
     // Body parsing: 1 MB globally (env MAX_BODY_BYTES); LARGE_BODY_ROUTES get their own limit
     this.app.use(bodyParsers(getMaxBodyBytes(this.env)));
@@ -164,37 +170,16 @@ export class RPracticesWebServer {
       res.json(spec);
     });
 
-    // OpenAPI UI (Swagger UI) - simple HTML redirect
+    // OpenAPI UI: Swagger UI served from the pinned swagger-ui-dist package, no CDN
+    // (only the two files the page needs are exposed, not the whole package directory)
+    const swaggerDist = path.join(__dirname, '..', 'node_modules', 'swagger-ui-dist');
+    for (const asset of ['swagger-ui.css', 'swagger-ui-bundle.js']) {
+      this.app.get(`/api-docs/assets/${asset}`, (req: Request, res: Response) => {
+        res.sendFile(path.join(swaggerDist, asset));
+      });
+    }
     this.app.get('/api-docs', (req: Request, res: Response) => {
-      const swaggerUrl = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@3';
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>R Best Practices MCP - API Documentation</title>
-            <meta charset="utf-8"/>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <link rel="stylesheet" href="${swaggerUrl}/swagger-ui.css">
-          </head>
-          <body>
-            <div id="swagger-ui"></div>
-            <script src="${swaggerUrl}/swagger-ui-bundle.js"></script>
-            <script>
-              window.onload = function() {
-                const ui = SwaggerUIBundle({
-                  url: window.location.origin + '/openapi.json',
-                  dom_id: '#swagger-ui',
-                  presets: [
-                    SwaggerUIBundle.presets.apis,
-                    SwaggerUIBundle.SwaggerUIStandalonePreset
-                  ],
-                  layout: "BaseLayout"
-                })
-              }
-            </script>
-          </body>
-        </html>
-      `);
+      res.sendFile(path.join(__dirname, '..', 'src', 'public', 'api-docs.html'));
     });
 
     // Metrics export endpoints

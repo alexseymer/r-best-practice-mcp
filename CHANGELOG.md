@@ -24,6 +24,11 @@
   instead of an empty "clean" result. The dashboard shows an amber card with a "Choose a workflow" button, "Not checked" in LAST AUDIT, and exports `warnings`.
 - Dashboard: favicon (`/favicon.svg`, `/favicon.ico` redirects to it), `theme-color`, Open Graph and Twitter card tags.
 - E2E: axe-core accessibility check on all five tabs (skipped when it cannot be loaded) and mobile tab-bar checks at 320, 360 and 390 px.
+- Dashboard and `/api-docs` are fully self-hosted (#19): Tailwind is precompiled (`npm run build:css`, wired into `npm run build` and the
+  Dockerfile; output `src/public/dashboard.css` is generated and git-ignored), Geist and JetBrains Mono ship as woff2 under
+  `src/public/fonts/` (OFL), Material Symbols are replaced by an inline SVG sprite (`src/public/icons.svg`, `npm run build:icons`), and
+  Swagger UI 5 is served from the pinned `swagger-ui-dist` package. The CSP is now `'self'` only (no `'unsafe-inline'`, no CDN origins).
+  Playwright asserts no request leaves the origin and 0 CSP violations. Front-end files are exempt from the API rate limit.
 
 ### Changed
 - Rate limiting identifies clients by `req.ip`; `X-Forwarded-For`/`X-Real-IP` are only honoured when `TRUST_PROXY` is set.

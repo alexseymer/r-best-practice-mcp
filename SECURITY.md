@@ -52,7 +52,8 @@ directory traversal, but a project file that is itself such a symlink is read. M
 Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
 `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera, microphone, geolocation and
 FLoC disabled), `Cross-Origin-Opener-Policy: same-origin` and a `Content-Security-Policy` (defined in
-`src/middleware/security-headers.ts`, with `frame-ancestors 'none'`). `Strict-Transport-Security` is sent only
+`src/middleware/security-headers.ts`: every source is `'self'` only, no `'unsafe-inline'`/`'unsafe-eval'`, no third-party origins,
+with `frame-ancestors 'none'`). `Strict-Transport-Security` is sent only
 for HTTPS requests; behind a TLS-terminating proxy this requires `TRUST_PROXY` so that `X-Forwarded-Proto` is
 believed. `X-Powered-By` is disabled. `/api/*`, `/health` and `/metrics*` are `Cache-Control: no-store`.
 

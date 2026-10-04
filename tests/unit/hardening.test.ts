@@ -36,19 +36,23 @@ function rawGet(
 }
 
 describe('CSP constants', () => {
-  it('allow exactly the dashboard sources and nothing else third-party', () => {
-    const csp = buildCsp(DASHBOARD_CSP);
-    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com");
-    expect(csp).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com");
-    expect(csp).toContain('font-src https://fonts.gstatic.com');
-    expect(csp).toContain("img-src 'self' data:");
-    expect(csp).toContain("connect-src 'self'");
-    expect(csp).toContain("frame-ancestors 'none'");
-    expect(csp).not.toContain('jsdelivr');
+  it('are self-hosted only: no third-party origins, no unsafe-inline, no unsafe-eval', () => {
+    for (const policy of [DASHBOARD_CSP, API_DOCS_CSP]) {
+      const csp = buildCsp(policy);
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("script-src 'self';");
+      expect(csp).toContain("style-src 'self';");
+      expect(csp).toContain("font-src 'self';");
+      expect(csp).toContain("img-src 'self' data:");
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).not.toMatch(/https?:/);
+      expect(csp).not.toContain('unsafe-inline');
+      expect(csp).not.toContain('unsafe-eval');
+    }
   });
 
-  it('adds cdn.jsdelivr.net for /api-docs only', () => {
-    expect(buildCsp(API_DOCS_CSP)).toContain('https://cdn.jsdelivr.net');
+  it('picks the policy by path', () => {
     expect(cspForPath('/api-docs')).toBe(buildCsp(API_DOCS_CSP));
     expect(cspForPath('/dashboard')).toBe(buildCsp(DASHBOARD_CSP));
     expect(cspForPath('/anything')).toBe(buildCsp(DASHBOARD_CSP));

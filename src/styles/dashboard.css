@@ -1,0 +1,51 @@
+/* Source for src/public/dashboard.css (built by `npm run build:css`, not committed). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Self-hosted fonts (SIL OFL 1.1, from @fontsource, latin subset). See src/public/fonts/. */
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 300; font-display: swap; src: url('/fonts/geist-latin-300-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/geist-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/geist-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/geist-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/geist-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
+
+/* Inline SVG icons from the sprite /icons.svg (size with font-size or width/height). */
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 1;
+  flex: none;
+}
+
+@media (max-width: 479px) {
+  /* Icon-only tabs: the label stays in the accessible name but is visually hidden. */
+  .tab-btn { flex: 1 1 0; justify-content: center; min-width: 0; }
+  .tab-btn .tab-label {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+  .tab-btn .icon { font-size: 22px; width: 22px; height: 22px; }
+}
+.tab-btn[aria-selected="true"] {
+  color: #006194;
+  border-bottom-color: #0EA5E9;
+  font-weight: 600;
+}
+.custom-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
