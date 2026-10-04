@@ -15,6 +15,7 @@ import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
 import { parseTrustProxy } from './middleware/trust-proxy.js';
+import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
 import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
@@ -130,7 +131,7 @@ export class RPracticesWebServer {
 
     // Deployment-dependent settings the dashboard adapts to
     this.app.get('/api/config', (req: Request, res: Response) => {
-      res.json({ error: false, data: getRuntimeConfig(), timestamp: Date.now() });
+      res.json({ error: false, data: this.runtime, timestamp: Date.now() });
     });
 
     // Metrics endpoint
@@ -218,6 +219,19 @@ export class RPracticesWebServer {
   }
 
   private setupRoutes(): void {
+    // Confine client-supplied paths to the allowed roots (no-op in unrestricted mode)
+    this.app.post(
+      [
+        '/api/detect-workflow',
+        '/api/v1/detect-workflow',
+        '/api/validate-project',
+        '/api/v1/validate-project',
+        '/api/validate-file',
+        '/api/v1/validate-file',
+      ],
+      pathGuard(this.runtime.serverPaths)
+    );
+
     // Detect workflow
     this.app.post('/api/detect-workflow', async (req: Request, res: Response) => {
       const startTime = process.hrtime();
@@ -239,7 +253,7 @@ export class RPracticesWebServer {
           });
         }
 
-        const result = await this.detector.detect(inputPath);
+        const result = await this.detector.detect(getConfinedPath(res, inputPath));
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('detection', duration, true);
@@ -419,7 +433,7 @@ export class RPracticesWebServer {
           });
         }
 
-        const result = await this.detector.detect(inputPath);
+        const result = await this.detector.detect(getConfinedPath(res, inputPath));
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('detection', duration, true);
@@ -596,7 +610,8 @@ export class RPracticesWebServer {
         return;
       }
 
-      const exists = await FileUtils.isDirectory(inputPath);
+      const targetPath = getConfinedPath(res, inputPath);
+      const exists = await FileUtils.isDirectory(targetPath);
       if (!exists) {
         res.status(404).json({
           error: true,
@@ -609,12 +624,12 @@ export class RPracticesWebServer {
       // Auto-detect workflow if not specified
       let detectedWorkflow = workflow || 'unknown';
       if (!workflow) {
-        const detection = await this.detector.detect(inputPath);
+        const detection = await this.detector.detect(targetPath);
         detectedWorkflow = detection.workflow;
       }
 
       const result = await this.validator.validateProject(
-        inputPath,
+        targetPath,
         detectedWorkflow as any,
         filters.value
       );
@@ -653,7 +668,8 @@ export class RPracticesWebServer {
         return;
       }
 
-      const exists = await FileUtils.exists(inputPath);
+      const targetPath = getConfinedPath(res, inputPath);
+      const exists = await FileUtils.exists(targetPath);
       if (!exists) {
         res.status(404).json({
           error: true,
@@ -663,7 +679,7 @@ export class RPracticesWebServer {
         return;
       }
 
-      const data = await this.validator.validateFileWithSummary(inputPath, filters.value);
+      const data = await this.validator.validateFileWithSummary(targetPath, filters.value);
       const hrTime = process.hrtime(startTime);
       const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
       metricsCollector.recordOperation('validation', duration, true);
