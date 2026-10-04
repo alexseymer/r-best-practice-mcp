@@ -219,6 +219,24 @@
     return configPromise;
   }
 
+  /** System panel: build info and the metrics download links, which only exist when metrics are public. */
+  function applySystemConfig() {
+    getConfig().then(function (config) {
+      if (!config) return;
+      var links = document.querySelectorAll('[data-metrics-link]');
+      for (var i = 0; i < links.length; i++) links[i].hidden = !(config.metrics && config.metrics.public);
+      var info = $('build-info');
+      if (!info) return;
+      var parts = [];
+      if (config.version) parts.push('Version ' + config.version);
+      var build = config.build || {};
+      if (build.commit) parts.push('commit ' + String(build.commit).slice(0, 7));
+      if (build.builtAt) parts.push('built ' + build.builtAt);
+      info.textContent = parts.join(' \u00b7 ');
+      info.hidden = parts.length === 0;
+    });
+  }
+
   function download(filename, content, mime) {
     var blob = content instanceof Blob ? content : new Blob([content], { type: mime || 'text/plain' });
     var url = URL.createObjectURL(blob);
@@ -1378,6 +1396,7 @@
     refreshStatus();
     loadPractices();
     getConfig();
+    applySystemConfig();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

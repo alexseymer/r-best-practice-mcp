@@ -1,3 +1,4 @@
+import compression from 'compression';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
 import type { Server } from 'http';
@@ -16,6 +17,9 @@ import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
 import { parseTrustProxy } from './middleware/trust-proxy.js';
 import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
+import { securityHeaders, noStore } from './middleware/security-headers.js';
+import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
+import { metricsAccess } from './middleware/metrics-access.js';
 import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
@@ -46,6 +50,7 @@ export class RPracticesWebServer {
     this.env = options.env ?? process.env;
     this.runtime = getRuntimeConfig(this.env);
     this.app = express();
+    this.app.disable('x-powered-by');
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
@@ -62,24 +67,17 @@ export class RPracticesWebServer {
   }
 
   private setupMiddleware(): void {
-    this.app.use(express.json({ limit: '50mb' }));
-    this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
+    // Response headers first so every response (429s and errors included) carries them
+    this.app.use(securityHeaders());
+    this.app.use(noStore());
+    this.app.use(compression());
 
-    // Rate limiting middleware - apply to all routes except /health (monitoring must not use up budget)
+    // Rate limiting middleware - apply to all routes except /health (monitoring must not use up budget).
+    // Mounted before the body parsers so rejected clients cost no parsing work.
     this.app.use(this.rateLimiter.middleware({ skip: (req) => req.path === '/health' }));
 
-    // Request size validation
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
-      const contentLength = req.headers['content-length'];
-      if (contentLength && !SecurityUtils.validateBodySize(parseInt(contentLength))) {
-        return res.status(413).json({
-          error: true,
-          code: 'PAYLOAD_TOO_LARGE',
-          message: 'Request body exceeds maximum allowed size (50MB)',
-        });
-      }
-      next();
-    });
+    // Body parsing: 1 MB globally (env MAX_BODY_BYTES); LARGE_BODY_ROUTES get their own limit
+    this.app.use(bodyParsers(getMaxBodyBytes(this.env)));
 
     // Serve static files from public directory
     // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
@@ -133,6 +131,9 @@ export class RPracticesWebServer {
     this.app.get('/api/config', (req: Request, res: Response) => {
       res.json({ error: false, data: this.runtime, timestamp: Date.now() });
     });
+
+    // /metrics*: public, bearer-token protected or disabled (404), see getRuntimeConfig().metrics
+    this.app.use('/metrics', metricsAccess(this.runtime.metrics, this.env.METRICS_TOKEN));
 
     // Metrics endpoint
     this.app.get('/metrics', (req: Request, res: Response) => {

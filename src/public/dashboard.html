@@ -449,6 +449,7 @@
       <div>
         <h2 class="text-headline-md font-headline-md text-on-surface">Server &amp; API</h2>
         <p class="text-body-sm font-body-sm text-secondary">Live health and usage of the server behind this dashboard.</p>
+        <p data-el="build-info" hidden class="text-body-sm font-body-sm text-secondary mt-1"></p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" data-action="refresh-status" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low inline-flex items-center gap-1.5">
@@ -456,8 +457,8 @@
         </button>
         <a href="/api-docs" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Interactive API docs</a>
         <a href="/openapi.json" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">OpenAPI spec</a>
-        <a href="/metrics/requests.csv" download class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Requests CSV</a>
-        <a href="/metrics/operations.csv" download class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Operations CSV</a>
+        <a href="/metrics/requests.csv" download hidden data-metrics-link class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Requests CSV</a>
+        <a href="/metrics/operations.csv" download hidden data-metrics-link class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Operations CSV</a>
       </div>
     </div>
     <dl data-el="health-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></dl>
