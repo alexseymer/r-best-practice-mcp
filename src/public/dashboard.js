@@ -207,6 +207,18 @@
     );
   }
 
+  var configPromise = null;
+  /** Deployment settings from GET /api/config (cached; resolves to null if the server is unreachable). */
+  function getConfig() {
+    if (!configPromise) {
+      configPromise = api('GET', '/api/config').catch(function () {
+        configPromise = null;
+        return null;
+      });
+    }
+    return configPromise;
+  }
+
   function download(filename, content, mime) {
     var blob = content instanceof Blob ? content : new Blob([content], { type: mime || 'text/plain' });
     var url = URL.createObjectURL(blob);
@@ -1365,6 +1377,7 @@
     routeFromHash();
     refreshStatus();
     loadPractices();
+    getConfig();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

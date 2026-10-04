@@ -1,5 +1,5 @@
 import path from 'path';
-import { getRuntimeConfig, UPLOAD_LIMITS } from '../../src/config/runtime';
+import { getRuntimeConfig, LARGE_BODY_ROUTES, UPLOAD_LIMITS } from '../../src/config/runtime';
 
 const env = (e: Record<string, string>): NodeJS.ProcessEnv => e as NodeJS.ProcessEnv;
 
@@ -104,5 +104,11 @@ describe('getRuntimeConfig', () => {
     expect(upload.maxFiles).toBe(UPLOAD_LIMITS.maxFiles);
     expect(upload.allowedExtensions).toContain('.r');
     expect(upload.allowedFileNames).toContain('DESCRIPTION');
+  });
+});
+
+describe('LARGE_BODY_ROUTES', () => {
+  it('allows the upload route more than the total upload limit', () => {
+    expect(LARGE_BODY_ROUTES['/api/validate-upload']).toBeGreaterThan(UPLOAD_LIMITS.maxTotalBytes);
   });
 });

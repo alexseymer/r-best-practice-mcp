@@ -42,6 +42,14 @@ export const UPLOAD_LIMITS = {
   ],
 } as const;
 
+/**
+ * Routes that accept a larger JSON body than the global default (bytes). The global body parser must skip
+ * these paths; each route mounts its own parser with this limit.
+ */
+export const LARGE_BODY_ROUTES: Readonly<Record<string, number>> = {
+  '/api/validate-upload': 8 * 1024 * 1024,
+};
+
 export interface RuntimeConfig {
   version: string;
   build: { commit: string | null; builtAt: string | null };
