@@ -5,6 +5,7 @@ import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
+import { getRuntimeConfig } from './config/runtime.js';
 import { FileUtils } from './utils/file.js';
 import { metricsCollector } from './utils/metrics.js';
 import { SecurityUtils } from './utils/security.js';
@@ -104,6 +105,11 @@ export class RPracticesWebServer {
           errorCounts: metrics.errorCounts,
         },
       });
+    });
+
+    // Deployment-dependent settings the dashboard adapts to
+    this.app.get('/api/config', (req: Request, res: Response) => {
+      res.json({ error: false, data: getRuntimeConfig(), timestamp: Date.now() });
     });
 
     // Metrics endpoint
