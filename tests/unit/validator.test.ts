@@ -25,6 +25,29 @@ describe('Validator', () => {
     cleanupTempDir(tempDir);
   });
 
+  describe('unknown workflow warning', () => {
+    it('adds warnings and no findings for an unknown workflow', async () => {
+      const result = await validator.validateProject(tempDir, 'unknown' as never);
+      expect(result.findings).toEqual([]);
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings?.[0]).toMatch(/no workflow-specific checks ran/);
+    });
+
+    it('does not warn for a recognised workflow', async () => {
+      const result = await validator.validateProject(tempDir, 'package');
+      expect(result.warnings).toBeUndefined();
+    });
+
+    it('keeps warnings when filters would hide every finding', async () => {
+      const result = await validator.validateProject(tempDir, 'unknown' as never, {
+        minSeverity: 'critical',
+        maxFindings: 1,
+        categories: ['security'],
+      });
+      expect(result.warnings).toHaveLength(1);
+    });
+  });
+
   describe('validateProject', () => {
     it('should validate R package structure', async () => {
       createPackageFixture(tempDir);

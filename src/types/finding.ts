@@ -46,6 +46,8 @@ export interface ValidationResult {
   findings: Finding[];
   /** Counts of all findings before filtering; `findings` may be a filtered subset. */
   summary?: FindingSummary;
+  /** Caveats about the run, e.g. no checks ran because the workflow is unknown. Never filtered. */
+  warnings?: string[];
   timestamp: number;
   duration: number; // ms
 }

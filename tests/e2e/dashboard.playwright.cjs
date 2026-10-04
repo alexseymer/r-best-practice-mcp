@@ -12,6 +12,7 @@
  *   PLAYWRIGHT_MODULE  path of the playwright package (default /opt/node22/lib/node_modules/playwright,
  *                      falls back to a normal require('playwright'))
  *   CHROMIUM_PATH      chromium executable (default /opt/pw-browsers/chromium-1194/chrome-linux/chrome)
+ *   E2E_IGNORE_HTTPS_ERRORS  set to 1 when a TLS-intercepting proxy blocks the CDNs used by the mobile/axe checks
  *
  * The Tailwind CDN and Google Fonts are blocked on purpose; the dashboard logic does not need them.
  * Downloads are written to a temporary directory. Exit code 0 = all checks passed.
@@ -525,6 +526,98 @@ function check(name, ok, extra) {
   await page.focus('#tab-practices');
   await page.keyboard.press('ArrowRight');
   check('arrow-key tab nav', await page.locator('#panel-system').evaluate((e) => !e.hidden));
+
+  // ---- unrecognised folder: warning, never the green success state (#13)
+  const EMPTY = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-e2e-empty-'));
+  process.on('exit', () => fs.rmSync(EMPTY, { recursive: true, force: true }));
+  await page.goto(BASE_URL + '/dashboard#validate');
+  await page.fill('#audit-path', EMPTY);
+  await page.selectOption('[data-el="audit-workflow"]', '');
+  await page.click('[data-el="audit-btn"]');
+  await page.waitForSelector('[data-el="audit-warning"]', { timeout: 8000 });
+  const warnText = await page.textContent('[data-el="audit-warning"]');
+  check('unknown folder shows warning card', /no workflow-specific checks ran/.test(warnText), warnText.replace(/\s+/g, ' ').slice(0, 90));
+  check('unknown folder never shows green success', !/No issues found/.test(await page.textContent('[data-el="findings"]')) && (await page.locator('[data-el="findings"] .bg-emerald-50').count()) === 0);
+  check('LAST AUDIT says Not checked', (await page.textContent('[data-el="stat-audit"]')) === 'Not checked' && /no project type detected/.test(await page.textContent('[data-el="stat-audit-sub"]')));
+  check('issue badge hidden for unchecked project', await page.locator('[data-el="issue-badge"]').evaluate((e) => e.classList.contains('hidden')));
+  check('summary does not say Unknown project', !/Unknown project/.test(await page.textContent('[data-el="findings-summary"]')), await page.textContent('[data-el="findings-summary"]'));
+  const [warnJson] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="download-json"]')]);
+  const warnParsed = JSON.parse(fs.readFileSync(await warnJson.path(), 'utf8'));
+  check('JSON export includes warnings', Array.isArray(warnParsed.warnings) && warnParsed.warnings.length === 1);
+  const [warnMd] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="download-md"]')]);
+  const warnMdText = fs.readFileSync(await warnMd.path(), 'utf8');
+  check('Markdown export includes warning and no success line', /Warning:/.test(warnMdText) && !/No issues found/.test(warnMdText));
+  await page.click('[data-action="choose-workflow"]');
+  check('Choose a workflow focuses the select', await page.evaluate(() => document.activeElement && document.activeElement.id === 'audit-workflow'));
+  // a genuinely clean project still shows green success
+  const CLEAN = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-e2e-clean-'));
+  process.on('exit', () => fs.rmSync(CLEAN, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(CLEAN, 'main.R'), '#!/usr/bin/env Rscript\n# Demo script\n\nprint("hi")\n');
+  await page.fill('#audit-path', CLEAN);
+  await page.selectOption('[data-el="audit-workflow"]', 'r-script');
+  await page.click('[data-el="audit-btn"]');
+  await page.waitForFunction(() => /R script|R Script|script/i.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+  const cleanFindings = await page.locator('[data-el="findings"] article').count();
+  if (cleanFindings === 0) {
+    check('clean project shows green success, no warning', (await page.locator('[data-el="audit-warning"]').count()) === 0 && /No issues found/.test(await page.textContent('[data-el="findings"]')));
+  } else {
+    check('clean fixture produced findings (success state not exercised)', true, cleanFindings);
+  }
+  await page.selectOption('[data-el="audit-workflow"]', '');
+
+  // ---- favicon, meta tags
+  const fav = await page.request.get(BASE_URL + '/favicon.svg');
+  check('favicon.svg is 200 image/svg+xml', fav.status() === 200 && /image\/svg\+xml/.test(fav.headers()['content-type'] || ''));
+  const icoRes = await page.request.get(BASE_URL + '/favicon.ico');
+  check('favicon.ico is 200 svg (after redirect)', icoRes.status() === 200 && /image\/svg\+xml/.test(icoRes.headers()['content-type'] || ''));
+  check('meta tags present', await page.evaluate(() => !!document.querySelector('meta[name="theme-color"][content="#0EA5E9"]') && !!document.querySelector('meta[property="og:title"]') && !!document.querySelector('meta[property="og:description"]') && !!document.querySelector('meta[name="twitter:card"][content="summary"]') && !!document.querySelector('link[rel="icon"][href="/favicon.svg"]')));
+
+  // ---- mobile tab bar and accessibility (#18): need the real Tailwind CDN and fonts, so a second,
+  // unblocked context is used. Skipped with a message when they cannot be loaded.
+  const liveCtx = await browser.newContext({ ignoreHTTPSErrors: !!process.env.E2E_IGNORE_HTTPS_ERRORS, viewport: { width: 1400, height: 1000 } });
+  const lp = await liveCtx.newPage();
+  await lp.goto(BASE_URL + '/dashboard#validate');
+  await lp.waitForSelector('[data-el="status-text"]');
+  const styled = await lp.waitForFunction(() => typeof window.tailwind !== 'undefined' && getComputedStyle(document.querySelector('[data-el="issue-badge"]')).display === 'none', null, { timeout: 40000 }).then(() => true, () => false);
+  const TABS = ['validate', 'detect', 'generate', 'practices', 'system'];
+  if (!styled) {
+    console.log('SKIP mobile tab and axe checks: Tailwind CDN could not be loaded');
+  } else {
+    await lp.evaluate(() => document.fonts.ready);
+    for (const width of [320, 360, 390]) {
+      await lp.setViewportSize({ width, height: 800 });
+      await lp.click('#tab-validate');
+      await lp.waitForTimeout(300);
+      const boxes = await lp.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((b) => { const r = b.getBoundingClientRect(); return { l: r.left, r: r.right, w: r.width }; }));
+      check('all tab buttons inside viewport @' + width, boxes.length === 5 && boxes.every((b) => b.l >= 0 && b.r <= width + 0.5 && b.w > 20), JSON.stringify(boxes.map((b) => Math.round(b.r))));
+      check('tab buttons keep titles and accessible text @' + width, await lp.evaluate(() => [...document.querySelectorAll('[role="tab"]')].every((b) => b.getAttribute('title') && b.textContent.trim().length > 0)));
+      for (const t of TABS) {
+        await lp.click('#tab-' + t);
+        const ok = await lp.evaluate((name) => [...document.querySelectorAll('[role="tabpanel"]')].every((p) => (p.dataset.panel === name) === !p.hidden), t);
+        const overflow = await lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        check('tab ' + t + ' switches, no horizontal overflow @' + width, ok && overflow <= 0, 'overflow ' + overflow);
+      }
+    }
+    await lp.setViewportSize({ width: 1400, height: 1000 });
+    let axeLoaded = false;
+    try {
+      await lp.addScriptTag({ url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js' });
+      axeLoaded = await lp.evaluate(() => typeof window.axe !== 'undefined');
+    } catch (e) {
+      axeLoaded = false;
+    }
+    if (!axeLoaded) {
+      console.log('SKIP axe-core checks: axe-core 4.9.1 could not be loaded from cdnjs.cloudflare.com');
+    } else {
+      for (const t of TABS) {
+        await lp.click('#tab-' + t);
+        if (t === 'system') await lp.waitForSelector('[data-el="health-grid"] dd');
+        const violations = await lp.evaluate(async () => (await window.axe.run(document)).violations.map((v) => v.id + ': ' + v.nodes.length + ' node(s)'));
+        check('axe: no violations on ' + t + ' tab', violations.length === 0, violations.join('; '));
+      }
+    }
+  }
+  await liveCtx.close();
 
   await page.screenshot({ path: path.join(OUT, 'shot.png'), fullPage: false });
   check('no JS errors', errors.length === 0, errors.join(' | '));

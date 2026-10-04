@@ -11,6 +11,24 @@ const RSCRIPT_GLOBALS_THRESHOLD = 15;
 
 export type ValidatorOptions = FindingFilterOptions;
 
+const KNOWN_WORKFLOWS = new Set<string>([
+  'r-script',
+  'quarto',
+  'shiny',
+  'package',
+  'rmarkdown',
+  'renv',
+  'targets',
+  'plumber',
+  'analysis',
+  'bookdown',
+  'blogdown',
+  'shinytest',
+]);
+
+export const UNKNOWN_WORKFLOW_WARNING =
+  'No R project type was detected in this folder, so no workflow-specific checks ran. Choose a workflow type or check the path.';
+
 export class Validator {
   async validateProject(
     dirPath: string,
@@ -76,6 +94,9 @@ export class Validator {
         workflow,
         findings: filtered,
         summary,
+        ...(!KNOWN_WORKFLOWS.has(workflow as string)
+          ? { warnings: [UNKNOWN_WORKFLOW_WARNING] }
+          : {}),
         timestamp: Date.now(),
         duration,
       };
