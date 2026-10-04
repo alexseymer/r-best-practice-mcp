@@ -122,8 +122,11 @@ describe('shared tool definitions', () => {
   it('every OpenAPI tool path corresponds to a shared tool definition', () => {
     const spec = OpenAPIGenerator.generateSpec('test', 'http://localhost');
     const toolPaths = new Set(TOOL_DEFS.map(toOpenApiPath));
-    const apiPaths = Object.keys(spec.paths).filter((p) => p.startsWith('/api/'));
+    // REST-only endpoints (no MCP tool) are documented by hand and listed here
+    const restOnly = new Set(['/api/validate-upload']);
+    const apiPaths = Object.keys(spec.paths).filter((p) => p.startsWith('/api/') && !restOnly.has(p));
     expect(sorted(apiPaths)).toEqual(sorted([...toolPaths]));
+    for (const p of restOnly) expect(spec.paths[p]).toBeDefined();
   });
 
   it('exposes the new filter parameters in MCP schemas', () => {

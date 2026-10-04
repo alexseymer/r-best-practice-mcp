@@ -8,6 +8,7 @@ import {
   toOpenApiPath,
   toOpenApiRequestSchema,
 } from '../tools/schemas.js';
+import { buildUploadOpenApiPaths } from '../routes/upload.js';
 
 /** Response documentation per operation (parameters and routes come from tools/schemas.ts). */
 const TOOL_RESPONSES: Record<
@@ -179,6 +180,7 @@ export class OpenAPIGenerator {
           },
         },
         ...buildToolPaths(),
+        ...buildUploadOpenApiPaths(),
         '/metrics': {
           get: {
             summary: 'Get Metrics',
