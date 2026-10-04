@@ -26,16 +26,11 @@ describe('Example Projects Validation', () => {
     it('should have required package files', async () => {
       const result = await validator.validateProject(projectPath, 'package');
 
-      // Check for critical issues that would indicate missing structure
-      const criticalFindings = result.findings.filter(f => f.severity === 'critical');
-
-      // Package should have DESCRIPTION file (should be checked by validator)
-      const hasDescriptionCheck = result.findings.some(f =>
-        f.id && f.id.includes('DESCRIPTION')
+      // The example package is complete (DESCRIPTION fields, License: MIT, R/, tests/)
+      const structural = result.findings.filter((f) =>
+        ['pkg-description', 'pkg-license', 'pkg-structure', 'pkg-tests'].includes(f.id)
       );
-
-      // These checks verify the package structure is being validated
-      expect(result.findings.length).toBeGreaterThan(0);
+      expect(structural).toEqual([]);
     });
 
     it('should have R subdirectory', async () => {

@@ -1,8 +1,8 @@
-import { Validator } from '../../engine/validator';
-import { FileUtils } from '../../utils/file';
-import { CLIFormatter, CLIOptions, getProjectPath } from '../utils';
-import { Finding } from '../../types/finding';
-import { Workflow } from '../../types/workflow';
+import { Validator } from '../../engine/validator.js';
+import { FileUtils } from '../../utils/file.js';
+import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
+import { Finding } from '../../types/finding.js';
+import { Workflow } from '../../types/workflow.js';
 
 export async function validateCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);
@@ -58,7 +58,6 @@ function displayValidationResult(result: any): void {
   });
 
   const severityOrder = ['critical', 'important', 'recommended', 'info'];
-  let totalDisplayed = 0;
 
   severityOrder.forEach((severity) => {
     const findingsForSeverity = bySeverity[severity];
@@ -76,7 +75,6 @@ function displayValidationResult(result: any): void {
       }
     });
 
-    totalDisplayed += findingsForSeverity.length;
 
     if (findingsForSeverity.length > 10) {
       CLIFormatter.info(`... and ${findingsForSeverity.length - 10} more`);

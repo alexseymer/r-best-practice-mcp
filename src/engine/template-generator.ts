@@ -7,7 +7,6 @@ export class TemplateGenerator {
     workflow: Workflow,
     options: TemplateGeneratorOptions = {}
   ): Promise<GeneratedTemplate> {
-    const startTime = Date.now();
     logger.info(`Generating template for ${workflow}`, options);
 
     let files: TemplateFile[] = [];
@@ -587,7 +586,7 @@ rmarkdown::render("report.Rmd")
     };
   }
 
-  private generateRenv(options: TemplateGeneratorOptions): { files: TemplateFile[]; directories: string[] } {
+  private generateRenv(_options: TemplateGeneratorOptions): { files: TemplateFile[]; directories: string[] } {
     return {
       files: [
         {

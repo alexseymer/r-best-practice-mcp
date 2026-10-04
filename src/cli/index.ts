@@ -1,8 +1,10 @@
-import { detectCommand } from './commands/detect';
-import { validateCommand } from './commands/validate';
-import { templateCommand } from './commands/template';
-import { reportCommand } from './commands/report';
-import { CLIFormatter, CLIOptions, ConfigLoader, FileWatcher, parseArgs } from './utils';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { detectCommand } from './commands/detect.js';
+import { validateCommand } from './commands/validate.js';
+import { templateCommand } from './commands/template.js';
+import { reportCommand } from './commands/report.js';
+import { CLIFormatter, CLIOptions, ConfigLoader, parseArgs } from './utils.js';
 
 const HELP_TEXT = `
 R Best Practices CLI
@@ -87,10 +89,12 @@ export async function run(): Promise<void> {
         console.log(HELP_TEXT);
         break;
 
-      case 'version':
-        const pkg = require('../../package.json');
+      case 'version': {
+        const pkgPath = fileURLToPath(new URL('../../package.json', import.meta.url));
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
         console.log(`r-best-practices version ${pkg.version}`);
         break;
+      }
 
       default:
         CLIFormatter.error(`Unknown command: ${command}`);

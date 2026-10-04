@@ -98,7 +98,7 @@ export class ReleaseModule {
             check_result <- devtools::check(error_on = 'note', document = TRUE)
             cat('   ✓ Package check passed\\n')
           }, error = function(e) {
-            cat('   ⚠ Package check failed:', e\$message, '\\n')
+            cat('   ⚠ Package check failed:', e$message, '\\n')
           })
 
           cat('\\n3. Preparing for CRAN submission...\\n')

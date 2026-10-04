@@ -16,7 +16,7 @@ The R Best Practices MCP Server helps developers write better R code by:
 - **Detecting** the R workflow type from a directory structure
 - **Validating** projects against best practices with detailed findings
 - **Generating** scaffold templates for new projects
-- **Providing** knowledge base access to 52+ best practices and recommendations
+- **Providing** knowledge base access to 70 best practices (59 checked automatically, 11 guidance-only)
 
 ### Supported Workflows
 
@@ -60,11 +60,12 @@ Generate complete project scaffolds:
 - Customizable project name and author info
 
 ### 📚 Knowledge Base
-Access to 52 best practices:
-- Organized by workflow type (9 workflows)
+Access to 70 best practices:
+- Organized by workflow type (12 workflows)
 - Categorized by topic (documentation, testing, security, etc.)
-- Searchable and filterable
-- Includes examples and references
+- Every practice has details, a "bad" and a "good" example, and references
+- **Automated** practices are checked by a validator rule with the same id; **guidance** practices are advice only and never produce findings
+- Searchable and filterable by workflow, category, minimum severity, tags, check type and free text
 
 ### 🔐 Security & Rate Limiting
 Production-ready security features:
@@ -230,8 +231,14 @@ The server exposes 6 tools via the Model Context Protocol:
 
 #### 2. `validate_project` — Check best practices
 ```javascript
-// Input
-{ "path": "/path/to/project", "workflow": "package" }
+// Input (everything except `path` is optional)
+{
+  "path": "/path/to/project",
+  "workflow": "package",
+  "minSeverity": "important",        // critical | important | recommended | info (at least this severe)
+  "categories": ["testing", "documentation"],
+  "maxFindings": 50                  // integer 1-1000
+}
 
 // Output
 {
@@ -244,9 +251,17 @@ The server exposes 6 tools via the Model Context Protocol:
       "message": "Add tests/ directory with testthat tests"
     }
   ],
+  "summary": {                       // counted BEFORE the filters above
+    "total": 7,
+    "bySeverity": { "critical": 1, "important": 2, "recommended": 4, "info": 0 },
+    "byCategory": { "testing": 1, "documentation": 3, "structure": 3 }
+  },
   "duration": 45
 }
 ```
+
+`validate_file` accepts the same three filters and returns the same `summary`. Invalid filter values are rejected
+with an `INVALID_PARAMETER` error (HTTP 400 on the REST API). Every finding id is a practice id (see `get_practice`).
 
 #### 3. `validate_file` — Check single file
 ```javascript
@@ -298,15 +313,26 @@ The server exposes 6 tools via the Model Context Protocol:
 
 #### 6. `list_practices` — Browse best practices
 ```javascript
-// Input
-{ "workflow": "package", "category": "documentation" }
+// Input (all optional)
+{
+  "workflow": "package",
+  "category": "documentation",
+  "minSeverity": "important",        // at least this severe
+  "tags": ["roxygen"],               // practice has any of these tags
+  "enforcement": "automated",        // automated | guidance
+  "query": "namespace",              // case-insensitive text search (id, title, description, details, tags)
+  "limit": 20                        // integer 1-200
+}
 
 // Output
 {
   "practices": [...],
-  "total": 52
+  "total": 3
 }
 ```
+
+The REST API accepts the same filters as query parameters on `GET /api/practices` and `GET /api/v1/practices`:
+`workflow`, `category`, `minSeverity`, `tags` (comma separated), `enforcement`, `q` (alias `query`), `limit`.
 
 ### Via REST API (HTTP)
 
@@ -328,11 +354,16 @@ curl -X POST http://localhost:3000/api/v1/validate-project \
   -H "Content-Type: application/json" \
   -d '{"path": "/path/to/project", "workflow": "package"}'
 
-# List practices with pagination (v1)
-curl "http://localhost:3000/api/v1/practices?limit=50&offset=0&workflow=package"
+# List practices with pagination and filters (v1)
+curl "http://localhost:3000/api/v1/practices?limit=50&offset=0&workflow=package&minSeverity=important&enforcement=automated"
+
+# Validate with filters (v1)
+curl -X POST http://localhost:3000/api/v1/validate-project \
+  -H "Content-Type: application/json" \
+  -d '{"path": "/path/to/project", "minSeverity": "important", "maxFindings": 20}'
 
 # Get practice details (v1)
-curl http://localhost:3000/api/v1/practice/package-roxygen2
+curl http://localhost:3000/api/v1/practice/pkg-roxygen
 
 # Generate template (v1)
 curl -X POST http://localhost:3000/api/v1/generate-template \
@@ -385,7 +416,7 @@ r-best-practice-mcp/
 │   │   ├── validator.ts           # Project validation (503 lines)
 │   │   └── template-generator.ts  # Template generation (833 lines)
 │   ├── data/
-│   │   └── knowledge-base.ts      # 52 best practices (592 lines)
+│   │   └── knowledge-base.ts      # Loads the 70 practices from data/practices/
 │   ├── analysis/                  # Phase 6: Advanced features
 │   │   ├── complexity.ts          # Complexity analysis
 │   │   ├── dependencies.ts        # Dependency tracking
@@ -509,17 +540,23 @@ Comprehensive test coverage (91 tests):
 
 ## Best Practices Coverage
 
-The knowledge base includes 52+ best practices:
+The knowledge base includes 70 best practices. 59 are *automated* (a validator rule reports violations);
+11 are *guidance only* (they need R to run, runtime behaviour or judgement, so they never produce findings):
 
-**R Scripts** (7) — Headers, functions, naming, organization  
-**Quarto** (7) — Chunks, YAML, caching, figures, tables  
-**Shiny** (7) — Reactivity, validation, modules, feedback  
-**Packages** (9) — roxygen2, testing, DESCRIPTION, coverage  
+**R Scripts** (7) — Headers, functions, naming, sections, error handling, cleanup  
+**Quarto** (7) — Chunk labels and options, YAML, caching, figures, tables, narrative  
 **R Markdown** (4) — YAML, chunks, options, inline code  
+**Shiny** (8) — Structure, separation, modules, validation, reactivity, feedback  
+**Packages** (10) — roxygen2, NAMESPACE, DESCRIPTION, tests, vignettes, license, check, coverage  
 **renv** (4) — Init, lock, snapshot, restore  
 **targets** (4) — Structure, naming, dependencies, branching  
-**Plumber** (6) — Endpoints, validation, responses, errors  
-**Analysis** (3) — Directory structure, docs, versioning  
+**Plumber** (6) — Paths, docs, validation, responses, status codes, errors  
+**Analysis** (3) — Directory structure, README, version control  
+**bookdown** (6) — Config, index, chapter naming, output formats, cross-references, README  
+**blogdown** (5) — Config, content structure, themes, front matter, deployment  
+**shinytest** (6) — Test structure, app, setup, recordings, unit tests, CI  
+
+Browse them in the dashboard (Practices tab), via `list_practices`, or `GET /api/practices`.
 
 ## Examples
 

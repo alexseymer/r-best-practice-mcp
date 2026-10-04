@@ -46,9 +46,53 @@ describe('KnowledgeBase', () => {
       expect(result.practices.every((p) => p.category === 'documentation')).toBe(true);
     });
 
-    it('should filter by severity', () => {
-      const result = kb.listPractices({ severity: 'critical' });
+    it('should filter by minimum severity', () => {
+      const result = kb.listPractices({ minSeverity: 'critical' });
+      expect(result.practices.length).toBeGreaterThan(0);
       expect(result.practices.every((p) => p.severity === 'critical')).toBe(true);
+    });
+
+    it('should keep practices at least as severe as minSeverity', () => {
+      const result = kb.listPractices({ minSeverity: 'important' });
+      expect(result.practices.every((p) => ['critical', 'important'].includes(p.severity))).toBe(
+        true
+      );
+      expect(result.total).toBeGreaterThan(kb.listPractices({ minSeverity: 'critical' }).total);
+    });
+
+    it('should filter by enforcement', () => {
+      const automated = kb.listPractices({ enforcement: 'automated' });
+      const guidance = kb.listPractices({ enforcement: 'guidance' });
+      expect(automated.practices.every((p) => p.enforcement === 'automated')).toBe(true);
+      expect(guidance.practices.every((p) => p.enforcement === 'guidance')).toBe(true);
+      expect(automated.total + guidance.total).toBe(kb.listPractices().total);
+    });
+
+    it('should filter by free-text query over id, title, description, details and tags', () => {
+      const all = kb.listPractices().practices;
+      const byId = kb.listPractices({ query: 'PKG-ROXYGEN' });
+      expect(byId.practices.some((p) => p.id === 'pkg-roxygen')).toBe(true);
+
+      const withDetails = all.find((p) => p.details);
+      if (withDetails) {
+        const word = withDetails.details!.split(/\s+/).find((w) => w.length > 6)!;
+        expect(
+          kb.listPractices({ query: word }).practices.some((p) => p.id === withDetails.id)
+        ).toBe(true);
+      }
+      expect(kb.listPractices({ query: 'zzzz-no-such-text' }).total).toBe(0);
+      expect(kb.listPractices({ query: '   ' }).total).toBe(all.length);
+    });
+
+    it('should combine filters', () => {
+      const result = kb.listPractices({
+        workflow: 'package',
+        minSeverity: 'important',
+        query: 'test',
+        limit: 3,
+      });
+      expect(result.practices.length).toBeLessThanOrEqual(3);
+      expect(result.practices.every((p) => p.workflow === 'package')).toBe(true);
     });
 
     it('should apply limit', () => {
@@ -118,9 +162,7 @@ describe('KnowledgeBase', () => {
         category: 'documentation',
       });
       expect(
-        result.practices.every(
-          (p) => p.workflow === 'package' && p.category === 'documentation'
-        )
+        result.practices.every((p) => p.workflow === 'package' && p.category === 'documentation')
       ).toBe(true);
     });
 
