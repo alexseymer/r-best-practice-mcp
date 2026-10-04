@@ -14,6 +14,7 @@ import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+import { registerUploadRoutes } from './routes/upload.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
@@ -256,6 +257,9 @@ export class RPracticesWebServer {
         this.handleValidateFile(req, res)
       );
     }
+
+    // Browser uploads (own JSON parser, see LARGE_BODY_ROUTES)
+    registerUploadRoutes(this.app, { validator: this.validator, detector: this.detector });
 
     // Get practice
     this.app.get('/api/practice/:id', (req: Request, res: Response) => {

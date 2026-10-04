@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- `POST /api/validate-upload` (REST only): validate or detect a project posted as `{ files: [{ path, content }] }` from the browser, with
+  strict path/size validation, a temp directory that is always deleted, at most 2 concurrent uploads (`503 BUSY`) and the limits
+  from `GET /api/config`. Dashboard: "Upload a project" in the Validate and Detect tabs (folder picker, drag and drop).
 - 4 practices (`pkg-structure`, `shiny-structure`, `shinytest-app`, `shinytest-setup`): 70 practices in total.
 - `Practice.enforcement` (`automated` | `guidance`): 59 practices are checked by a validator rule, 11 are advice only.
 - 32 new validator rules (rule registry in `src/engine/rules/`), one per automated practice that previously had none.
