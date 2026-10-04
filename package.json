@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/alexseymer/r-coding-mcp.git"
+    "url": "https://github.com/alexseymer/r-best-practice-mcp.git"
   },
-  "homepage": "https://github.com/alexseymer/r-coding-mcp#readme",
+  "homepage": "https://github.com/alexseymer/r-best-practice-mcp#readme",
   "bugs": {
-    "url": "https://github.com/alexseymer/r-coding-mcp/issues"
+    "url": "https://github.com/alexseymer/r-best-practice-mcp/issues"
   },
   "files": [
     "dist/",
