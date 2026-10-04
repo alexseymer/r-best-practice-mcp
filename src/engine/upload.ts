@@ -177,7 +177,9 @@ export async function withUploadedProject<T>(
   files: readonly UploadFile[],
   fn: (dir: string, createdDir: string) => Promise<T>
 ): Promise<T> {
-  const created = await fs.mkdtemp(path.join(os.tmpdir(), 'rbp-upload-'));
+  const base = process.env.UPLOAD_TMP_DIR?.trim() || os.tmpdir();
+  await fs.mkdir(base, { recursive: true, mode: 0o700 });
+  const created = await fs.mkdtemp(path.join(base, 'rbp-upload-'));
   try {
     const root = await fs.realpath(created);
     await fs.chmod(root, 0o700);

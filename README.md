@@ -383,6 +383,8 @@ curl -X POST http://localhost:3000/api/validate-upload \
   -d '{"files": [{"path": "DESCRIPTION", "content": "Package: demo\n"}, {"path": "R/a.R", "content": "a <- 1\n"}], "minSeverity": "important"}'
 ```
 
+Uploaded files are written to a private temporary directory under `UPLOAD_TMP_DIR` (default: the system temp directory) and deleted as soon as the request finishes; point it at a tmpfs or a dedicated volume if you want uploads kept off the main disk.
+
 - Body: `files` (`[{ path, content }]`, paths relative to the project root, `/` or `\` separators) and optional `workflow`
   (detected when omitted), `minSeverity`, `categories`, `maxFindings` (same as `validate-project`), `detectOnly` (return only
   `detected` and `upload`, no findings).

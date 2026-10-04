@@ -25,8 +25,22 @@ function failure(body: unknown, limits: UploadLimits = UPLOAD_LIMITS): UploadErr
   throw new Error('expected sanitizeUpload to throw');
 }
 
+// Jest runs test files in parallel processes that share the system temp dir (and `process.env` inside Jest is a
+// copy, so TMPDIR cannot be redirected). UPLOAD_TMP_DIR gives each file its own upload directory, so the
+// "nothing is left behind" assertions only ever see this file's directories.
+const uploadBase = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-test-uploads-'));
+const originalUploadTmp = process.env.UPLOAD_TMP_DIR;
+beforeAll(() => {
+  process.env.UPLOAD_TMP_DIR = uploadBase;
+});
+afterAll(() => {
+  if (originalUploadTmp === undefined) delete process.env.UPLOAD_TMP_DIR;
+  else process.env.UPLOAD_TMP_DIR = originalUploadTmp;
+  fs.rmSync(uploadBase, { recursive: true, force: true });
+});
+
 const tempDirs = (): string[] =>
-  fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('rbp-upload-'));
+  fs.readdirSync(uploadBase).filter((n) => n.startsWith('rbp-upload-'));
 
 describe('sanitizeUpload', () => {
   it('accepts allowed files and normalises backslashes', () => {
@@ -159,6 +173,15 @@ describe('withUploadedProject', () => {
     expect(result).toBe(42);
     expect(fs.existsSync(seen)).toBe(false);
     expect(tempDirs()).toEqual(before);
+  });
+
+  it('creates its directory under UPLOAD_TMP_DIR when set', async () => {
+    let created = '';
+    await withUploadedProject([{ path: 'a.R', content: 'x' }], async (_dir, createdDir) => {
+      created = createdDir;
+    });
+    expect(path.dirname(created)).toBe(uploadBase);
+    expect(fs.existsSync(created)).toBe(false);
   });
 
   it('removes the directory when fn throws', async () => {

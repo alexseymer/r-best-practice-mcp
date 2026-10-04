@@ -12,8 +12,22 @@ import { Validator } from '../../src/engine/validator';
 import { UPLOAD_LIMITS } from '../../src/config/runtime';
 import { createTempDir, cleanupTempDir, createFile } from '../fixtures/setup';
 
+// Jest runs test files in parallel processes that share the system temp dir (and `process.env` inside Jest is a
+// copy, so TMPDIR cannot be redirected). UPLOAD_TMP_DIR gives each file its own upload directory, so the
+// "nothing is left behind" assertions only ever see this file's directories.
+const uploadBase = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-test-uploads-'));
+const originalUploadTmp = process.env.UPLOAD_TMP_DIR;
+beforeAll(() => {
+  process.env.UPLOAD_TMP_DIR = uploadBase;
+});
+afterAll(() => {
+  if (originalUploadTmp === undefined) delete process.env.UPLOAD_TMP_DIR;
+  else process.env.UPLOAD_TMP_DIR = originalUploadTmp;
+  fs.rmSync(uploadBase, { recursive: true, force: true });
+});
+
 const tempDirs = (): string[] =>
-  fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith('rbp-upload-'));
+  fs.readdirSync(uploadBase).filter((n) => n.startsWith('rbp-upload-'));
 
 interface Reply {
   status: number;
@@ -114,7 +128,7 @@ describe('POST /api/validate-upload (full server)', () => {
     });
     expect(res.status).toBe(200);
     const text = JSON.stringify(res.json);
-    expect(text).not.toContain(os.tmpdir());
+    expect(text).not.toContain(uploadBase);
     expect(text).not.toContain('rbp-upload-');
     const files = res.json.data.findings.map((f: { file?: string }) => f.file).filter(Boolean);
     expect(files.length).toBeGreaterThan(0);
