@@ -190,6 +190,11 @@ export class RPracticesWebServer {
       res.sendFile(dashboardPath);
     });
 
+    // Browsers request /favicon.ico regardless of <link rel=icon>; avoid the JSON 404
+    this.app.get('/favicon.ico', (req: Request, res: Response) => {
+      res.redirect(301, '/favicon.svg');
+    });
+
     // Index route redirects to dashboard
     this.app.get('/', (req: Request, res: Response) => {
       res.redirect('/dashboard');

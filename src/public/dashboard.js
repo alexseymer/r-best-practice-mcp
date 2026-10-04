@@ -612,6 +612,51 @@
       });
   }
 
+  var UNCHECKED_DEFAULT =
+    'No R project type was detected in this folder, so no workflow-specific checks ran. Choose a workflow type or check the path.';
+
+  // An audit whose workflow was not recognised ran no checks: it must never look like a clean result.
+  function auditWarnings(result) {
+    var warnings = Array.isArray(result.warnings)
+      ? result.warnings.filter(function (w) { return typeof w === 'string' && w; })
+      : [];
+    if (!warnings.length && result.workflow === 'unknown') warnings = [UNCHECKED_DEFAULT];
+    return warnings;
+  }
+
+  function chooseWorkflow() {
+    var select = $('audit-workflow');
+    select.scrollIntoView({ block: 'center' });
+    select.focus();
+    try {
+      if (typeof select.showPicker === 'function') select.showPicker();
+    } catch (e) {
+      /* showPicker needs a user gesture in some browsers; focus is enough */
+    }
+  }
+
+  function warningCard(warnings) {
+    return h('div', { role: 'status', 'data-el': 'audit-warning', class: 'rounded-xl border border-amber-300 bg-amber-50 text-amber-900 p-5 flex items-start gap-3' }, [
+      h('span', { class: 'material-symbols-outlined text-[22px] text-amber-600', 'aria-hidden': 'true', text: 'warning' }),
+      h('div', { class: 'flex-1 space-y-2' }, [
+        h('div', { class: 'font-semibold', text: 'No checks were run' }),
+      ].concat(
+        warnings.map(function (w) {
+          return h('p', { class: 'text-body-sm font-body-sm break-words', text: w });
+        }),
+        [
+          h('button', {
+            type: 'button',
+            'data-action': 'choose-workflow',
+            class: 'px-3 py-1.5 rounded-lg border border-amber-400 bg-white text-amber-900 font-semibold text-label-md font-label-md hover:bg-amber-100',
+            text: 'Choose a workflow',
+            onclick: chooseWorkflow,
+          }),
+        ],
+      )),
+    ]);
+  }
+
   function renderAudit() {
     var audit = state.audit;
     var result = audit.result;
@@ -622,24 +667,30 @@
       counts[f.severity] = (counts[f.severity] || 0) + 1;
     });
 
+    var warnings = auditWarnings(result);
+    var unchecked = warnings.length > 0;
     var summary =
       audit.kind === 'file'
         ? 'File ' + audit.target
-        : workflowLabel(result.workflow) + ' project · ' + audit.target;
+        : unchecked
+          ? 'No project type detected · ' + audit.target
+          : workflowLabel(result.workflow) + ' project · ' + audit.target;
     $('findings-summary').textContent =
       summary +
       ' · ' +
-      (result.summary ? 'Showing ' + all.length + ' of ' + plural(totalFound, 'finding') : plural(all.length, 'finding')) +
+      (unchecked ? 'Not checked' : result.summary ? 'Showing ' + all.length + ' of ' + plural(totalFound, 'finding') : plural(all.length, 'finding')) +
       ' · ' +
       formatMs(result.duration);
     $('findings-actions').classList.remove('hidden');
     $('findings-filters').classList.toggle('hidden', all.length === 0);
 
     var badgeEl = $('issue-badge');
-    badgeEl.textContent = String(all.length);
-    badgeEl.classList.remove('hidden');
-    $('stat-audit').textContent = String(all.length);
-    $('stat-audit-sub').textContent = all.length
+    badgeEl.textContent = unchecked ? '' : String(all.length);
+    badgeEl.classList.toggle('hidden', unchecked);
+    $('stat-audit').textContent = unchecked ? 'Not checked' : String(all.length);
+    $('stat-audit-sub').textContent = unchecked
+      ? 'no project type detected'
+      : all.length
       ? SEVERITIES.filter(function (s) { return counts[s]; })
           .map(function (s) { return counts[s] + ' ' + s; })
           .join(' · ')
@@ -685,12 +736,16 @@
     });
     catSelect.value = cats.indexOf(currentCat) >= 0 ? currentCat : '';
 
-    renderFindingList(all.length);
+    renderFindingList(all.length, warnings);
   }
 
-  function renderFindingList(total) {
+  function renderFindingList(total, warnings) {
     var list = $('findings');
     clear(list);
+    if (warnings && warnings.length) {
+      list.appendChild(warningCard(warnings));
+      if (total === 0) return;
+    }
     if (total === 0 && state.audit.result.summary && state.audit.result.summary.total > 0) {
       list.appendChild(emptyBox('All ' + plural(state.audit.result.summary.total, 'finding') + ' were hidden by the audit filters. Adjust or reset the filters and run the audit again.'));
       return;
@@ -761,6 +816,7 @@
         durationMs: a.result.duration,
         filters: a.filters || {},
         summary: a.result.summary || null,
+        warnings: auditWarnings(a.result),
         findings: a.result.findings,
       },
       null,
@@ -791,7 +847,10 @@
       );
     }
     lines.push('');
-    if (!findings.length) {
+    auditWarnings(a.result).forEach(function (w) {
+      lines.push('> **Warning:** ' + w, '');
+    });
+    if (!findings.length && !auditWarnings(a.result).length) {
       lines.push(a.result.summary && a.result.summary.total ? 'No findings match the filters used.' : 'No issues found.');
     }
     findings.forEach(function (f) {
