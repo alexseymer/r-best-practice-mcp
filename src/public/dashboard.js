@@ -940,7 +940,7 @@
             h('span', { text: 'Confidence' }),
             h('span', { class: 'font-bold text-primary', text: confidence + '%' }),
           ]),
-          h('div', { class: 'w-full h-3 bg-slate-100 rounded-full overflow-hidden', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(confidence) }, [
+          h('div', { class: 'w-full h-3 bg-slate-100 rounded-full overflow-hidden', role: 'progressbar', 'aria-label': 'Detection confidence', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(confidence) }, [
             h('div', { class: 'h-full bg-gradient-to-r from-cyan-400 to-primary', style: 'width:' + confidence + '%' }),
           ]),
         ]),
@@ -1295,7 +1295,7 @@
   function codeBlock(label, code, tone) {
     return h('div', null, [
       h('div', { class: 'text-label-md font-label-md font-semibold ' + tone, text: label }),
-      h('pre', { class: 'mt-1 p-3 rounded-lg bg-slate-900 text-slate-100 text-code-md font-code-md overflow-auto custom-scroll' }, [h('code', { text: code })]),
+      h('pre', { tabindex: '0', 'aria-label': label, class: 'mt-1 p-3 rounded-lg bg-slate-900 text-slate-100 text-code-md font-code-md overflow-auto custom-scroll' }, [h('code', { text: code })]),
     ]);
   }
 
