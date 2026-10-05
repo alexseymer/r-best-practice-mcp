@@ -82,7 +82,7 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'validate_project',
     description:
-      'Validate an R project against best practices. Optional filters narrow the returned findings; the summary always counts all findings.',
+      'Validate an R project against best practices. Optional filters narrow the returned findings; the summary always counts all findings. If no project type is detected the result has no findings and a `warnings` array: that means no checks ran, not that the project is clean.',
     method: 'POST',
     path: '/api/validate-project',
     operationId: 'validateProject',

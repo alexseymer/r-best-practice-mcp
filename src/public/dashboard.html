@@ -5,6 +5,15 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>R Best Practices Dashboard</title>
 <meta name="description" content="Validate R projects, detect workflows, generate templates and browse best practices."/>
+<meta name="theme-color" content="#0EA5E9"/>
+<meta property="og:title" content="R Best Practices Dashboard"/>
+<meta property="og:description" content="Validate R projects, detect workflows, generate templates and browse best practices."/>
+<meta property="og:type" content="website"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="R Best Practices Dashboard"/>
+<meta name="twitter:description" content="Validate R projects, detect workflows, generate templates and browse best practices."/>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+<link rel="alternate icon" href="/favicon.ico"/>
 <!-- Material Symbols Outlined -->
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <!-- Google Fonts: Geist & JetBrains Mono -->
@@ -137,6 +146,16 @@
       display: inline-block;
       line-height: 1;
     }
+    @media (max-width: 479px) {
+      /* Icon-only tabs: the label stays in the accessible name but is visually hidden. */
+      .tab-btn { flex: 1 1 0; justify-content: center; min-width: 0; }
+      .tab-btn .tab-label {
+        position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+      }
+      /* fixed box so the ligature text cannot widen the tab while the icon font loads */
+      .tab-btn .material-symbols-outlined { font-size: 22px; width: 22px; overflow: hidden; }
+    }
     .tab-btn[aria-selected="true"] {
       color: #006194;
       border-bottom-color: #0EA5E9;
@@ -167,21 +186,21 @@
     </a>
 
     <nav role="tablist" aria-label="Dashboard sections" class="flex items-center gap-1 sm:gap-4 overflow-x-auto custom-scroll order-3 sm:order-none w-full sm:w-auto">
-      <button role="tab" id="tab-validate" data-tab="validate" aria-controls="panel-validate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span>Validate
+      <button role="tab" id="tab-validate" data-tab="validate" title="Validate" aria-controls="panel-validate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span><span class="tab-label">Validate</span>
         <span data-el="issue-badge" class="hidden px-1.5 rounded-full text-[10px] font-bold bg-surface-container text-primary"></span>
       </button>
-      <button role="tab" id="tab-detect" data-tab="detect" aria-controls="panel-detect" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span>Detect
+      <button role="tab" id="tab-detect" data-tab="detect" title="Detect" aria-controls="panel-detect" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span><span class="tab-label">Detect</span>
       </button>
-      <button role="tab" id="tab-generate" data-tab="generate" aria-controls="panel-generate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span>Generate
+      <button role="tab" id="tab-generate" data-tab="generate" title="Generate" aria-controls="panel-generate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span><span class="tab-label">Generate</span>
       </button>
-      <button role="tab" id="tab-practices" data-tab="practices" aria-controls="panel-practices" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">menu_book</span>Practices
+      <button role="tab" id="tab-practices" data-tab="practices" title="Practices" aria-controls="panel-practices" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">menu_book</span><span class="tab-label">Practices</span>
       </button>
-      <button role="tab" id="tab-system" data-tab="system" aria-controls="panel-system" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">monitor_heart</span>System
+      <button role="tab" id="tab-system" data-tab="system" title="System" aria-controls="panel-system" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
+        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">monitor_heart</span><span class="tab-label">System</span>
       </button>
     </nav>
 
@@ -198,7 +217,7 @@
 </header>
 
 <!-- ================= HERO ================= -->
-<section class="relative overflow-hidden bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#0F172A] text-white py-8 px-4 sm:px-6 border-b border-slate-700/40">
+<section aria-label="Introduction" class="relative overflow-hidden bg-gradient-to-r from-[#0369A1] via-[#0284C7] to-[#0F172A] text-white py-8 px-4 sm:px-6 border-b border-slate-700/40">
   <div class="absolute -right-20 -top-24 w-96 h-96 bg-cyan-400/15 rounded-full blur-3xl pointer-events-none"></div>
   <div class="max-w-[1400px] mx-auto relative z-10 space-y-2">
     <h1 class="text-white text-headline-lg font-headline-lg sm:text-display-lg sm:font-display-lg tracking-tight">R Best Practices</h1>

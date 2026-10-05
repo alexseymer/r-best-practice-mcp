@@ -15,7 +15,7 @@ import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
-import { parseTrustProxy } from './middleware/trust-proxy.js';
+import { parseTrustProxy, proxyMisconfigurationWarning } from './middleware/trust-proxy.js';
 import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
 import { securityHeaders, noStore } from './middleware/security-headers.js';
 import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
@@ -62,6 +62,7 @@ export class RPracticesWebServer {
     );
     // Never trust X-Forwarded-For unless TRUST_PROXY says so
     this.app.set('trust proxy', parseTrustProxy(this.env.TRUST_PROXY));
+    this.app.use(proxyMisconfigurationWarning(this.env.TRUST_PROXY, (m) => logger.warn(m)));
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
@@ -213,6 +214,11 @@ export class RPracticesWebServer {
     this.app.get('/dashboard', (req: Request, res: Response) => {
       const dashboardPath = path.join(__dirname, '..', 'src', 'public', 'dashboard.html');
       res.sendFile(dashboardPath);
+    });
+
+    // Browsers request /favicon.ico regardless of <link rel=icon>; avoid the JSON 404
+    this.app.get('/favicon.ico', (req: Request, res: Response) => {
+      res.redirect(301, '/favicon.svg');
     });
 
     // Index route redirects to dashboard

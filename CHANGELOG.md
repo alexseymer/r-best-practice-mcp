@@ -20,6 +20,10 @@
 - `minSeverity`, `tags`, `enforcement`, `query`/`q` and `limit` for `list_practices` and `GET /api/practices` (v0 and v1).
 - Dashboard: server-side filters, "X of Y" counts, automated/guidance badges, JSON/Markdown export, ZIP download of templates, System tab.
 - `tests/unit/rule-consistency.test.ts`, `tests/unit/practice-content.test.ts`, `tests/e2e/dashboard.playwright.cjs`.
+- `ValidationResult.warnings` (`validate_project` over MCP, REST v0/v1, CLI): an unrecognised project type now returns a warning that no checks ran
+  instead of an empty "clean" result. The dashboard shows an amber card with a "Choose a workflow" button, "Not checked" in LAST AUDIT, and exports `warnings`.
+- Dashboard: favicon (`/favicon.svg`, `/favicon.ico` redirects to it), `theme-color`, Open Graph and Twitter card tags.
+- E2E: axe-core accessibility check on all five tabs (skipped when it cannot be loaded) and mobile tab-bar checks at 320, 360 and 390 px.
 
 ### Changed
 - Rate limiting identifies clients by `req.ip`; `X-Forwarded-For`/`X-Real-IP` are only honoured when `TRUST_PROXY` is set.
@@ -36,6 +40,9 @@
 - Malformed JSON bodies returned 500; they now return 400 `INVALID_JSON` (oversized bodies 413 `PAYLOAD_TOO_LARGE`).
 - `X-RateLimit-*` headers were missing on the first request of a window, the request that reset it and on 429; `Retry-After` was missing.
 - `/health` reported a hard-coded version `1.0.0`, OpenAPI `0.2.0`; OpenAPI contact pointed at the old repository.
+- Dashboard: at 480 px and below the tab bar is icon-only (names kept as `title` and visually hidden text), so Practices and System were
+  no longer pushed off-screen; the hero is a labelled landmark (axe `region` violation on every tab).
+- CLI `validate` crashed when printing the summary (`result.data.duration` on an unwrapped result).
 - `quarto-labels` flagged correctly labelled chunks (`#| label:`); `pkg-description` required the legacy `Author:`/`Maintainer:` fields;
   `pkg-license` required a `LICENSE` file for every license; shinytest checks only accepted the legacy `shinytest` layout;
   `analysis-readme` was reported by the Quarto validator instead of the analysis one; `rscript-globals`, `plumber-validation`

@@ -25,6 +25,7 @@ all functions work without it.
 - **Filters** (sent to the server): minimum severity, categories, max findings. Results show "Showing X of Y findings" (Y is counted before the filters).
 - **View refinements** (in the browser): severity chips, category and text filter over the returned findings.
 - **Export**: copy or download the report as JSON, or download it as Markdown (includes the filters used).
+- **Unrecognised folders**: when no project type is detected, no checks run. The dashboard shows an amber "No checks were run" card with a **Choose a workflow** button (instead of the green "No issues found"), LAST AUDIT reads "Not checked", and exports include `warnings`.
 - **View practice** on a finding opens the matching practice card.
 - The single-file check runs the original file-level rules only (`.R`, `.qmd`, `.Rmd`); the 32 newer rules work on whole projects.
 
@@ -54,7 +55,7 @@ Deep links: `#practices/<id>`, for example `#practices/pkg-roxygen`.
 
 ## Keyboard and routing
 
-Tabs support arrow keys; the URL hash selects the tab (`#validate`, `#detect`, `#generate`, `#practices`, `#system`).
+On screens 480 px wide or narrower the tabs show icons only (each keeps its name for screen readers and as a tooltip). Tabs support arrow keys; the URL hash selects the tab (`#validate`, `#detect`, `#generate`, `#practices`, `#system`).
 Recently used project paths are remembered in the browser (localStorage).
 
 ## Testing
