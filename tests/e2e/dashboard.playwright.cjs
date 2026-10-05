@@ -664,6 +664,19 @@ function check(name, ok, extra) {
         const violations = await lp.evaluate(async () => (await window.axe.run(document)).violations.map((v) => v.id + ': ' + v.nodes.length + ' node(s)'));
         check('axe: no violations on ' + t + ' tab', violations.length === 0, violations.join('; '));
       }
+      // Result states render extra widgets (confidence bar, file tree, code blocks) that the empty tabs do not have.
+      const axeNow = () => lp.evaluate(async () => (await window.axe.run(document)).violations.map((v) => v.id + ': ' + v.nodes.length + ' node(s)'));
+      await lp.click('#tab-generate');
+      await lp.click('[data-el="gen-btn"]');
+      await lp.waitForSelector('[data-el="gen-result"]:not(.hidden)');
+      const genViolations = await axeNow();
+      check('axe: no violations on generate tab with a generated template', genViolations.length === 0, genViolations.join('; '));
+      await lp.click('#tab-detect');
+      await lp.fill('#detect-path', FIXTURE);
+      await lp.click('[data-el="detect-btn"]');
+      await lp.waitForSelector('[role="progressbar"]');
+      const detectViolations = await axeNow();
+      check('axe: no violations on detect tab with a result', detectViolations.length === 0, detectViolations.join('; '));
     }
   }
   await collectCsp(lp);
