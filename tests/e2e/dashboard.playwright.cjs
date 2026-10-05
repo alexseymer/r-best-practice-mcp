@@ -471,6 +471,16 @@ function check(name, ok, extra) {
     check('run button re-enabled after a failed upload', await page.locator('[data-el="upload-run-audit"]').isEnabled());
     await page.click('[data-action="dismiss-alert"]');
 
+    // a dropped connection (no HTTP response) names the browser's error and the request size
+    await page.route('**/api/validate-upload', (r) => r.abort('connectionreset'));
+    await page.click('[data-el="upload-run-audit"]');
+    await page.waitForFunction(() => !document.querySelector('[data-el="alert"]').classList.contains('hidden'));
+    const netMsg = await page.textContent('[data-el="alert-text"]');
+    check('network failure message names the browser error and size', /Cannot reach the server \(.+ while sending \d+ KB\)/.test(netMsg), netMsg);
+    await page.unroute('**/api/validate-upload');
+    check('run button re-enabled after a dropped connection', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+    await page.click('[data-action="dismiss-alert"]');
+
     // drag and drop (plain-files fallback; folder entries use the same selection code as the directory input)
     await page.evaluate(() => {
       const dt = new DataTransfer();
