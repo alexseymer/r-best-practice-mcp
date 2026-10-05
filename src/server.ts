@@ -1,3 +1,4 @@
+import { getRuntimeConfig } from './config/runtime.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -29,7 +30,7 @@ export class RPracticesMCPServer {
     this.server = new Server(
       {
         name: 'r-best-practices-mcp',
-        version: '1.0.0',
+        version: getRuntimeConfig().version,
       },
       // Without this capability the SDK refuses to register the tools handlers.
       { capabilities: { tools: {} } }

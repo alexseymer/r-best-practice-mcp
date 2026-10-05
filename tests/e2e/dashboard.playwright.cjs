@@ -358,6 +358,23 @@ function check(name, ok, extra) {
   const toolsText = await page.textContent('[data-el="tools-list"]');
   check('tools list documents the new filters', /minSeverity/.test(toolsText) && /maxFindings/.test(toolsText) && /enforcement/.test(toolsText));
   check('ops table has rows', (await page.locator('[data-el="ops-body"] tr').count()) > 0);
+  check('metrics links visible when metrics are public', (await page.locator('[data-metrics-link]:visible').count()) === 2);
+  check('build info shows the version', /Version \d/.test(await page.textContent('[data-el="build-info"]')), await page.textContent('[data-el="build-info"]'));
+  {
+    const p2 = await ctx.newPage();
+    await p2.route('**/api/config', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.metrics = { public: false, tokenRequired: true };
+      json.data.build = { commit: 'abcdef1234567890', builtAt: '2026-10-04T10:00:00Z' };
+      await route.fulfill({ response: res, json });
+    });
+    await p2.goto(BASE_URL + '/dashboard#system');
+    await p2.waitForFunction(() => /abcdef1/.test(document.querySelector('[data-el="build-info"]').textContent), null, { timeout: 8000 }).then(() => check('build info shows short commit and build time', true), () => check('build info shows short commit and build time', false));
+    check('metrics links hidden when metrics are not public', (await p2.locator('[data-metrics-link]:visible').count()) === 0);
+    check('build info omits the full sha', !/abcdef1234567890/.test(await p2.textContent('[data-el="build-info"]')));
+    await p2.close();
+  }
 
   // ---- routing
   await page.goto(BASE_URL + '/dashboard#generate');

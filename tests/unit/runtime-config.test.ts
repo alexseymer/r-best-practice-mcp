@@ -96,6 +96,22 @@ describe('getRuntimeConfig', () => {
       );
       expect(getRuntimeConfig(env({})).version).toBe(pkg.version);
     });
+
+    it('finds the version through the entry script when started from another directory', () => {
+      const pkg = JSON.parse(
+        require('fs').readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8')
+      );
+      const entry = path.join(process.cwd(), 'src', 'config', 'runtime.ts');
+      const cwd = jest.spyOn(process, 'cwd').mockReturnValue(require('os').tmpdir());
+      const argv1 = process.argv[1];
+      process.argv[1] = entry;
+      try {
+        expect(getRuntimeConfig(env({})).version).toBe(pkg.version);
+      } finally {
+        process.argv[1] = argv1;
+        cwd.mockRestore();
+      }
+    });
   });
 
   it('exposes the upload limits', () => {

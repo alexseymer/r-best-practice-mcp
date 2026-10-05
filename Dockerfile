@@ -37,6 +37,12 @@ COPY --from=builder /app/dist ./dist
 # Web dashboard static assets (served from ./src/public at runtime)
 COPY --from=builder /app/src/public ./src/public
 
+# Build information shown by /health and /api/config (pass with --build-arg)
+ARG GIT_SHA=""
+ARG BUILD_TIME=""
+ENV GIT_SHA=$GIT_SHA \
+    BUILD_TIME=$BUILD_TIME
+
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001

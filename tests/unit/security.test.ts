@@ -158,37 +158,27 @@ describe('SecurityUtils', () => {
   });
 
   describe('getClientIp', () => {
-    it('should extract IP from X-Forwarded-For header', () => {
-      const req = {
-        headers: { 'x-forwarded-for': '192.168.1.1, 10.0.0.1' },
-        socket: { remoteAddress: '127.0.0.1' },
-      };
-      const ip = SecurityUtils.getClientIp(req);
-      expect(ip).toBe('192.168.1.1');
+    it('should use req.ip (resolved by Express according to trust proxy)', () => {
+      const req = { ip: '192.168.1.1', socket: { remoteAddress: '127.0.0.1' } };
+      expect(SecurityUtils.getClientIp(req)).toBe('192.168.1.1');
     });
 
-    it('should fallback to X-Real-IP header', () => {
+    it('should never read forwarded headers itself', () => {
       const req = {
-        headers: { 'x-real-ip': '192.168.1.2' },
+        ip: '127.0.0.1',
+        headers: { 'x-forwarded-for': '6.6.6.6', 'x-real-ip': '7.7.7.7' },
         socket: { remoteAddress: '127.0.0.1' },
       };
-      const ip = SecurityUtils.getClientIp(req);
-      expect(ip).toBe('192.168.1.2');
+      expect(SecurityUtils.getClientIp(req)).toBe('127.0.0.1');
     });
 
     it('should fallback to socket remoteAddress', () => {
-      const req = {
-        headers: {},
-        socket: { remoteAddress: '192.168.1.3' },
-      };
-      const ip = SecurityUtils.getClientIp(req);
-      expect(ip).toBe('192.168.1.3');
+      const req = { socket: { remoteAddress: '192.168.1.3' } };
+      expect(SecurityUtils.getClientIp(req)).toBe('192.168.1.3');
     });
 
     it('should return "unknown" when no IP found', () => {
-      const req = { headers: {}, socket: {} };
-      const ip = SecurityUtils.getClientIp(req);
-      expect(ip).toBe('unknown');
+      expect(SecurityUtils.getClientIp({ socket: {} })).toBe('unknown');
     });
   });
 

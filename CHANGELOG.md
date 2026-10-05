@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- Server hardening: path confinement to `ALLOWED_PROJECT_ROOTS` (default `/projects` in production), security headers and
+  CSP (`src/middleware/security-headers.ts`), gzip compression, 1 MB body limit (`MAX_BODY_BYTES`), `/metrics*` protected by
+  `METRICS_TOKEN` (404 when neither a token nor `METRICS_PUBLIC=true` is set in production), `TRUST_PROXY`.
+- `/health` and `/openapi.json` report the package version; `/health` also returns `build: {commit, builtAt}` (Docker build args
+  `GIT_SHA`, `BUILD_TIME`). Dashboard System panel shows build info and hides metrics links when metrics are not public.
+- OpenAPI structural test (`tests/unit/openapi-spec.test.ts`).
 - 4 practices (`pkg-structure`, `shiny-structure`, `shinytest-app`, `shinytest-setup`): 70 practices in total.
 - `Practice.enforcement` (`automated` | `guidance`): 59 practices are checked by a validator rule, 11 are advice only.
 - 32 new validator rules (rule registry in `src/engine/rules/`), one per automated practice that previously had none.
@@ -13,6 +19,9 @@
 - `tests/unit/rule-consistency.test.ts`, `tests/unit/practice-content.test.ts`, `tests/e2e/dashboard.playwright.cjs`.
 
 ### Changed
+- Rate limiting identifies clients by `req.ip`; `X-Forwarded-For`/`X-Real-IP` are only honoured when `TRUST_PROXY` is set.
+  `/health` is exempt, the cleanup timer is unref'd and stoppable, `/metrics/rate-limit` shows salted hashes instead of addresses.
+- Default request body limit lowered from 50 MB to 1 MB.
 - Finding ids `blogdown-content` and `blogdown-themes` are now `blogdown-content-structure` and `blogdown-theme` (they match their practices).
 - `PracticeListOptions.severity` is now `minSeverity` (still "at least this severe").
 - `bookdown-config` severity is `important` (a book builds without `_bookdown.yml`).
@@ -20,6 +29,10 @@
 - Logs go to stderr so stdout stays clean for the MCP stdio protocol and CLI output.
 
 ### Fixed
+- Anonymous visitors could probe the server filesystem through `validate-project`/`validate-file` (200 vs 404 for any path).
+- Malformed JSON bodies returned 500; they now return 400 `INVALID_JSON` (oversized bodies 413 `PAYLOAD_TOO_LARGE`).
+- `X-RateLimit-*` headers were missing on the first request of a window, the request that reset it and on 429; `Retry-After` was missing.
+- `/health` reported a hard-coded version `1.0.0`, OpenAPI `0.2.0`; OpenAPI contact pointed at the old repository.
 - `quarto-labels` flagged correctly labelled chunks (`#| label:`); `pkg-description` required the legacy `Author:`/`Maintainer:` fields;
   `pkg-license` required a `LICENSE` file for every license; shinytest checks only accepted the legacy `shinytest` layout;
   `analysis-readme` was reported by the Quarto validator instead of the analysis one; `rscript-globals`, `plumber-validation`

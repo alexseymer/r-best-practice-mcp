@@ -1,11 +1,13 @@
+import compression from 'compression';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import path from 'path';
+import type { Server } from 'http';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
-import { getRuntimeConfig } from './config/runtime.js';
+import { getRuntimeConfig, RuntimeConfig } from './config/runtime.js';
 import { FileUtils } from './utils/file.js';
 import { metricsCollector } from './utils/metrics.js';
 import { SecurityUtils } from './utils/security.js';
@@ -13,10 +15,22 @@ import { RateLimiter } from './utils/rate-limiter.js';
 import { OpenAPIGenerator } from './utils/openapi.js';
 import { PaginationUtils } from './utils/pagination.js';
 import { toRestToolsPayload } from './tools/schemas.js';
+import { parseTrustProxy } from './middleware/trust-proxy.js';
+import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
+import { securityHeaders, noStore } from './middleware/security-headers.js';
+import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
+import { metricsAccess } from './middleware/metrics-access.js';
+import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
+}
+
+export interface WebServerOptions {
+  env?: NodeJS.ProcessEnv;
+  /** Override the per-client rate limit (default 100 requests per 60 s). */
+  rateLimit?: { windowMs: number; maxRequests: number };
 }
 
 export class RPracticesWebServer {
@@ -26,38 +40,44 @@ export class RPracticesWebServer {
   private validator: Validator;
   private templateGenerator: TemplateGenerator;
   private rateLimiter: RateLimiter;
+  private httpServer?: Server;
+  private env: NodeJS.ProcessEnv;
+  private runtime: RuntimeConfig;
 
-  constructor(port: number = 3000) {
+  /** `options.env` replaces `process.env` for deployment settings (used by tests). */
+  constructor(port: number = 3000, options: WebServerOptions = {}) {
     this.port = port;
+    this.env = options.env ?? process.env;
+    this.runtime = getRuntimeConfig(this.env);
     this.app = express();
+    this.app.disable('x-powered-by');
     this.detector = new WorkflowDetector();
     this.validator = new Validator();
     this.templateGenerator = new TemplateGenerator();
-    this.rateLimiter = new RateLimiter(60000, 100); // 100 requests per 60 seconds per IP
+    // 100 requests per 60 seconds per client (req.ip)
+    this.rateLimiter = new RateLimiter(
+      options.rateLimit?.windowMs ?? 60000,
+      options.rateLimit?.maxRequests ?? 100
+    );
+    // Never trust X-Forwarded-For unless TRUST_PROXY says so
+    this.app.set('trust proxy', parseTrustProxy(this.env.TRUST_PROXY));
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
   }
 
   private setupMiddleware(): void {
-    this.app.use(express.json({ limit: '50mb' }));
-    this.app.use(express.urlencoded({ limit: '50mb', extended: true }));
+    // Response headers first so every response (429s and errors included) carries them
+    this.app.use(securityHeaders());
+    this.app.use(noStore());
+    this.app.use(compression());
 
-    // Rate limiting middleware - apply to all routes
-    this.app.use(this.rateLimiter.middleware());
+    // Rate limiting middleware - apply to all routes except /health (monitoring must not use up budget).
+    // Mounted before the body parsers so rejected clients cost no parsing work.
+    this.app.use(this.rateLimiter.middleware({ skip: (req) => req.path === '/health' }));
 
-    // Request size validation
-    this.app.use((req: Request, res: Response, next: NextFunction) => {
-      const contentLength = req.headers['content-length'];
-      if (contentLength && !SecurityUtils.validateBodySize(parseInt(contentLength))) {
-        return res.status(413).json({
-          error: true,
-          code: 'PAYLOAD_TOO_LARGE',
-          message: 'Request body exceeds maximum allowed size (50MB)',
-        });
-      }
-      next();
-    });
+    // Body parsing: 1 MB globally (env MAX_BODY_BYTES); LARGE_BODY_ROUTES get their own limit
+    this.app.use(bodyParsers(getMaxBodyBytes(this.env)));
 
     // Serve static files from public directory
     // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
@@ -95,7 +115,8 @@ export class RPracticesWebServer {
       res.json({
         status: 'ok',
         service: 'r-best-practices-mcp',
-        version: '1.0.0',
+        version: this.runtime.version,
+        build: this.runtime.build,
         timestamp: new Date().toISOString(),
         metrics: {
           uptime: metrics.uptime,
@@ -109,8 +130,11 @@ export class RPracticesWebServer {
 
     // Deployment-dependent settings the dashboard adapts to
     this.app.get('/api/config', (req: Request, res: Response) => {
-      res.json({ error: false, data: getRuntimeConfig(), timestamp: Date.now() });
+      res.json({ error: false, data: this.runtime, timestamp: Date.now() });
     });
+
+    // /metrics*: public, bearer-token protected or disabled (404), see getRuntimeConfig().metrics
+    this.app.use('/metrics', metricsAccess(this.runtime.metrics, this.env.METRICS_TOKEN));
 
     // Metrics endpoint
     this.app.get('/metrics', (req: Request, res: Response) => {
@@ -134,7 +158,7 @@ export class RPracticesWebServer {
     // OpenAPI spec endpoint
     this.app.get('/openapi.json', (req: Request, res: Response) => {
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const spec = OpenAPIGenerator.generateSpec('0.2.0', baseUrl);
+      const spec = OpenAPIGenerator.generateSpec(this.runtime.version, baseUrl);
       res.json(spec);
     });
 
@@ -197,6 +221,19 @@ export class RPracticesWebServer {
   }
 
   private setupRoutes(): void {
+    // Confine client-supplied paths to the allowed roots (no-op in unrestricted mode)
+    this.app.post(
+      [
+        '/api/detect-workflow',
+        '/api/v1/detect-workflow',
+        '/api/validate-project',
+        '/api/v1/validate-project',
+        '/api/validate-file',
+        '/api/v1/validate-file',
+      ],
+      pathGuard(this.runtime.serverPaths)
+    );
+
     // Detect workflow
     this.app.post('/api/detect-workflow', async (req: Request, res: Response) => {
       const startTime = process.hrtime();
@@ -218,7 +255,7 @@ export class RPracticesWebServer {
           });
         }
 
-        const result = await this.detector.detect(inputPath);
+        const result = await this.detector.detect(getConfinedPath(res, inputPath));
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('detection', duration, true);
@@ -398,7 +435,7 @@ export class RPracticesWebServer {
           });
         }
 
-        const result = await this.detector.detect(inputPath);
+        const result = await this.detector.detect(getConfinedPath(res, inputPath));
         const hrTime = process.hrtime(startTime);
         const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
         metricsCollector.recordOperation('detection', duration, true);
@@ -575,7 +612,8 @@ export class RPracticesWebServer {
         return;
       }
 
-      const exists = await FileUtils.isDirectory(inputPath);
+      const targetPath = getConfinedPath(res, inputPath);
+      const exists = await FileUtils.isDirectory(targetPath);
       if (!exists) {
         res.status(404).json({
           error: true,
@@ -588,12 +626,12 @@ export class RPracticesWebServer {
       // Auto-detect workflow if not specified
       let detectedWorkflow = workflow || 'unknown';
       if (!workflow) {
-        const detection = await this.detector.detect(inputPath);
+        const detection = await this.detector.detect(targetPath);
         detectedWorkflow = detection.workflow;
       }
 
       const result = await this.validator.validateProject(
-        inputPath,
+        targetPath,
         detectedWorkflow as any,
         filters.value
       );
@@ -632,7 +670,8 @@ export class RPracticesWebServer {
         return;
       }
 
-      const exists = await FileUtils.exists(inputPath);
+      const targetPath = getConfinedPath(res, inputPath);
+      const exists = await FileUtils.exists(targetPath);
       if (!exists) {
         res.status(404).json({
           error: true,
@@ -642,7 +681,7 @@ export class RPracticesWebServer {
         return;
       }
 
-      const data = await this.validator.validateFileWithSummary(inputPath, filters.value);
+      const data = await this.validator.validateFileWithSummary(targetPath, filters.value);
       const hrTime = process.hrtime(startTime);
       const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
       metricsCollector.recordOperation('validation', duration, true);
@@ -754,20 +793,30 @@ export class RPracticesWebServer {
       });
     });
 
-    // Error handler
-    this.app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-      logger.error('Unhandled error', err);
-      res.status(500).json({
-        error: true,
-        code: 'INTERNAL_ERROR',
-        message: 'Internal server error',
-      });
+    // Error handler (status-aware: malformed JSON -> 400, oversized body -> 413, ...)
+    this.app.use(errorHandler);
+  }
+
+  /** Port the server is actually listening on (useful when constructed with port 0). */
+  listeningPort(): number | undefined {
+    const address = this.httpServer?.address();
+    return address && typeof address === 'object' ? address.port : undefined;
+  }
+
+  async stop(): Promise<void> {
+    this.rateLimiter.stop();
+    const server = this.httpServer;
+    this.httpServer = undefined;
+    if (!server) return;
+    await new Promise<void>((resolve) => {
+      server.close(() => resolve());
+      server.closeAllConnections?.();
     });
   }
 
   async start(): Promise<void> {
     return new Promise((resolve) => {
-      this.app.listen(this.port, '0.0.0.0', () => {
+      this.httpServer = this.app.listen(this.port, '0.0.0.0', () => {
         logger.info(`R Best Practices Web Server running on port ${this.port}`);
         logger.info(`Dashboard available at http://localhost:${this.port}/dashboard`);
         logger.info(`API documentation available at http://localhost:${this.port}/api/tools`);
