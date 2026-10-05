@@ -493,8 +493,8 @@ r-practices validate . --watch
 
 The roadmap is community-driven. To suggest features or enhancements:
 
-1. **Open Discussion** — [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
-2. **Create Issue** — [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
+1. **Open Discussion** — [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
+2. **Create Issue** — [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
 3. **Submit PR** — [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ---
@@ -513,9 +513,9 @@ The roadmap is community-driven. To suggest features or enhancements:
 
 ## 📞 Get Involved
 
-- **Report Issues** — [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
-- **Ask Questions** — [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
-- **Submit Code** — [Pull Requests](https://github.com/alexseymer/r-coding-mcp/pulls)
+- **Report Issues** — [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
+- **Ask Questions** — [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
+- **Submit Code** — [Pull Requests](https://github.com/alexseymer/r-best-practice-mcp/pulls)
 - **Suggest Features** — Open discussion or issue
 
 ---

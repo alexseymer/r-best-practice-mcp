@@ -64,8 +64,8 @@ node node_modules/r-best-practices-mcp/dist/index.js
 
 **Option 2: From source**
 ```bash
-git clone https://github.com/alexseymer/r-coding-mcp.git
-cd r-coding-mcp
+git clone https://github.com/alexseymer/r-best-practice-mcp.git
+cd r-best-practice-mcp
 npm install
 npm run build
 node dist/index.js
@@ -132,7 +132,7 @@ The RStudio addin can be installed via:
 
 ```R
 # From GitHub
-devtools::install_github("alexseymer/r-coding-mcp/rstudio-addin")
+devtools::install_github("alexseymer/r-best-practice-mcp/rstudio-addin")
 
 # Or from CRAN (when released)
 install.packages("rbestpractices")
@@ -565,7 +565,7 @@ LOG_LEVEL=debug r-practices validate .
 
 ### How do I report bugs?
 
-1. Check existing issues: [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
+1. Check existing issues: [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
 2. Create new issue with:
    - Clear title and description
    - Steps to reproduce
@@ -574,7 +574,7 @@ LOG_LEVEL=debug r-practices validate .
 
 ### How do I suggest new features?
 
-1. Check existing discussions: [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
+1. Check existing discussions: [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
 2. Create discussion or issue with:
    - Feature description
    - Use cases
@@ -609,11 +609,11 @@ Yes! Please:
 3. List key files/structures for detection
 4. Reference best practices for the workflow
 
-Example: [Issue: Add bookdown workflow](https://github.com/alexseymer/r-coding-mcp/issues)
+Example: [Issue: Add bookdown workflow](https://github.com/alexseymer/r-best-practice-mcp/issues)
 
 ### How do I stay updated?
 
-- **Releases**: Watch releases on [GitHub Releases](https://github.com/alexseymer/r-coding-mcp/releases)
+- **Releases**: Watch releases on [GitHub Releases](https://github.com/alexseymer/r-best-practice-mcp/releases)
 - **Changes**: See [CHANGELOG](../PROJECT_STATUS.md) for completion history
 - **Roadmap**: Check [ROADMAP.md](../ROADMAP.md) for planned features
 
@@ -621,8 +621,8 @@ Example: [Issue: Add bookdown workflow](https://github.com/alexseymer/r-coding-m
 
 1. **Documentation**: [docs/INDEX.md](./INDEX.md)
 2. **FAQ**: You're reading it!
-3. **Issues**: [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
-4. **Discussions**: [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
+3. **Issues**: [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
+4. **Discussions**: [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
 5. **Email**: Open an issue for direct contact
 
 ### Can I use this for commercial projects?
@@ -661,4 +661,4 @@ Not currently, but interested community members can:
 ---
 
 **Last Updated**: 2026-09-26  
-**Found an issue in this FAQ?** [Report it on GitHub](https://github.com/alexseymer/r-coding-mcp/issues)
+**Found an issue in this FAQ?** [Report it on GitHub](https://github.com/alexseymer/r-best-practice-mcp/issues)

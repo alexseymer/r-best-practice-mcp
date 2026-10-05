@@ -152,7 +152,7 @@ When you push a version tag, the `.github/workflows/publish.yml` workflow automa
 
 4. **Monitor the workflow**
 
-   - Go to [GitHub Actions](https://github.com/yourusername/r-coding-mcp/actions)
+   - Go to [GitHub Actions](https://github.com/alexseymer/r-best-practice-mcp/actions)
    - Watch the `publish.yml` workflow
    - It will:
      - Build and test
@@ -164,7 +164,7 @@ When you push a version tag, the `.github/workflows/publish.yml` workflow automa
 
    - Check [npm package page](https://www.npmjs.com/package/r-best-practices-mcp)
    - Check [Docker Hub repository](https://hub.docker.com/r/yourusername/r-best-practices-mcp)
-   - Check [GitHub Releases](https://github.com/yourusername/r-coding-mcp/releases)
+   - Check [GitHub Releases](https://github.com/alexseymer/r-best-practice-mcp/releases)
 
 ### Pre-release Publishing
 

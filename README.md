@@ -1,7 +1,7 @@
 # R Best Practices MCP Server
 
-[![Build](https://github.com/alexseymer/r-coding-mcp/actions/workflows/build.yaml/badge.svg)](https://github.com/alexseymer/r-coding-mcp/actions/workflows/build.yaml)
-[![Publish](https://github.com/alexseymer/r-coding-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/alexseymer/r-coding-mcp/actions/workflows/publish.yml)
+[![Build](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/test.yml)
+[![Publish](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/alexseymer/r-best-practice-mcp/actions/workflows/publish.yml)
 [![npm](https://img.shields.io/npm/v/r-best-practices-mcp.svg)](https://www.npmjs.com/package/r-best-practices-mcp)
 [![Docker Pulls](https://img.shields.io/docker/pulls/alexseymer/r-best-practices-mcp.svg)](https://hub.docker.com/r/alexseymer/r-best-practices-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -131,8 +131,8 @@ npm install -g r-best-practices-mcp
 
 ```bash
 # Clone the repository
-git clone https://github.com/alexseymer/r-coding-mcp.git
-cd r-coding-mcp
+git clone https://github.com/alexseymer/r-best-practice-mcp.git
+cd r-best-practice-mcp
 
 # Install dependencies
 npm install
@@ -184,8 +184,8 @@ docker run -d \
 
 ```bash
 # Clone and deploy with Docker Compose
-git clone https://github.com/alexseymer/r-coding-mcp.git
-cd r-coding-mcp
+git clone https://github.com/alexseymer/r-best-practice-mcp.git
+cd r-best-practice-mcp
 
 # Start the API server
 docker-compose up -d
@@ -749,8 +749,8 @@ MIT License
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/alexseymer/r-coding-mcp/issues)
-- **Questions**: [GitHub Discussions](https://github.com/alexseymer/r-coding-mcp/discussions)
+- **Issues**: [GitHub Issues](https://github.com/alexseymer/r-best-practice-mcp/issues)
+- **Questions**: [GitHub Discussions](https://github.com/alexseymer/r-best-practice-mcp/discussions)
 - **Security**: Email alexseymer@gmail.com with security concerns
 - **Publishing**: [PUBLISH.md](./PUBLISH.md)
 - **Versioning**: [docs/versioning.md](./docs/versioning.md)
