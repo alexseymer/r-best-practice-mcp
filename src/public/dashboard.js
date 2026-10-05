@@ -216,7 +216,13 @@
           aborted.aborted = true;
           throw aborted;
         }
-        throw new Error('Cannot reach the server. Is it still running?');
+        /* No HTTP response at all: say what the browser reported, so a user can tell a dropped connection
+           or a blocker from a server that is down. */
+        var reason = (err && err.message) || 'unknown error';
+        var size = opts.body ? ' while sending ' + Math.max(1, Math.round(opts.body.length / 1024)) + ' KB' : '';
+        var offline = typeof navigator !== 'undefined' && navigator.onLine === false ? ' Your browser reports it is offline.' : '';
+        if (typeof console !== 'undefined') console.error('[dashboard] request failed:', method, url, err);
+        throw new Error('Cannot reach the server (' + reason + size + ').' + offline + ' Try again; if it keeps happening the connection is being dropped before the app answers.');
       },
     );
   }
