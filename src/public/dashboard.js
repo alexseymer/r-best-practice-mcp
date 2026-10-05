@@ -528,7 +528,8 @@
     updateFiltersBadge();
   }
 
-  function runAudit(path, workflow) {
+  /* upload (optional): { files, button } sends an uploaded project to /api/validate-upload; path is then its label. */
+  function runAudit(path, workflow, upload) {
     clearAlert();
     if (!path) {
       showAlert('Enter the path of the project folder first.');
@@ -539,13 +540,13 @@
       showAlert(read.error);
       return Promise.resolve();
     }
-    var btn = $('audit-btn');
+    var btn = upload ? upload.button : $('audit-btn');
     setBusy(btn, true, 'Auditing…');
-    var body = Object.assign({ path: path }, read.filters);
+    var body = Object.assign(upload ? { files: upload.files } : { path: path }, read.filters);
     if (workflow) body.workflow = workflow;
-    return api('POST', '/api/validate-project', body).then(
+    return api('POST', upload ? '/api/validate-upload' : '/api/validate-project', body).then(
       function (result) {
-        rememberPath(path);
+        if (!upload) rememberPath(path);
         state.audit = { kind: 'project', target: path, result: result, filters: read.filters };
         state.sevFilter = {};
         $('finding-category').value = '';
@@ -848,7 +849,7 @@
     );
   }
 
-  function renderDetect(path, result) {
+  function renderDetect(path, result, uploaded) {
     var box = $('detect-result');
     clear(box);
     var known = WORKFLOWS.some(function (w) { return w.id === result.workflow; });
@@ -889,9 +890,10 @@
                 class: 'px-3 py-1.5 rounded-lg bg-primary text-white text-label-md font-label-md font-semibold hover:opacity-90',
                 text: 'Validate as ' + workflowLabel(result.workflow),
                 onclick: function () {
-                  setSharedPath(path);
                   $('audit-workflow').value = result.workflow;
                   showTab('validate');
+                  if (uploaded) return runUploadAudit(result.workflow);
+                  setSharedPath(path);
                   runAudit(path, result.workflow);
                 },
               }),
@@ -1293,6 +1295,415 @@
     });
   }
 
+  /* ---------- upload a project from the browser (POST /api/validate-upload) ---------- */
+
+  /* Directories that are build output or dependency caches; never read or sent. */
+  var UPLOAD_SKIP_DIRS = ['node_modules', '.git', 'renv', '_book', '_site'];
+  var UPLOAD_MAX_DEPTH = 20;
+  var UPLOAD_WALK_LIMIT = 20000;
+  var UPLOAD_READ_BATCH = 25;
+  var UPLOAD_PRIVACY_NOTE = 'Your files are sent to the server for analysis and deleted immediately; nothing is stored.';
+
+  /* Shared by the Validate and Detect panels: { name, entries: [{ path, file }], bytes, skipped, error }. */
+  var uploadSel = null;
+  var uploadUis = [];
+  var uploadRunning = false;
+
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1).replace(/\.0$/, '') + ' KB';
+    return (n / (1024 * 1024)).toFixed(1).replace(/\.0$/, '') + ' MB';
+  }
+
+  function hasControlChars(text) {
+    for (var i = 0; i < text.length; i++) {
+      var c = text.charCodeAt(i);
+      if (c < 32 || c === 127) return true;
+    }
+    return false;
+  }
+
+  function uploadNameAllowed(name, cfg) {
+    if (cfg.allowedFileNames.indexOf(name) >= 0) return true;
+    var dot = name.lastIndexOf('.');
+    return dot > 0 && cfg.allowedExtensions.indexOf(name.slice(dot).toLowerCase()) >= 0;
+  }
+
+  /* Filters picked files against the server's limits. items: [{ path: 'folder/R/a.R', file: File }]. */
+  function buildUploadSelection(items, cfg, truncated) {
+    var sel = { name: 'selected files', entries: [], bytes: 0, skipped: 0, error: '' };
+    if (!cfg || !cfg.upload) {
+      sel.error = 'Cannot reach the server to read the upload limits. Reload the page and try again.';
+      return sel;
+    }
+    var limits = cfg.upload;
+    if (truncated) {
+      sel.error = 'That folder holds more than ' + UPLOAD_WALK_LIMIT + ' entries. Choose the project folder itself, not a parent directory.';
+      return sel;
+    }
+    var first = items.length ? items[0].path.split('/')[0] : '';
+    var common =
+      items.length > 0 &&
+      items.every(function (it) {
+        var parts = it.path.split('/');
+        return parts.length > 1 && parts[0] === first;
+      });
+    if (common) sel.name = first;
+    else if (items.length === 1) sel.name = items[0].path;
+    var tooBig = 0;
+    items.forEach(function (it) {
+      var path = common ? it.path.slice(first.length + 1) : it.path;
+      var parts = path.split('/');
+      var dirs = parts.slice(0, -1);
+      var bad =
+        !path ||
+        path.length > limits.maxPathLength ||
+        parts.length > UPLOAD_MAX_DEPTH ||
+        hasControlChars(path) ||
+        parts.some(function (p) { return p === '' || p === '.' || p === '..'; });
+      var skippedDir = dirs.some(function (d) { return UPLOAD_SKIP_DIRS.indexOf(d) >= 0; });
+      if (bad || skippedDir || !uploadNameAllowed(parts[parts.length - 1], limits)) {
+        sel.skipped++;
+      } else if (it.file.size > limits.maxFileBytes) {
+        sel.skipped++;
+        tooBig++;
+      } else {
+        sel.entries.push({ path: path, file: it.file });
+        sel.bytes += it.file.size;
+      }
+    });
+    sel.tooBig = tooBig;
+    if (sel.entries.length === 0) {
+      sel.error =
+        'No supported files found (' + plural(items.length, 'file') + ' selected, ' + sel.skipped + ' skipped). Supported: ' +
+        limits.allowedExtensions.join(' ') + ' and files such as DESCRIPTION, NAMESPACE or .Rprofile.' +
+        (tooBig ? ' ' + plural(tooBig, 'file') + ' larger than ' + formatBytes(limits.maxFileBytes) + ' ' + (tooBig === 1 ? 'was' : 'were') + ' skipped.' : '');
+    } else if (sel.entries.length > limits.maxFiles) {
+      sel.error =
+        'Too many files: ' + sel.entries.length + ' supported files selected, the limit is ' + limits.maxFiles +
+        '. Choose a smaller folder or the project root without data and build folders.';
+    } else if (sel.bytes > limits.maxTotalBytes) {
+      sel.error =
+        'Too much text: ' + formatBytes(sel.bytes) + ' selected, the limit is ' + formatBytes(limits.maxTotalBytes) +
+        '. Choose a smaller folder.';
+    }
+    return sel;
+  }
+
+  function uploadSummary(sel) {
+    var text = plural(sel.entries.length, 'file') + ', ' + formatBytes(sel.bytes);
+    if (sel.skipped) {
+      text += ' (' + sel.skipped + ' skipped' + (sel.tooBig ? ', ' + sel.tooBig + ' too large' : '') + ')';
+    }
+    return text;
+  }
+
+  function setUploadSelection(items, truncated) {
+    return getConfig().then(function (cfg) {
+      uploadSel = buildUploadSelection(items, cfg, truncated);
+      renderUploadUis();
+    });
+  }
+
+  function readDirEntries(reader) {
+    return new Promise(function (resolve) {
+      var all = [];
+      (function next() {
+        reader.readEntries(
+          function (batch) {
+            if (!batch.length) return resolve(all);
+            all = all.concat(Array.prototype.slice.call(batch));
+            next();
+          },
+          function () { resolve(all); }
+        );
+      })();
+    });
+  }
+
+  function walkEntry(entry, out, budget) {
+    if (budget.n > UPLOAD_WALK_LIMIT) {
+      budget.truncated = true;
+      return Promise.resolve();
+    }
+    budget.n++;
+    var rel = String(entry.fullPath || entry.name).replace(/^\/+/, '');
+    if (entry.isFile) {
+      return new Promise(function (resolve) {
+        entry.file(function (f) { out.push({ path: rel, file: f }); resolve(); }, function () { resolve(); });
+      });
+    }
+    if (entry.isDirectory) {
+      if (UPLOAD_SKIP_DIRS.indexOf(entry.name) >= 0) return Promise.resolve();
+      return readDirEntries(entry.createReader()).then(function (children) {
+        return Promise.all(children.map(function (c) { return walkEntry(c, out, budget); }));
+      });
+    }
+    return Promise.resolve();
+  }
+
+  /* Folder drag-and-drop: entries must be taken synchronously, the rest is asynchronous. */
+  function handleDrop(dt) {
+    var entries = [];
+    Array.prototype.slice.call(dt.items || []).forEach(function (it) {
+      var en = it.webkitGetAsEntry && it.webkitGetAsEntry();
+      if (en) entries.push(en);
+    });
+    if (!entries.length) {
+      var plain = Array.prototype.slice.call(dt.files || []).map(function (f) { return { path: f.name, file: f }; });
+      return setUploadSelection(plain, false);
+    }
+    var out = [];
+    var budget = { n: 0, truncated: false };
+    return Promise.all(entries.map(function (en) { return walkEntry(en, out, budget); })).then(function () {
+      return setUploadSelection(out, budget.truncated);
+    });
+  }
+
+  /* Reads the selected files in small batches; resolves to [{ path, content }]. */
+  function readUploadFiles(entries) {
+    var out = [];
+    var i = 0;
+    function next() {
+      if (i >= entries.length) return Promise.resolve(out);
+      var slice = entries.slice(i, i + UPLOAD_READ_BATCH);
+      i += UPLOAD_READ_BATCH;
+      return Promise.all(
+        slice.map(function (e) {
+          return e.file.text().then(function (content) { return { path: e.path, content: content }; });
+        })
+      ).then(function (done) {
+        out = out.concat(done);
+        return next();
+      });
+    }
+    return next();
+  }
+
+  function findUploadUi(kind) {
+    for (var i = 0; i < uploadUis.length; i++) if (uploadUis[i].kind === kind) return uploadUis[i];
+    return null;
+  }
+
+  function uploadReady() {
+    return !!uploadSel && !uploadSel.error && uploadSel.entries.length > 0;
+  }
+
+  function runUploadAudit(workflowOverride) {
+    clearAlert();
+    var ui = findUploadUi('audit');
+    if (!uploadReady() || !ui) {
+      showAlert('Choose a project folder first.');
+      return Promise.resolve();
+    }
+    var sel = uploadSel;
+    var workflow = workflowOverride !== undefined ? workflowOverride : $('audit-workflow').value;
+    uploadRunning = true;
+    renderUploadUis();
+    return readUploadFiles(sel.entries)
+      .then(
+        function (files) {
+          return runAudit(sel.name, workflow, { files: files, button: ui.runBtn });
+        },
+        function () {
+          showAlert('Some files could not be read. Select the folder again and retry.');
+        }
+      )
+      .then(function () {
+        uploadRunning = false;
+        renderUploadUis();
+      });
+  }
+
+  function runUploadDetect() {
+    clearAlert();
+    var ui = findUploadUi('detect');
+    if (!uploadReady() || !ui) {
+      showAlert('Choose a project folder first.');
+      return Promise.resolve();
+    }
+    var sel = uploadSel;
+    uploadRunning = true;
+    renderUploadUis();
+    return readUploadFiles(sel.entries)
+      .then(function (files) {
+        setBusy(ui.runBtn, true, 'Detecting…');
+        return api('POST', '/api/validate-upload', { files: files, detectOnly: true });
+      })
+      .then(
+        function (data) {
+          setBusy(ui.runBtn, false);
+          renderDetect(sel.name + ' (uploaded)', data.detected, true);
+        },
+        function (err) {
+          setBusy(ui.runBtn, false);
+          showAlert(err.message);
+        }
+      )
+      .then(function () {
+        uploadRunning = false;
+        renderUploadUis();
+      });
+  }
+
+  function renderUploadUis() {
+    uploadUis.forEach(function (ui) { ui.render(); });
+  }
+
+  /* kind: 'audit' (Validate panel) or 'detect' (Detect panel). */
+  function createUploadSection(kind) {
+    var detect = kind === 'detect';
+    var headingId = 'upload-heading-' + kind;
+    var dirInput = h('input', { type: 'file', hidden: true, multiple: true, webkitdirectory: true, 'aria-label': 'Project folder', 'data-upload-input': 'dir-' + kind });
+    var filesInput = h('input', { type: 'file', hidden: true, multiple: true, 'aria-label': 'Project files', 'data-upload-input': 'files-' + kind });
+    var statusEl = h('p', { class: 'text-body-sm font-body-sm text-on-surface break-words', role: 'status', 'aria-live': 'polite', 'data-el': 'upload-status-' + kind });
+    var errorEl = h('p', { class: 'hidden text-body-sm font-body-sm text-red-700 break-words', role: 'alert', 'data-el': 'upload-error-' + kind });
+    var runBtn = h(
+      'button',
+      {
+        type: 'button',
+        disabled: true,
+        'data-el': 'upload-run-' + kind,
+        class: 'w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed',
+        onclick: detect ? runUploadDetect : function () { runUploadAudit(); },
+      },
+      [icon(detect ? 'radar' : 'play_circle', 20), h('span', { 'data-el': 'upload-' + kind + '-run-label', text: detect ? 'Detect workflow' : 'Run project audit' })]
+    );
+    var chooseBtn = h('button', {
+      type: 'button',
+      'data-el': 'upload-choose-' + kind,
+      class: 'px-3 py-2 rounded-lg border border-primary text-primary font-semibold hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-r-accent/40',
+      text: 'Choose a project folder',
+      onclick: function () { dirInput.click(); },
+    });
+    var filesBtn = h('button', {
+      type: 'button',
+      'data-el': 'upload-files-' + kind,
+      class: 'px-2.5 py-1 rounded-lg text-label-md font-label-md text-secondary hover:underline focus:outline-none focus:ring-2 focus:ring-r-accent/40',
+      text: 'or select individual files',
+      onclick: function () { filesInput.click(); },
+    });
+    var drop = h('div', { class: 'rounded-lg border-2 border-dashed border-border-strong bg-white px-4 py-5 text-center space-y-2', 'data-el': 'upload-drop-' + kind }, [
+      h('p', { class: 'text-body-sm font-body-sm text-secondary', text: 'Drag a project folder here, or' }),
+      h('div', { class: 'flex flex-wrap items-center justify-center gap-2' }, [chooseBtn, filesBtn]),
+    ]);
+    var root = h(
+      'section',
+      { 'aria-labelledby': headingId, 'data-upload': kind, class: 'rounded-xl p-5 border border-border-subtle bg-surface-canvas space-y-3' },
+      [
+        h('div', { class: 'flex items-center gap-2' }, [
+          h('span', { class: 'material-symbols-outlined text-primary text-[20px]', 'aria-hidden': 'true', text: 'upload_file' }),
+          h('h2', { id: headingId, class: 'text-headline-sm font-headline-sm text-on-surface', text: detect ? 'Upload a project to detect it' : 'Upload a project' }),
+        ]),
+        h('p', { class: 'text-label-sm font-label-sm text-secondary', text: 'Check a project that lives on your computer. ' + UPLOAD_PRIVACY_NOTE }),
+        drop,
+        dirInput,
+        filesInput,
+        statusEl,
+        errorEl,
+        runBtn,
+      ]
+    );
+
+    function fromInput(input) {
+      var items = Array.prototype.slice.call(input.files || []).map(function (f) {
+        return { path: f.webkitRelativePath || f.name, file: f };
+      });
+      input.value = '';
+      if (items.length) setUploadSelection(items, false);
+    }
+    dirInput.addEventListener('change', function () { fromInput(dirInput); });
+    filesInput.addEventListener('change', function () { fromInput(filesInput); });
+
+    var dragClass = ['border-primary', 'bg-surface-container-low'];
+    function setDrag(on) {
+      dragClass.forEach(function (c) { drop.classList.toggle(c, on); });
+    }
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); setDrag(true); });
+    });
+    drop.addEventListener('dragleave', function () { setDrag(false); });
+    drop.addEventListener('drop', function (e) {
+      e.preventDefault();
+      setDrag(false);
+      if (e.dataTransfer) handleDrop(e.dataTransfer);
+    });
+
+    var ui = {
+      kind: kind,
+      root: root,
+      runBtn: runBtn,
+      render: function () {
+        var sel = uploadSel;
+        errorEl.classList.toggle('hidden', !(sel && sel.error));
+        errorEl.textContent = sel && sel.error ? sel.error : '';
+        statusEl.textContent = sel && !sel.error ? 'Selected ' + sel.name + ': ' + uploadSummary(sel) : '';
+        runBtn.disabled = uploadRunning || !uploadReady();
+      },
+      setPrimary: function (on) {
+        ['border-2', 'border-primary'].forEach(function (c) { root.classList.toggle(c, on); });
+        root.classList.toggle('border', !on);
+        root.classList.toggle('border-border-subtle', !on);
+      },
+    };
+    uploadUis.push(ui);
+    return ui;
+  }
+
+  /* Server-path forms: explain the restriction and, when restricted, tuck them away. */
+  function adaptServerPathForm(kind, cfg) {
+    var input = document.getElementById(kind + '-path');
+    var form = document.querySelector('[data-form="' + kind + '"]');
+    if (!input || !form) return;
+    var field = input.parentElement;
+    var roots = (cfg.serverPaths.roots || []).join(', ') || 'none configured';
+    var helpText = 'Server paths are limited to: ' + roots + '.';
+    var help = field.querySelector('p');
+    if (help) help.textContent = helpText;
+    else field.appendChild(h('p', { class: 'text-label-sm font-label-sm text-secondary', text: helpText }));
+
+    var summary = h('summary', { class: 'cursor-pointer text-label-md font-label-md text-on-surface font-semibold', text: 'Advanced: analyse a folder on the server' });
+    var details = h('details', { class: 'rounded-lg border border-border-subtle bg-white px-3 py-2 space-y-2', 'data-el': 'server-path-' + kind }, [summary]);
+    field.parentNode.insertBefore(details, field);
+    details.appendChild(field);
+
+    var label = kind === 'audit' ? $('audit-btn-label') : $('detect-btn');
+    if (label) label.textContent = kind === 'audit' ? 'Run audit on server folder' : 'Detect workflow on server folder';
+
+    /* An empty path with the section collapsed opens it instead of failing with an alert. */
+    document.addEventListener(
+      'submit',
+      function (e) {
+        if (e.target !== form || input.value.trim()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        details.open = true;
+        input.focus();
+      },
+      true
+    );
+  }
+
+  function initUpload() {
+    var auditForm = document.querySelector('[data-form="audit"]');
+    var detectField = document.getElementById('detect-path');
+    if (!auditForm || !detectField) return;
+    auditForm.parentNode.insertBefore(createUploadSection('audit').root, auditForm);
+    var detectFieldWrap = detectField.parentElement;
+    detectFieldWrap.parentNode.insertBefore(createUploadSection('detect').root, detectFieldWrap);
+
+    getConfig().then(function (cfg) {
+      if (!cfg || !cfg.serverPaths) return;
+      var restricted = cfg.serverPaths.unrestricted === false;
+      var local = ['localhost', '127.0.0.1', '[::1]', '::1', ''].indexOf(window.location.hostname) >= 0;
+      uploadUis.forEach(function (ui) { ui.setPrimary(restricted || !local); });
+      if (restricted) {
+        adaptServerPathForm('audit', cfg);
+        adaptServerPathForm('detect', cfg);
+      }
+    });
+  }
+
   /* ---------- wiring ---------- */
 
   function pathFrom(form) {
@@ -1392,6 +1803,7 @@
       if (el && actions[el.getAttribute('data-action')]) actions[el.getAttribute('data-action')]();
     });
 
+    initUpload();
     routeFromHash();
     refreshStatus();
     loadPractices();

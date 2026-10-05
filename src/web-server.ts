@@ -22,6 +22,7 @@ import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
 import { metricsAccess } from './middleware/metrics-access.js';
 import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+import { registerUploadRoutes } from './routes/upload.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
@@ -293,6 +294,9 @@ export class RPracticesWebServer {
         this.handleValidateFile(req, res)
       );
     }
+
+    // Browser uploads (own JSON parser, see LARGE_BODY_ROUTES)
+    registerUploadRoutes(this.app, { validator: this.validator, detector: this.detector });
 
     // Get practice
     this.app.get('/api/practice/:id', (req: Request, res: Response) => {

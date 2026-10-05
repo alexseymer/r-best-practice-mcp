@@ -349,6 +349,146 @@ function check(name, ok, extra) {
     check('View practice opens card', await page.locator('#panel-practices').evaluate((e) => !e.hidden));
   }
 
+  // ---- Upload a project (browser folder -> /api/validate-upload)
+  {
+    const cfg = await page.evaluate(async (base) => (await (await fetch(base + '/api/config')).json()).data, BASE_URL);
+    const mk = (root, files) => {
+      for (const [rel, content] of Object.entries(files)) {
+        const p = path.join(root, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, content);
+      }
+      return root;
+    };
+    const UP = mk(path.join(OUT, 'uploadpkg'), {
+      DESCRIPTION: 'Package: uploadpkg\nVersion: 0.1.0\n',
+      NAMESPACE: 'export(f)\n',
+      'R/a.R': 'f <- function(x) {\n  x+1\n}\n',
+      'node_modules/dep/x.R': 'ignored <- 1\n',
+      'data/logo.png': 'not text',
+    });
+    const BIG = mk(path.join(OUT, 'bigfolder'), { 'R/big.R': '#'.repeat(cfg.upload.maxFileBytes + 10) });
+    const BIN = mk(path.join(OUT, 'binfolder'), { 'img/logo.png': 'x', 'bin/tool.exe': 'x' });
+    const MANY = path.join(OUT, 'manyfolder');
+    for (let i = 0; i <= cfg.upload.maxFiles; i++) mk(MANY, { ['R/f' + i + '.R']: 'x <- ' + i + '\n' });
+
+    await page.click('#tab-validate');
+    const section = page.locator('[data-upload="audit"]');
+    check('upload section visible in Validate panel', await section.isVisible());
+    check('upload section sits above the server-path form', await page.evaluate(() => {
+      const s = document.querySelector('[data-upload="audit"]');
+      const f = document.querySelector('[data-form="audit"]');
+      return !!(s.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }));
+    check('privacy statement shown', /sent to the server for analysis and deleted immediately; nothing is stored/.test(await section.textContent()));
+    check('choose-folder button labelled', (await page.textContent('[data-el="upload-choose-audit"]')).trim() === 'Choose a project folder');
+    check('directory input has webkitdirectory', await page.locator('[data-upload-input="dir-audit"]').evaluate((e) => e.hasAttribute('webkitdirectory') && e.multiple));
+    check('run button disabled before a selection', await page.locator('[data-el="upload-run-audit"]').isDisabled());
+
+    // keyboard: the button opens the file chooser
+    await page.focus('[data-el="upload-choose-audit"]');
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')]);
+    check('choose button is keyboard operable (opens a directory chooser)', !!chooser && chooser.isMultiple());
+    await chooser.setFiles(UP);
+
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent), null, { timeout: 8000 });
+    const status = await page.textContent('[data-el="upload-status-audit"]');
+    check('summary counts files, size and skipped', /uploadpkg: 3 files, [\d.]+ B \(2 skipped\)/.test(status), status);
+    check('status is an aria-live region', (await page.getAttribute('[data-el="upload-status-audit"]', 'aria-live')) === 'polite');
+    check('run button enabled after selection', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+
+    await page.selectOption('[data-el="audit-workflow"]', '');
+    const [upReq] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-audit"]'),
+    ]);
+    const sent = JSON.parse(upReq.postData());
+    check('upload sends relative paths without node_modules or binaries', JSON.stringify(sent.files.map((f) => f.path).sort()) === JSON.stringify(['DESCRIPTION', 'NAMESPACE', 'R/a.R']), JSON.stringify(sent.files.map((f) => f.path)));
+    check('upload sends file contents', sent.files.find((f) => f.path === 'R/a.R').content.includes('x+1'));
+    await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    const upFindings = await page.locator('[data-el="findings"] article').count();
+    check('uploaded project renders findings through the existing renderer', upFindings > 0, upFindings + ' findings');
+    const upSummary = await page.textContent('[data-el="findings-summary"]');
+    check('uploaded audit summary names the folder and workflow', /uploadpkg/.test(upSummary) && /R package/.test(upSummary), upSummary);
+    check('findings show relative locations only', !(await page.textContent('[data-el="findings"]')).includes('rbp-upload-'));
+    await page.waitForFunction(() => !document.querySelector('[data-el="upload-run-audit"]').disabled);
+    check('run button usable again after the audit', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+
+    // filters from the form are applied to the upload
+    await page.locator('[data-el="audit-filters"] summary').click();
+    await page.fill('#filter-max', '1');
+    const [capped] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-audit"]'),
+    ]);
+    check('upload request carries the filter values', JSON.parse(capped.postData()).maxFindings === 1);
+    await page.waitForFunction(() => document.querySelectorAll('[data-el="findings"] article').length === 1, null, { timeout: 8000 }).then(() => check('maxFindings applied to upload', true), () => check('maxFindings applied to upload', false));
+    await page.click('[data-action="reset-filters"]');
+    await page.locator('[data-el="audit-filters"] summary').click();
+
+    // error handling
+    await page.setInputFiles('[data-upload-input="dir-audit"]', BIG);
+    await page.waitForFunction(() => document.querySelector('[data-el="upload-error-audit"]').textContent.length > 0);
+    const bigErr = await page.textContent('[data-el="upload-error-audit"]');
+    check('oversize file is skipped with a clear message', /No supported files/.test(bigErr) && /larger than/.test(bigErr), bigErr);
+    check('error is announced (role=alert) and run is disabled', (await page.getAttribute('[data-el="upload-error-audit"]', 'role')) === 'alert' && (await page.locator('[data-el="upload-run-audit"]').isDisabled()));
+    await page.setInputFiles('[data-upload-input="dir-audit"]', BIN);
+    await page.waitForFunction(() => /No supported files/.test(document.querySelector('[data-el="upload-error-audit"]').textContent));
+    check('unsupported-only selection explains itself', /2 skipped/.test(await page.textContent('[data-el="upload-error-audit"]')), await page.textContent('[data-el="upload-error-audit"]'));
+    await page.setInputFiles('[data-upload-input="dir-audit"]', MANY);
+    await page.waitForFunction(() => /Too many files/.test(document.querySelector('[data-el="upload-error-audit"]').textContent));
+    const manyErr = await page.textContent('[data-el="upload-error-audit"]');
+    check('too many files shows the numbers', manyErr.includes(String(cfg.upload.maxFiles + 1)) && manyErr.includes(String(cfg.upload.maxFiles)), manyErr);
+    check('previous summary cleared on error', (await page.textContent('[data-el="upload-status-audit"]')) === '');
+
+    // server errors surface in the alert banner and nothing stays stuck
+    await page.setInputFiles('[data-upload-input="dir-audit"]', UP);
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent));
+    await page.route('**/api/validate-upload', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: true, code: 'BUSY', message: 'The server is busy analysing other uploads. Try again shortly.' }) }));
+    await page.click('[data-el="upload-run-audit"]');
+    await page.waitForFunction(() => !document.querySelector('[data-el="alert"]').classList.contains('hidden'));
+    check('503 BUSY message shown', /busy/.test(await page.textContent('[data-el="alert-text"]')), await page.textContent('[data-el="alert-text"]'));
+    await page.unroute('**/api/validate-upload');
+    check('run button re-enabled after a failed upload', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+    await page.click('[data-action="dismiss-alert"]');
+
+    // drag and drop (plain-files fallback; folder entries use the same selection code as the directory input)
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['Package: dropped\nVersion: 0.1.0\n'], 'DESCRIPTION'));
+      dt.items.add(new File(['x <- 1\n'], 'a.R'));
+      document.querySelector('[data-el="upload-drop-audit"]').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    await page.waitForFunction(() => /2 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent), null, { timeout: 5000 }).then(() => check('dropping files selects them', true), () => check('dropping files selects them', false));
+
+    // Detect panel
+    await page.click('#tab-detect');
+    check('upload option in Detect panel', await page.locator('[data-upload="detect"]').isVisible());
+    await page.setInputFiles('[data-upload-input="dir-detect"]', UP);
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-detect"]').textContent));
+    const [detReq] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-detect"]'),
+    ]);
+    check('detect upload asks for detection only', JSON.parse(detReq.postData()).detectOnly === true);
+    await page.waitForFunction(() => /\(uploaded\)/.test(document.querySelector('[data-el="detect-result"]').textContent), null, { timeout: 8000 });
+    const upDetect = await page.textContent('[data-el="detect-result"]');
+    check('detect upload shows the workflow and confidence', /R package/.test(upDetect) && /\d+%/.test(upDetect) && /uploadpkg \(uploaded\)/.test(upDetect), upDetect.replace(/\s+/g, ' ').slice(0, 120));
+    await page.click('text=Validate as R package');
+    await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    check('detect upload -> validate handoff audits the upload', (await page.locator('#panel-validate').evaluate((e) => !e.hidden)) && (await page.locator('[data-el="findings"] article').count()) > 0);
+
+    // server-path forms follow the deployment mode
+    const helpText = await page.textContent('#audit-path >> xpath=../p');
+    if (cfg.serverPaths.unrestricted) {
+      check('unrestricted: server path help unchanged and form not collapsed', /Absolute path on the machine/.test(helpText) && (await page.locator('[data-el="server-path-audit"]').count()) === 0, helpText);
+    } else {
+      check('restricted: help names the allowed roots', helpText.includes('Server paths are limited to') && cfg.serverPaths.roots.every((r) => helpText.includes(r)), helpText);
+      check('restricted: server form collapsed under Advanced', (await page.locator('[data-el="server-path-audit"]').count()) === 1 && !(await page.locator('[data-el="server-path-audit"]').evaluate((e) => e.open)) && /Advanced: analyse a folder on the server/.test(await page.textContent('[data-el="server-path-audit"] summary')));
+      check('restricted: upload section is the primary option', await page.locator('[data-upload="audit"]').evaluate((e) => e.classList.contains('border-primary')));
+    }
+  }
+
   // ---- System
   await page.click('#tab-system');
   await page.waitForSelector('[data-el="health-grid"] dd');
