@@ -3,21 +3,17 @@ import { Request, Response, NextFunction } from 'express';
 /**
  * Content-Security-Policy directives, one constant per page family.
  *
- * DASHBOARD_CSP allows exactly what `src/public/dashboard.html` loads today:
- * - script: same origin, the inline Tailwind config script and `cdn.tailwindcss.com`
- * - style: same origin, inline styles (Tailwind's runtime injects <style>) and Google Fonts CSS
- * - font: `fonts.gstatic.com`
- * - img: same origin and `data:`
- * - connect: same origin (the dashboard only calls its own API)
- *
- * When the third-party assets are self-hosted, remove `cdn.tailwindcss.com`, `fonts.googleapis.com`
- * and `fonts.gstatic.com` here (and `'unsafe-inline'` once Tailwind is precompiled).
+ * Everything the dashboard and the API docs load is self-hosted (precompiled Tailwind CSS, woff2 fonts,
+ * SVG icon sprite, swagger-ui-dist), so every fetch directive is 'self' only: no third-party origins, no
+ * 'unsafe-inline' and no 'unsafe-eval'. The pages contain no inline <script>/<style> and no inline event
+ * handler or style attributes; dashboard.js applies dynamic styles through the CSSOM (element.style), which CSP
+ * allows. `data:` is allowed for images only (swagger-ui-dist embeds small data: URI images).
  */
 export const DASHBOARD_CSP: Readonly<Record<string, readonly string[]>> = {
   'default-src': ["'self'"],
-  'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com'],
-  'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-  'font-src': ['https://fonts.gstatic.com'],
+  'script-src': ["'self'"],
+  'style-src': ["'self'"],
+  'font-src': ["'self'"],
   'img-src': ["'self'", 'data:'],
   'connect-src': ["'self'"],
   'object-src': ["'none'"],
@@ -26,12 +22,8 @@ export const DASHBOARD_CSP: Readonly<Record<string, readonly string[]>> = {
   'frame-ancestors': ["'none'"],
 };
 
-/** `/api-docs` (Swagger UI) additionally loads its script and stylesheet from cdn.jsdelivr.net. */
-export const API_DOCS_CSP: Readonly<Record<string, readonly string[]>> = {
-  ...DASHBOARD_CSP,
-  'script-src': [...DASHBOARD_CSP['script-src'], 'https://cdn.jsdelivr.net'],
-  'style-src': [...DASHBOARD_CSP['style-src'], 'https://cdn.jsdelivr.net'],
-};
+/** `/api-docs` (Swagger UI) is served from the same origin too, so it uses the same policy. */
+export const API_DOCS_CSP: Readonly<Record<string, readonly string[]>> = DASHBOARD_CSP;
 
 /** Path -> policy overrides; every other path uses DASHBOARD_CSP. */
 export const CSP_BY_PATH: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {

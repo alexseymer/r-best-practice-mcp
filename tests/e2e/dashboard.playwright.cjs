@@ -12,9 +12,10 @@
  *   PLAYWRIGHT_MODULE  path of the playwright package (default /opt/node22/lib/node_modules/playwright,
  *                      falls back to a normal require('playwright'))
  *   CHROMIUM_PATH      chromium executable (default /opt/pw-browsers/chromium-1194/chrome-linux/chrome)
- *   E2E_IGNORE_HTTPS_ERRORS  set to 1 when a TLS-intercepting proxy blocks the CDNs used by the mobile/axe checks
+ *   E2E_SHOT_DIR       directory for desktop/mobile screenshots (default: a temporary directory)
  *
- * The Tailwind CDN and Google Fonts are blocked on purpose; the dashboard logic does not need them.
+ * The dashboard is fully self-hosted (#19): every request of the whole tour must stay on the BASE_URL origin
+ * and no Content-Security-Policy violation or console warning/error may occur.
  * Downloads are written to a temporary directory. Exit code 0 = all checks passed.
  * Run it from the repository root (the Shiny example under ./examples is used for workflow detection).
  * The audit target is a deliberately incomplete R package created in a temporary directory, so the
@@ -56,11 +57,28 @@ function check(name, ok, extra) {
 (async () => {
   const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, args: ['--no-sandbox'] });
   const ctx = await browser.newContext({ acceptDownloads: true, viewport: { width: 1400, height: 1000 } });
-  const page = await ctx.newPage();
+  const BASE_ORIGIN = new URL(BASE_URL).origin;
+  const requested = [];
   const errors = [];
-  page.on('pageerror', (e) => { if (!/tailwind is not defined/.test(e.message)) errors.push('pageerror: ' + e.message); });
-  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push('console: ' + m.text()); });
-  await ctx.route(/cdn\.tailwindcss\.com|fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  const cspViolations = [];
+  // Records every network request of a context and every CSP violation / console warning / page error of its pages.
+  async function instrument(c) {
+    c.on('request', (r) => { if (/^https?:/.test(r.url())) requested.push(r.url()); });
+    await c.addInitScript(() => {
+      window.__csp = [];
+      document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
+    });
+    c.on('page', (p) => {
+      p.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+      // HTTP error statuses are provoked on purpose by the error-path checks; blocked/failed loads and CSP reports are not
+      p.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !/Failed to load resource: the server responded with a status/.test(m.text())) errors.push('console ' + m.type() + ': ' + m.text()); });
+    });
+  }
+  async function collectCsp(p) {
+    try { cspViolations.push(...(await p.evaluate(() => window.__csp || []))); } catch (e) { /* page closed or navigating */ }
+  }
+  await instrument(ctx);
+  const page = await ctx.newPage();
 
   await page.goto(BASE_URL + '/dashboard');
   await page.waitForFunction(() => document.querySelector('[data-el="status-text"]').textContent === 'Online', null, { timeout: 8000 });
@@ -572,18 +590,30 @@ function check(name, ok, extra) {
   check('favicon.ico is 200 svg (after redirect)', icoRes.status() === 200 && /image\/svg\+xml/.test(icoRes.headers()['content-type'] || ''));
   check('meta tags present', await page.evaluate(() => !!document.querySelector('meta[name="theme-color"][content="#0EA5E9"]') && !!document.querySelector('meta[property="og:title"]') && !!document.querySelector('meta[property="og:description"]') && !!document.querySelector('meta[name="twitter:card"][content="summary"]') && !!document.querySelector('link[rel="icon"][href="/favicon.svg"]')));
 
-  // ---- mobile tab bar and accessibility (#18): need the real Tailwind CDN and fonts, so a second,
-  // unblocked context is used. Skipped with a message when they cannot be loaded.
-  const liveCtx = await browser.newContext({ ignoreHTTPSErrors: !!process.env.E2E_IGNORE_HTTPS_ERRORS, viewport: { width: 1400, height: 1000 } });
+  // ---- mobile tab bar and accessibility (#18): the precompiled stylesheet and self-hosted fonts must be applied
+  const SHOT_DIR = process.env.E2E_SHOT_DIR || OUT;
+  fs.mkdirSync(SHOT_DIR, { recursive: true });
+  const liveCtx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  await instrument(liveCtx);
   const lp = await liveCtx.newPage();
   await lp.goto(BASE_URL + '/dashboard#validate');
   await lp.waitForSelector('[data-el="status-text"]');
-  const styled = await lp.waitForFunction(() => typeof window.tailwind !== 'undefined' && getComputedStyle(document.querySelector('[data-el="issue-badge"]')).display === 'none', null, { timeout: 40000 }).then(() => true, () => false);
+  const styled = await lp.evaluate(() => getComputedStyle(document.querySelector('[data-el="issue-badge"]')).display === 'none');
+  check('precompiled Tailwind CSS applied (hidden utility works)', styled);
   const TABS = ['validate', 'detect', 'generate', 'practices', 'system'];
-  if (!styled) {
-    console.log('SKIP mobile tab and axe checks: Tailwind CDN could not be loaded');
-  } else {
-    await lp.evaluate(() => document.fonts.ready);
+  {
+    const fonts = await lp.evaluate(async () => {
+      await document.fonts.load('400 14px Geist');
+      await document.fonts.load('500 13px "JetBrains Mono"');
+      return { geist: document.fonts.check('400 14px Geist'), mono: document.fonts.check('500 13px "JetBrains Mono"'), loaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family + ' ' + f.weight) };
+    });
+    check('self-hosted fonts load (Geist, JetBrains Mono)', fonts.geist && fonts.mono && fonts.loaded.length >= 2, fonts.loaded.join(', '));
+    check('body uses Geist', await lp.evaluate(() => getComputedStyle(document.body).fontFamily.startsWith('Geist')));
+    check('icons render from the SVG sprite', await lp.evaluate(() => { const uses = [...document.querySelectorAll('svg.icon use')]; return uses.length >= 10 && uses.every((u) => /^\/icons\.svg#[a-z_]+$/.test(u.getAttribute('href'))) && [...document.querySelectorAll('svg.icon')].filter((s) => s.getClientRects().length).every((s) => s.getBoundingClientRect().width > 8); }));
+    const spriteIds = await lp.evaluate(async () => { const t = await (await fetch('/icons.svg')).text(); return [...t.matchAll(/id="([a-z_]+)"/g)].map((m) => m[1]); });
+    const usedIds = await lp.evaluate(() => [...new Set([...document.querySelectorAll('svg.icon use')].map((u) => u.getAttribute('href').split('#')[1]))]);
+    check('every icon used exists in the sprite', usedIds.every((id) => spriteIds.includes(id)), usedIds.filter((id) => !spriteIds.includes(id)).join(','));
+    await lp.screenshot({ path: path.join(SHOT_DIR, 'desktop-validate.png') });
     for (const width of [320, 360, 390]) {
       await lp.setViewportSize({ width, height: 800 });
       await lp.click('#tab-validate');
@@ -596,6 +626,7 @@ function check(name, ok, extra) {
         const ok = await lp.evaluate((name) => [...document.querySelectorAll('[role="tabpanel"]')].every((p) => (p.dataset.panel === name) === !p.hidden), t);
         const overflow = await lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         check('tab ' + t + ' switches, no horizontal overflow @' + width, ok && overflow <= 0, 'overflow ' + overflow);
+        if (width === 390) await lp.screenshot({ path: path.join(SHOT_DIR, 'mobile390-' + t + '.png'), fullPage: true });
       }
     }
     await lp.setViewportSize({ width: 1400, height: 1000 });
@@ -609,7 +640,8 @@ function check(name, ok, extra) {
     }
     let axeLoaded = false;
     if (axePath) {
-      await lp.addScriptTag({ path: axePath });
+      // evaluated through the DevTools protocol: an injected <script> would (rightly) be blocked by the CSP
+      await lp.evaluate(fs.readFileSync(axePath, 'utf8'));
       axeLoaded = await lp.evaluate(() => typeof window.axe !== 'undefined');
       check('axe-core loaded into the page', axeLoaded, 'inline injection blocked?');
     }
@@ -624,7 +656,26 @@ function check(name, ok, extra) {
       }
     }
   }
+  await collectCsp(lp);
+
+  // ---- API docs: Swagger UI served locally (#19)
+  const docs = await liveCtx.newPage();
+  await docs.goto(BASE_URL + '/api-docs');
+  await docs.waitForSelector('.swagger-ui .info .title', { timeout: 15000 }).then(() => check('/api-docs renders Swagger UI from the local package', true), () => check('/api-docs renders Swagger UI from the local package', false));
+  await docs.waitForSelector('.swagger-ui .opblock', { timeout: 15000 }).then(() => check('/api-docs lists the operations of /openapi.json', true), () => check('/api-docs lists the operations of /openapi.json', false));
+  const docsCsp = (await docs.request.get(BASE_URL + '/api-docs')).headers()['content-security-policy'];
+  check('/api-docs CSP has no third-party origin or unsafe source', !!docsCsp && !/https?:|unsafe-/.test(docsCsp), docsCsp);
+  await docs.screenshot({ path: path.join(SHOT_DIR, 'desktop-api-docs.png') });
+  await collectCsp(docs);
   await liveCtx.close();
+  await collectCsp(page);
+
+  // ---- self-hosted (#19): nothing left the origin, no CSP violation
+  const external = [...new Set(requested.filter((u) => new URL(u).origin !== BASE_ORIGIN))];
+  check('no request to an external origin during the whole tour', external.length === 0, external.length ? external.join(', ') : requested.length + ' same-origin requests');
+  check('0 Content-Security-Policy violations', cspViolations.length === 0, cspViolations.join(' | '));
+  const dashCsp = (await ctx.request.get(BASE_URL + '/dashboard')).headers()['content-security-policy'];
+  check('dashboard CSP is self-only (no inline, eval or third-party sources)', !!dashCsp && !/https?:|unsafe-/.test(dashCsp), dashCsp);
 
   await page.screenshot({ path: path.join(OUT, 'shot.png'), fullPage: false });
   check('no JS errors', errors.length === 0, errors.join(' | '));

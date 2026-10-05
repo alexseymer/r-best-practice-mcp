@@ -14,165 +14,9 @@
 <meta name="twitter:description" content="Validate R projects, detect workflows, generate templates and browse best practices."/>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
 <link rel="alternate icon" href="/favicon.ico"/>
-<!-- Material Symbols Outlined -->
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<!-- Google Fonts: Geist & JetBrains Mono -->
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<!-- Tailwind CSS v3 -->
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          "colors": {
-            "error": "#ba1a1a",
-            "secondary-container": "#dae2fd",
-            "outline": "#707881",
-            "error-container": "#ffdad6",
-            "on-background": "#0b1c30",
-            "on-primary-fixed": "#001d31",
-            "on-tertiary-fixed": "#00174b",
-            "telemetry-indigo": "#6366F1",
-            "surface-card": "#FFFFFF",
-            "tertiary-fixed-dim": "#b4c5ff",
-            "surface-container-high": "#dce9ff",
-            "surface-dim": "#cbdbf5",
-            "tertiary-fixed": "#dbe1ff",
-            "outline-variant": "#bfc7d2",
-            "on-secondary": "#ffffff",
-            "surface-container": "#e5eeff",
-            "surface-bright": "#f8f9ff",
-            "on-secondary-container": "#5c647a",
-            "on-surface": "#0b1c30",
-            "primary-fixed-dim": "#93ccff",
-            "border-subtle": "#E2E8F0",
-            "telemetry-emerald": "#10B981",
-            "surface-container-lowest": "#ffffff",
-            "telemetry-rose": "#F43F5E",
-            "primary-fixed": "#cce5ff",
-            "on-primary-fixed-variant": "#004b73",
-            "surface-tint": "#006398",
-            "on-tertiary": "#ffffff",
-            "surface-canvas": "#F8FAFC",
-            "surface-variant": "#d3e4fe",
-            "secondary": "#565e74",
-            "primary-container": "#007bb9",
-            "on-primary-container": "#fdfcff",
-            "on-surface-variant": "#3f4850",
-            "primary": "#006194",
-            "telemetry-amber": "#F59E0B",
-            "surface-container-highest": "#d3e4fe",
-            "on-tertiary-container": "#fefcff",
-            "secondary-fixed-dim": "#bec6e0",
-            "r-accent": "#0EA5E9",
-            "border-strong": "#CBD5E1",
-            "inverse-surface": "#213145",
-            "on-tertiary-fixed-variant": "#003ea8",
-            "tertiary": "#0051d5",
-            "tertiary-container": "#316bf3",
-            "surface-container-low": "#eff4ff",
-            "surface": "#f8f9ff",
-            "background": "#f8f9ff",
-            "on-error-container": "#93000a",
-            "inverse-primary": "#93ccff",
-            "on-primary": "#ffffff",
-            "on-error": "#ffffff",
-            "inverse-on-surface": "#eaf1ff",
-            "on-secondary-fixed-variant": "#3f465c",
-            "secondary-fixed": "#dae2fd",
-            "on-secondary-fixed": "#131b2e"
-          },
-          "borderRadius": {
-            "DEFAULT": "0.125rem",
-            "lg": "0.25rem",
-            "xl": "0.5rem",
-            "full": "0.75rem",
-            "card": "1rem"
-          },
-          "spacing": {
-            "gutter": "1rem",
-            "space-md": "0.75rem",
-            "space-sm": "0.5rem",
-            "space-3xl": "3rem",
-            "margin-desktop": "2rem",
-            "space-xl": "1.5rem",
-            "gutter-desktop": "1.5rem",
-            "space-2xl": "2rem",
-            "space-2xs": "0.125rem",
-            "space-lg": "1rem",
-            "space-xs": "0.25rem",
-            "margin": "1rem"
-          },
-          "fontFamily": {
-            "label-sm": ["Geist"],
-            "code-md": ["JetBrains Mono"],
-            "display-lg": ["Geist"],
-            "body-md": ["Geist"],
-            "headline-md": ["Geist"],
-            "headline-lg-mobile": ["Geist"],
-            "body-lg": ["Geist"],
-            "label-md": ["Geist"],
-            "headline-sm": ["Geist"],
-            "headline-lg": ["Geist"],
-            "code-sm": ["JetBrains Mono"],
-            "body-sm": ["Geist"]
-          },
-          "fontSize": {
-            "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
-            "code-md": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
-            "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
-            "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
-            "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
-            "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
-            "body-lg": ["15px", {"lineHeight": "24px", "fontWeight": "400"}],
-            "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "500"}],
-            "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
-            "headline-lg": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.015em", "fontWeight": "600"}],
-            "code-sm": ["11px", {"lineHeight": "16px", "fontWeight": "500"}],
-            "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}]
-          }
-        },
-      },
-    }
-  </script>
-<style>
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
-      vertical-align: middle;
-      display: inline-block;
-      line-height: 1;
-    }
-    @media (max-width: 479px) {
-      /* Icon-only tabs: the label stays in the accessible name but is visually hidden. */
-      .tab-btn { flex: 1 1 0; justify-content: center; min-width: 0; }
-      .tab-btn .tab-label {
-        position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-        overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-      }
-      /* fixed box so the ligature text cannot widen the tab while the icon font loads */
-      .tab-btn .material-symbols-outlined { font-size: 22px; width: 22px; overflow: hidden; }
-    }
-    .tab-btn[aria-selected="true"] {
-      color: #006194;
-      border-bottom-color: #0EA5E9;
-      font-weight: 600;
-    }
-    .custom-scroll::-webkit-scrollbar {
-      height: 6px;
-      width: 6px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-      background: #F1F5F9;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: #CBD5E1;
-      border-radius: 4px;
-    }
-  </style>
+<link rel="preload" href="/fonts/geist-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin=""/>
+<!-- Precompiled Tailwind CSS (npm run build:css), self-hosted fonts and icon sprite: no third-party origins -->
+<link rel="stylesheet" href="/dashboard.css"/>
 </head>
 <body class="bg-surface-canvas text-on-surface antialiased min-h-screen flex flex-col font-body-md text-body-md selection:bg-r-accent selection:text-white">
 
@@ -187,20 +31,20 @@
 
     <nav role="tablist" aria-label="Dashboard sections" class="flex items-center gap-1 sm:gap-4 overflow-x-auto custom-scroll order-3 sm:order-none w-full sm:w-auto">
       <button role="tab" id="tab-validate" data-tab="validate" title="Validate" aria-controls="panel-validate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span><span class="tab-label">Validate</span>
+        <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#verified"/></svg><span class="tab-label">Validate</span>
         <span data-el="issue-badge" class="hidden px-1.5 rounded-full text-[10px] font-bold bg-surface-container text-primary"></span>
       </button>
       <button role="tab" id="tab-detect" data-tab="detect" title="Detect" aria-controls="panel-detect" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">radar</span><span class="tab-label">Detect</span>
+        <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#radar"/></svg><span class="tab-label">Detect</span>
       </button>
       <button role="tab" id="tab-generate" data-tab="generate" title="Generate" aria-controls="panel-generate" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">auto_awesome</span><span class="tab-label">Generate</span>
+        <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#auto_awesome"/></svg><span class="tab-label">Generate</span>
       </button>
       <button role="tab" id="tab-practices" data-tab="practices" title="Practices" aria-controls="panel-practices" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">menu_book</span><span class="tab-label">Practices</span>
+        <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#menu_book"/></svg><span class="tab-label">Practices</span>
       </button>
       <button role="tab" id="tab-system" data-tab="system" title="System" aria-controls="panel-system" class="tab-btn h-14 inline-flex items-center gap-1.5 px-2 border-b-2 border-transparent text-secondary hover:text-on-surface font-medium text-label-md font-label-md whitespace-nowrap transition-colors">
-        <span class="material-symbols-outlined text-[18px]" aria-hidden="true">monitor_heart</span><span class="tab-label">System</span>
+        <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#monitor_heart"/></svg><span class="tab-label">System</span>
       </button>
     </nav>
 
@@ -210,7 +54,7 @@
         <span data-el="status-text">Checking&hellip;</span>
       </button>
       <a href="https://github.com/alexseymer/r-best-practice-mcp#readme" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-canvas hover:bg-surface-container-low border border-border-subtle rounded-lg text-label-md font-label-md text-on-surface font-medium transition-colors">
-        <span class="material-symbols-outlined text-[16px] text-secondary" aria-hidden="true">menu_book</span>Docs
+        <svg class="icon text-[16px] text-secondary" aria-hidden="true"><use href="/icons.svg#menu_book"/></svg>Docs
       </a>
     </div>
   </div>
@@ -255,7 +99,7 @@
   </div>
 
   <div data-el="alert" role="alert" class="hidden mb-4 rounded-xl border border-red-200 bg-red-50 text-red-900 px-4 py-3 text-body-sm font-body-sm flex items-start gap-2">
-    <span class="material-symbols-outlined text-[18px] mt-0.5" aria-hidden="true">error</span>
+    <svg class="icon text-[18px] mt-0.5" aria-hidden="true"><use href="/icons.svg#error"/></svg>
     <span data-el="alert-text" class="flex-1 break-words"></span>
     <button type="button" data-action="dismiss-alert" class="text-red-900 hover:underline font-semibold">Dismiss</button>
   </div>
@@ -266,7 +110,7 @@
       <div class="lg:col-span-5 space-y-6">
         <form data-form="audit" class="bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
           <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">tune</span>
+            <svg class="icon text-primary text-[20px]" aria-hidden="true"><use href="/icons.svg#tune"/></svg>
             <h2 class="text-headline-sm font-headline-sm text-on-surface">Validate a project</h2>
           </div>
           <div class="space-y-1.5">
@@ -280,7 +124,7 @@
           </div>
           <details data-el="audit-filters" class="rounded-lg border border-border-subtle bg-white px-3 py-2">
             <summary class="cursor-pointer text-label-md font-label-md text-on-surface font-semibold flex items-center gap-2">
-              <span class="material-symbols-outlined text-[18px]" aria-hidden="true">filter_list</span>
+              <svg class="icon text-[18px]" aria-hidden="true"><use href="/icons.svg#filter_list"/></svg>
               Filters
               <span data-el="filters-badge" class="hidden px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 text-[11px] font-semibold"></span>
             </summary>
@@ -303,14 +147,14 @@
             </div>
           </details>
           <button type="submit" data-el="audit-btn" class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-r-accent to-primary text-white font-headline-sm text-headline-sm font-semibold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-            <span class="material-symbols-outlined text-[20px]" aria-hidden="true">play_circle</span>
+            <svg class="icon text-[20px]" aria-hidden="true"><use href="/icons.svg#play_circle"/></svg>
             <span data-el="audit-btn-label">Run project audit</span>
           </button>
         </form>
 
         <form data-form="file" class="bg-surface-card rounded-xl p-5 border border-dashed border-border-strong space-y-3" novalidate>
           <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-secondary text-[20px]" aria-hidden="true">description</span>
+            <svg class="icon text-secondary text-[20px]" aria-hidden="true"><use href="/icons.svg#description"/></svg>
             <h2 class="text-headline-sm font-headline-sm text-on-surface">Validate a single file</h2>
           </div>
           <p class="text-label-sm font-label-sm text-secondary">Check one <code class="font-code-sm">.R</code>, <code class="font-code-sm">.Rmd</code> or <code class="font-code-sm">.qmd</code> file without scanning the whole project. The filters from the project form apply here too.</p>
@@ -357,7 +201,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       <form data-form="detect" class="lg:col-span-5 bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
         <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">radar</span>
+          <svg class="icon text-primary text-[20px]" aria-hidden="true"><use href="/icons.svg#radar"/></svg>
           <h2 class="text-headline-sm font-headline-sm text-on-surface">Detect workflow</h2>
         </div>
         <p class="text-body-sm font-body-sm text-secondary">Inspects the folder structure to work out what kind of R project it is, and how confident that guess is.</p>
@@ -380,7 +224,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
       <form data-form="generate" class="lg:col-span-4 bg-surface-canvas rounded-xl p-5 border border-border-subtle space-y-4" novalidate>
         <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary text-[20px]" aria-hidden="true">auto_awesome</span>
+          <svg class="icon text-primary text-[20px]" aria-hidden="true"><use href="/icons.svg#auto_awesome"/></svg>
           <h2 class="text-headline-sm font-headline-sm text-on-surface">Generate a project template</h2>
         </div>
         <div class="space-y-1.5">
@@ -411,7 +255,7 @@
               <p data-el="gen-sub" class="text-body-sm font-body-sm text-secondary"></p>
             </div>
             <button type="button" data-action="download-zip" class="px-3 py-1.5 rounded-lg bg-primary text-white text-label-md font-label-md font-semibold hover:opacity-90 inline-flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-[16px]" aria-hidden="true">download</span>Download ZIP
+              <svg class="icon text-[16px]" aria-hidden="true"><use href="/icons.svg#download"/></svg>Download ZIP
             </button>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -472,7 +316,7 @@
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" data-action="refresh-status" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low inline-flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-[16px]" aria-hidden="true">refresh</span>Refresh
+          <svg class="icon text-[16px]" aria-hidden="true"><use href="/icons.svg#refresh"/></svg>Refresh
         </button>
         <a href="/api-docs" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">Interactive API docs</a>
         <a href="/openapi.json" target="_blank" rel="noopener" class="px-3 py-1.5 rounded-lg border border-border-strong text-label-md font-label-md hover:bg-surface-container-low">OpenAPI spec</a>

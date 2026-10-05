@@ -72,6 +72,7 @@
         if (v === null || v === undefined || v === false) return;
         if (k === 'class') el.className = v;
         else if (k === 'text') el.textContent = v;
+        else if (k === 'style') applyStyle(el, v);
         else if (k.slice(0, 2) === 'on' && typeof v === 'function') el.addEventListener(k.slice(2), v);
         else el.setAttribute(k, v === true ? '' : v);
       });
@@ -83,13 +84,26 @@
     return el;
   }
 
-  function icon(name, size) {
-    return h('span', {
-      class: 'material-symbols-outlined',
-      style: 'font-size:' + (size || 16) + 'px',
-      'aria-hidden': 'true',
-      text: name,
+  // The CSP forbids inline style attributes (no 'unsafe-inline'), but CSSOM writes are allowed.
+  function applyStyle(el, css) {
+    String(css).split(';').forEach(function (decl) {
+      var i = decl.indexOf(':');
+      if (i > 0) el.style.setProperty(decl.slice(0, i).trim(), decl.slice(i + 1).trim());
     });
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  // Inline SVG icon from the same-origin sprite /icons.svg (names listed in scripts/build-icons.mjs).
+  function icon(name, size, extraClass) {
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', extraClass ? 'icon ' + extraClass : 'icon');
+    svg.style.fontSize = (size || 16) + 'px'; // .icon is 1em x 1em
+    svg.setAttribute('aria-hidden', 'true');
+    var use = document.createElementNS(SVG_NS, 'use');
+    use.setAttribute('href', '/icons.svg#' + name);
+    svg.appendChild(use);
+    return svg;
   }
 
   function clear(el) {
@@ -656,7 +670,7 @@
 
   function warningCard(warnings) {
     return h('div', { role: 'status', 'data-el': 'audit-warning', class: 'rounded-xl border border-amber-300 bg-amber-50 text-amber-900 p-5 flex items-start gap-3' }, [
-      h('span', { class: 'material-symbols-outlined text-[22px] text-amber-600', 'aria-hidden': 'true', text: 'warning' }),
+      icon('warning', 22, 'text-amber-600'),
       h('div', { class: 'flex-1 space-y-2' }, [
         h('div', { class: 'font-semibold', text: 'No checks were run' }),
       ].concat(
@@ -1651,7 +1665,7 @@
       { 'aria-labelledby': headingId, 'data-upload': kind, class: 'rounded-xl p-5 border border-border-subtle bg-surface-canvas space-y-3' },
       [
         h('div', { class: 'flex items-center gap-2' }, [
-          h('span', { class: 'material-symbols-outlined text-primary text-[20px]', 'aria-hidden': 'true', text: 'upload_file' }),
+          icon('upload_file', 20, 'text-primary'),
           h('h2', { id: headingId, class: 'text-headline-sm font-headline-sm text-on-surface', text: detect ? 'Upload a project to detect it' : 'Upload a project' }),
         ]),
         h('p', { class: 'text-label-sm font-label-sm text-secondary', text: 'Check a project that lives on your computer. ' + UPLOAD_PRIVACY_NOTE }),
