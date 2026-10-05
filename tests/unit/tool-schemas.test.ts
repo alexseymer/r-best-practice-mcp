@@ -122,8 +122,11 @@ describe('shared tool definitions', () => {
   it('every OpenAPI tool path corresponds to a shared tool definition', () => {
     const spec = OpenAPIGenerator.generateSpec('test', 'http://localhost');
     const toolPaths = new Set(TOOL_DEFS.map(toOpenApiPath));
-    const apiPaths = Object.keys(spec.paths).filter((p) => p.startsWith('/api/'));
+    // REST-only endpoints (no MCP tool) are documented by hand and listed here
+    const restOnly = new Set(['/api/validate-upload']);
+    const apiPaths = Object.keys(spec.paths).filter((p) => p.startsWith('/api/') && !restOnly.has(p));
     expect(sorted(apiPaths)).toEqual(sorted([...toolPaths]));
+    for (const p of restOnly) expect(spec.paths[p]).toBeDefined();
   });
 
   it('exposes the new filter parameters in MCP schemas', () => {
@@ -191,6 +194,49 @@ describe('shared tool definitions', () => {
       expect(full.data.findings).toHaveLength(2);
       expect(capped.data.findings).toHaveLength(1);
       expect(capped.data.summary).toEqual(full.data.summary);
+    });
+
+    it('validate_project returns warnings for an unrecognised folder', async () => {
+      const empty = createTempDir();
+      const r = await callMcp('validate_project', { path: empty });
+      cleanupTempDir(empty);
+      expect(r.error).toBe(false);
+      expect(r.data.workflow).toBe('unknown');
+      expect(r.data.findings).toEqual([]);
+      expect(r.data.warnings[0]).toMatch(/no workflow-specific checks ran/);
+    });
+
+    it('validate_project has no warnings for a known workflow', async () => {
+      const r = await callMcp('validate_project', { path: tempDir, workflow: 'package' });
+      expect(r.data.warnings).toBeUndefined();
+    });
+
+    it('REST validate-project returns warnings for an unrecognised folder (v0 and v1)', async () => {
+      const empty = createTempDir();
+      for (const prefix of ['/api', '/api/v1']) {
+        const res = await fetch(`${baseUrl}${prefix}/validate-project`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path: empty }),
+        });
+        const json = (await res.json()) as any;
+        expect(json.data.warnings).toHaveLength(1);
+      }
+      cleanupTempDir(empty);
+    });
+
+    it('serves the favicon and redirects /favicon.ico to it', async () => {
+      const svg = await fetch(`${baseUrl}/favicon.svg`);
+      expect(svg.status).toBe(200);
+      expect(svg.headers.get('content-type')).toMatch(/image\/svg\+xml/);
+      const ico = await fetch(`${baseUrl}/favicon.ico`, { redirect: 'manual' });
+      expect(ico.status).toBe(301);
+      expect(ico.headers.get('location')).toBe('/favicon.svg');
+    });
+
+    it('describes warnings in the validate_project tool description', () => {
+      const tool = TOOL_DEFS.find((t) => t.name === 'validate_project');
+      expect(tool?.description).toMatch(/warnings/);
     });
 
     it('validate_project returns a summary', async () => {

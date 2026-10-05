@@ -19,6 +19,68 @@ This document outlines security best practices for the R Best Practices MCP Serv
 
 ---
 
+## Server Hardening (current behaviour)
+
+This section describes what the web server enforces today. Where older sections below differ, this one wins.
+
+### Path confinement
+
+The web server can only read paths inside an allow-list of root directories (`GET /api/config` shows the
+active mode under `serverPaths`):
+
+| Setting | Effect |
+|---|---|
+| `NODE_ENV` unset or `development` | Any absolute path may be analysed (local use). |
+| `NODE_ENV=production` | Only `/projects` (mount your R projects there, read-only). |
+| `ALLOWED_PROJECT_ROOTS=/a,/b` | Only these directories (comma separated). |
+| `ALLOW_ANY_PATH=true` | Opt back in to unrestricted paths. Never do this on a public server. |
+
+When confined, `detect-workflow`, `validate-project` and `validate-file` (v0 and v1) resolve the path with
+`realpath` (so symlinks cannot escape), require it to be inside a root and use the resolved path from then on.
+A path outside every root, a path that does not exist, `..` traversal, a symlink escape and a relative path all
+produce the same response, so the endpoint cannot be used to probe the container filesystem:
+
+```
+HTTP 400  {"error":true,"code":"PATH_NOT_ALLOWED","message":"Path is not available on this server"}
+```
+
+Residual risk: symbolic links *inside* an allowed project that point outside the root are not followed during
+directory traversal, but a project file that is itself such a symlink is read. Mount untrusted projects read-only.
+
+### Response headers
+
+Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera, microphone, geolocation and
+FLoC disabled), `Cross-Origin-Opener-Policy: same-origin` and a `Content-Security-Policy` (defined in
+`src/middleware/security-headers.ts`: every source is `'self'` only, no `'unsafe-inline'`/`'unsafe-eval'`, no third-party origins,
+with `frame-ancestors 'none'`). `Strict-Transport-Security` is sent only
+for HTTPS requests; behind a TLS-terminating proxy this requires `TRUST_PROXY` so that `X-Forwarded-Proto` is
+believed. `X-Powered-By` is disabled. `/api/*`, `/health` and `/metrics*` are `Cache-Control: no-store`.
+
+### Rate limiting
+
+100 requests per minute per client. Every response of a limited route carries `X-RateLimit-Limit`,
+`X-RateLimit-Remaining` and `X-RateLimit-Reset`; a `429` adds `Retry-After` (seconds). `/health` is exempt.
+The client is Express's `req.ip`. `X-Forwarded-For` and `X-Real-IP` are **ignored** unless `TRUST_PROXY` is set
+(a hop count such as `1`, or an Express value such as `loopback`), so a client cannot dodge the limit by
+spoofing a header. Behind a reverse proxy you must set `TRUST_PROXY`, otherwise all visitors share the proxy's bucket.
+`/metrics/rate-limit` reports salted short hashes, never client addresses.
+
+### Request limits and errors
+
+JSON and form bodies are limited to 1 MB (`MAX_BODY_BYTES` to change); routes that need more declare their own
+limit in `LARGE_BODY_ROUTES`. Malformed JSON gives `400 INVALID_JSON`, oversized bodies `413 PAYLOAD_TOO_LARGE`,
+unexpected failures `500 INTERNAL_ERROR`; error bodies never contain stack traces or server paths.
+
+### Metrics protection
+
+`/metrics`, `/metrics/rate-limit`, `/metrics/requests.csv` and `/metrics/operations.csv` are public in development.
+In production they answer `404` (as if they did not exist) unless `METRICS_TOKEN` is set, in which case they require
+`Authorization: Bearer <METRICS_TOKEN>` (constant-time comparison, `401` with `WWW-Authenticate: Bearer` otherwise).
+`METRICS_PUBLIC=true` makes them public explicitly. `/health` stays public and exposes only aggregate numbers.
+
+---
+
 ## Input Validation & Sanitization
 
 ### Implemented Protections

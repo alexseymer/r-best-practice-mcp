@@ -210,6 +210,30 @@ curl http://localhost:3000/health
 - Performance tuning
 - Security best practices
 
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` | Port of the web server. |
+| `NODE_ENV` | unset | `production` confines paths to `/projects` and disables `/metrics*` unless configured. |
+| `ALLOWED_PROJECT_ROOTS` | `/projects` in production | Comma separated directories the web server may analyse. |
+| `ALLOW_ANY_PATH` | `false` | `true` allows any absolute path (never on a public server). |
+| `METRICS_TOKEN` | unset | Bearer token required for `/metrics*`. |
+| `METRICS_PUBLIC` | `false` | `true` serves `/metrics*` without credentials (default outside production). |
+| `TRUST_PROXY` | unset (trust nothing) | Reverse proxy hops whose `X-Forwarded-*` headers are trusted: a number (`1`) or an Express value (`loopback`). Needed behind a proxy for per-client rate limits and HSTS. |
+| `MAX_BODY_BYTES` | `1048576` | Maximum JSON/form request body. |
+| `GIT_SHA`, `BUILD_TIME` | unset | Build information returned by `/health` and `/api/config` (Docker build args of the same name). |
+
+`LOG_LEVEL` appears in `docker-compose.yml` but is not read by the server.
+
+### Verifying a deployment
+
+```bash
+curl -s https://your-host/health        # status, version, build.commit, build.builtAt
+curl -s https://your-host/api/config    # active path roots, metrics mode, upload limits
+curl -sI https://your-host/dashboard    # security headers (CSP, X-Frame-Options, HSTS over HTTPS)
+```
+
 ## Usage
 
 ### Via MCP Server (Claude & other clients)
@@ -370,6 +394,32 @@ curl -X POST http://localhost:3000/api/v1/generate-template \
   -H "Content-Type: application/json" \
   -d '{"workflow": "package", "projectName": "mypackage"}'
 ```
+
+#### Upload a project (REST only)
+
+`POST /api/validate-upload` validates a project posted from a browser (the server never sees a path). It is REST only,
+not an MCP tool, and is also listed in `/openapi.json`. The files are written to a private temporary directory, analysed and
+deleted immediately; nothing is stored.
+
+```bash
+curl -X POST http://localhost:3000/api/validate-upload \
+  -H "Content-Type: application/json" \
+  -d '{"files": [{"path": "DESCRIPTION", "content": "Package: demo\n"}, {"path": "R/a.R", "content": "a <- 1\n"}], "minSeverity": "important"}'
+```
+
+Uploaded files are written to a private temporary directory under `UPLOAD_TMP_DIR` (default: the system temp directory) and deleted as soon as the request finishes; point it at a tmpfs or a dedicated volume if you want uploads kept off the main disk.
+
+- Body: `files` (`[{ path, content }]`, paths relative to the project root, `/` or `\` separators) and optional `workflow`
+  (detected when omitted), `minSeverity`, `categories`, `maxFindings` (same as `validate-project`), `detectOnly` (return only
+  `detected` and `upload`, no findings).
+- Response `data`: the `validate-project` fields (`filePath` is the label `uploaded project`, finding `file` values are relative)
+  plus `detected` (`workflow`, `confidence`, `indicators`) and `upload` (`files`, `bytes`, `skipped`).
+- Limits (also in `GET /api/config` under `upload`): 500 files, 1 MB per file, 5 MB in total, 260 characters per path, 20 levels deep;
+  the JSON body may be 8 MB. Only text project files are accepted (`.R .Rmd .qmd .md .yml .yaml .toml .json .lock .txt .dcf ...`
+  and files such as `DESCRIPTION`, `NAMESPACE`, `.Rprofile`); other files are skipped and counted in `upload.skipped`.
+- Errors: `400 INVALID_PARAMETER` (not an array, empty, absolute path, `.`/`..`/empty segment, control characters, duplicate path,
+  wrong types, no supported files), `400 INVALID_WORKFLOW`, `413 PAYLOAD_TOO_LARGE` (file/total/count/body limits),
+  `503 BUSY` with `Retry-After` (at most 2 uploads are analysed at the same time).
 
 #### API Documentation
 

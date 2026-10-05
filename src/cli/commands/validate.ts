@@ -45,6 +45,8 @@ function displayValidationResult(result: any): void {
   CLIFormatter.header('Project Validation Result');
 
   const findings = result.findings as Finding[];
+  const warnings = (result.warnings ?? []) as string[];
+  warnings.forEach((warning) => CLIFormatter.warn(warning));
   const bySeverity: Record<string, Finding[]> = {
     critical: [],
     important: [],
@@ -83,8 +85,8 @@ function displayValidationResult(result: any): void {
 
   console.log('');
   CLIFormatter.header('Summary');
-  console.log(`Total Findings: ${findings.length}`);
-  console.log(`Duration:      ${result.data.duration}ms`);
+  console.log(`Total Findings: ${findings.length}${warnings.length > 0 ? ' (no checks ran)' : ''}`);
+  console.log(`Duration:      ${result.duration}ms`);
 }
 
 function getSeverityIcon(severity: string): string {

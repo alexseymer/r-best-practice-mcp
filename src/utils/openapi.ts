@@ -8,6 +8,7 @@ import {
   toOpenApiPath,
   toOpenApiRequestSchema,
 } from '../tools/schemas.js';
+import { buildUploadOpenApiPaths } from '../routes/upload.js';
 
 /** Response documentation per operation (parameters and routes come from tools/schemas.ts). */
 const TOOL_RESPONSES: Record<
@@ -144,11 +145,11 @@ export class OpenAPIGenerator {
         title: 'R Best Practices MCP Server',
         version,
         description:
-          'API for workflow detection, project validation, template generation, and best practices knowledge base for R development',
+          'API for workflow detection, project validation, template generation, and best practices knowledge base for R development. The documented /api/v1 routes are the supported API; the unversioned /api/* routes are backward-compatible aliases.',
         contact: {
-          name: 'Alex Seymer',
+          name: 'Alexander Seymer',
           email: 'alexseymer@gmail.com',
-          url: 'https://github.com/alexseymer/r-coding-mcp',
+          url: 'https://github.com/alexseymer/r-best-practice-mcp',
         },
       },
       servers: [
@@ -179,6 +180,7 @@ export class OpenAPIGenerator {
           },
         },
         ...buildToolPaths(),
+        ...buildUploadOpenApiPaths(),
         '/metrics': {
           get: {
             summary: 'Get Metrics',

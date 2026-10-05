@@ -12,8 +12,10 @@
  *   PLAYWRIGHT_MODULE  path of the playwright package (default /opt/node22/lib/node_modules/playwright,
  *                      falls back to a normal require('playwright'))
  *   CHROMIUM_PATH      chromium executable (default /opt/pw-browsers/chromium-1194/chrome-linux/chrome)
+ *   E2E_SHOT_DIR       directory for desktop/mobile screenshots (default: a temporary directory)
  *
- * The Tailwind CDN and Google Fonts are blocked on purpose; the dashboard logic does not need them.
+ * The dashboard is fully self-hosted (#19): every request of the whole tour must stay on the BASE_URL origin
+ * and no Content-Security-Policy violation or console warning/error may occur.
  * Downloads are written to a temporary directory. Exit code 0 = all checks passed.
  * Run it from the repository root (the Shiny example under ./examples is used for workflow detection).
  * The audit target is a deliberately incomplete R package created in a temporary directory, so the
@@ -55,11 +57,28 @@ function check(name, ok, extra) {
 (async () => {
   const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, args: ['--no-sandbox'] });
   const ctx = await browser.newContext({ acceptDownloads: true, viewport: { width: 1400, height: 1000 } });
-  const page = await ctx.newPage();
+  const BASE_ORIGIN = new URL(BASE_URL).origin;
+  const requested = [];
   const errors = [];
-  page.on('pageerror', (e) => { if (!/tailwind is not defined/.test(e.message)) errors.push('pageerror: ' + e.message); });
-  page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errors.push('console: ' + m.text()); });
-  await ctx.route(/cdn\.tailwindcss\.com|fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
+  const cspViolations = [];
+  // Records every network request of a context and every CSP violation / console warning / page error of its pages.
+  async function instrument(c) {
+    c.on('request', (r) => { if (/^https?:/.test(r.url())) requested.push(r.url()); });
+    await c.addInitScript(() => {
+      window.__csp = [];
+      document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(e.violatedDirective + ' ' + e.blockedURI));
+    });
+    c.on('page', (p) => {
+      p.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+      // HTTP error statuses are provoked on purpose by the error-path checks; blocked/failed loads and CSP reports are not
+      p.on('console', (m) => { if ((m.type() === 'error' || m.type() === 'warning') && !/Failed to load resource: the server responded with a status/.test(m.text())) errors.push('console ' + m.type() + ': ' + m.text()); });
+    });
+  }
+  async function collectCsp(p) {
+    try { cspViolations.push(...(await p.evaluate(() => window.__csp || []))); } catch (e) { /* page closed or navigating */ }
+  }
+  await instrument(ctx);
+  const page = await ctx.newPage();
 
   await page.goto(BASE_URL + '/dashboard');
   await page.waitForFunction(() => document.querySelector('[data-el="status-text"]').textContent === 'Online', null, { timeout: 8000 });
@@ -349,6 +368,146 @@ function check(name, ok, extra) {
     check('View practice opens card', await page.locator('#panel-practices').evaluate((e) => !e.hidden));
   }
 
+  // ---- Upload a project (browser folder -> /api/validate-upload)
+  {
+    const cfg = await page.evaluate(async (base) => (await (await fetch(base + '/api/config')).json()).data, BASE_URL);
+    const mk = (root, files) => {
+      for (const [rel, content] of Object.entries(files)) {
+        const p = path.join(root, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, content);
+      }
+      return root;
+    };
+    const UP = mk(path.join(OUT, 'uploadpkg'), {
+      DESCRIPTION: 'Package: uploadpkg\nVersion: 0.1.0\n',
+      NAMESPACE: 'export(f)\n',
+      'R/a.R': 'f <- function(x) {\n  x+1\n}\n',
+      'node_modules/dep/x.R': 'ignored <- 1\n',
+      'data/logo.png': 'not text',
+    });
+    const BIG = mk(path.join(OUT, 'bigfolder'), { 'R/big.R': '#'.repeat(cfg.upload.maxFileBytes + 10) });
+    const BIN = mk(path.join(OUT, 'binfolder'), { 'img/logo.png': 'x', 'bin/tool.exe': 'x' });
+    const MANY = path.join(OUT, 'manyfolder');
+    for (let i = 0; i <= cfg.upload.maxFiles; i++) mk(MANY, { ['R/f' + i + '.R']: 'x <- ' + i + '\n' });
+
+    await page.click('#tab-validate');
+    const section = page.locator('[data-upload="audit"]');
+    check('upload section visible in Validate panel', await section.isVisible());
+    check('upload section sits above the server-path form', await page.evaluate(() => {
+      const s = document.querySelector('[data-upload="audit"]');
+      const f = document.querySelector('[data-form="audit"]');
+      return !!(s.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }));
+    check('privacy statement shown', /sent to the server for analysis and deleted immediately; nothing is stored/.test(await section.textContent()));
+    check('choose-folder button labelled', (await page.textContent('[data-el="upload-choose-audit"]')).trim() === 'Choose a project folder');
+    check('directory input has webkitdirectory', await page.locator('[data-upload-input="dir-audit"]').evaluate((e) => e.hasAttribute('webkitdirectory') && e.multiple));
+    check('run button disabled before a selection', await page.locator('[data-el="upload-run-audit"]').isDisabled());
+
+    // keyboard: the button opens the file chooser
+    await page.focus('[data-el="upload-choose-audit"]');
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.keyboard.press('Enter')]);
+    check('choose button is keyboard operable (opens a directory chooser)', !!chooser && chooser.isMultiple());
+    await chooser.setFiles(UP);
+
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent), null, { timeout: 8000 });
+    const status = await page.textContent('[data-el="upload-status-audit"]');
+    check('summary counts files, size and skipped', /uploadpkg: 3 files, [\d.]+ B \(2 skipped\)/.test(status), status);
+    check('status is an aria-live region', (await page.getAttribute('[data-el="upload-status-audit"]', 'aria-live')) === 'polite');
+    check('run button enabled after selection', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+
+    await page.selectOption('[data-el="audit-workflow"]', '');
+    const [upReq] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-audit"]'),
+    ]);
+    const sent = JSON.parse(upReq.postData());
+    check('upload sends relative paths without node_modules or binaries', JSON.stringify(sent.files.map((f) => f.path).sort()) === JSON.stringify(['DESCRIPTION', 'NAMESPACE', 'R/a.R']), JSON.stringify(sent.files.map((f) => f.path)));
+    check('upload sends file contents', sent.files.find((f) => f.path === 'R/a.R').content.includes('x+1'));
+    await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    const upFindings = await page.locator('[data-el="findings"] article').count();
+    check('uploaded project renders findings through the existing renderer', upFindings > 0, upFindings + ' findings');
+    const upSummary = await page.textContent('[data-el="findings-summary"]');
+    check('uploaded audit summary names the folder and workflow', /uploadpkg/.test(upSummary) && /R package/.test(upSummary), upSummary);
+    check('findings show relative locations only', !(await page.textContent('[data-el="findings"]')).includes('rbp-upload-'));
+    await page.waitForFunction(() => !document.querySelector('[data-el="upload-run-audit"]').disabled);
+    check('run button usable again after the audit', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+
+    // filters from the form are applied to the upload
+    await page.locator('[data-el="audit-filters"] summary').click();
+    await page.fill('#filter-max', '1');
+    const [capped] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-audit"]'),
+    ]);
+    check('upload request carries the filter values', JSON.parse(capped.postData()).maxFindings === 1);
+    await page.waitForFunction(() => document.querySelectorAll('[data-el="findings"] article').length === 1, null, { timeout: 8000 }).then(() => check('maxFindings applied to upload', true), () => check('maxFindings applied to upload', false));
+    await page.click('[data-action="reset-filters"]');
+    await page.locator('[data-el="audit-filters"] summary').click();
+
+    // error handling
+    await page.setInputFiles('[data-upload-input="dir-audit"]', BIG);
+    await page.waitForFunction(() => document.querySelector('[data-el="upload-error-audit"]').textContent.length > 0);
+    const bigErr = await page.textContent('[data-el="upload-error-audit"]');
+    check('oversize file is skipped with a clear message', /No supported files/.test(bigErr) && /larger than/.test(bigErr), bigErr);
+    check('error is announced (role=alert) and run is disabled', (await page.getAttribute('[data-el="upload-error-audit"]', 'role')) === 'alert' && (await page.locator('[data-el="upload-run-audit"]').isDisabled()));
+    await page.setInputFiles('[data-upload-input="dir-audit"]', BIN);
+    await page.waitForFunction(() => /No supported files/.test(document.querySelector('[data-el="upload-error-audit"]').textContent));
+    check('unsupported-only selection explains itself', /2 skipped/.test(await page.textContent('[data-el="upload-error-audit"]')), await page.textContent('[data-el="upload-error-audit"]'));
+    await page.setInputFiles('[data-upload-input="dir-audit"]', MANY);
+    await page.waitForFunction(() => /Too many files/.test(document.querySelector('[data-el="upload-error-audit"]').textContent));
+    const manyErr = await page.textContent('[data-el="upload-error-audit"]');
+    check('too many files shows the numbers', manyErr.includes(String(cfg.upload.maxFiles + 1)) && manyErr.includes(String(cfg.upload.maxFiles)), manyErr);
+    check('previous summary cleared on error', (await page.textContent('[data-el="upload-status-audit"]')) === '');
+
+    // server errors surface in the alert banner and nothing stays stuck
+    await page.setInputFiles('[data-upload-input="dir-audit"]', UP);
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent));
+    await page.route('**/api/validate-upload', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: true, code: 'BUSY', message: 'The server is busy analysing other uploads. Try again shortly.' }) }));
+    await page.click('[data-el="upload-run-audit"]');
+    await page.waitForFunction(() => !document.querySelector('[data-el="alert"]').classList.contains('hidden'));
+    check('503 BUSY message shown', /busy/.test(await page.textContent('[data-el="alert-text"]')), await page.textContent('[data-el="alert-text"]'));
+    await page.unroute('**/api/validate-upload');
+    check('run button re-enabled after a failed upload', await page.locator('[data-el="upload-run-audit"]').isEnabled());
+    await page.click('[data-action="dismiss-alert"]');
+
+    // drag and drop (plain-files fallback; folder entries use the same selection code as the directory input)
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['Package: dropped\nVersion: 0.1.0\n'], 'DESCRIPTION'));
+      dt.items.add(new File(['x <- 1\n'], 'a.R'));
+      document.querySelector('[data-el="upload-drop-audit"]').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    });
+    await page.waitForFunction(() => /2 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent), null, { timeout: 5000 }).then(() => check('dropping files selects them', true), () => check('dropping files selects them', false));
+
+    // Detect panel
+    await page.click('#tab-detect');
+    check('upload option in Detect panel', await page.locator('[data-upload="detect"]').isVisible());
+    await page.setInputFiles('[data-upload-input="dir-detect"]', UP);
+    await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-detect"]').textContent));
+    const [detReq] = await Promise.all([
+      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
+      page.click('[data-el="upload-run-detect"]'),
+    ]);
+    check('detect upload asks for detection only', JSON.parse(detReq.postData()).detectOnly === true);
+    await page.waitForFunction(() => /\(uploaded\)/.test(document.querySelector('[data-el="detect-result"]').textContent), null, { timeout: 8000 });
+    const upDetect = await page.textContent('[data-el="detect-result"]');
+    check('detect upload shows the workflow and confidence', /R package/.test(upDetect) && /\d+%/.test(upDetect) && /uploadpkg \(uploaded\)/.test(upDetect), upDetect.replace(/\s+/g, ' ').slice(0, 120));
+    await page.click('text=Validate as R package');
+    await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    check('detect upload -> validate handoff audits the upload', (await page.locator('#panel-validate').evaluate((e) => !e.hidden)) && (await page.locator('[data-el="findings"] article').count()) > 0);
+
+    // server-path forms follow the deployment mode
+    const helpText = await page.textContent('#audit-path >> xpath=../p');
+    if (cfg.serverPaths.unrestricted) {
+      check('unrestricted: server path help unchanged and form not collapsed', /Absolute path on the machine/.test(helpText) && (await page.locator('[data-el="server-path-audit"]').count()) === 0, helpText);
+    } else {
+      check('restricted: help names the allowed roots', helpText.includes('Server paths are limited to') && cfg.serverPaths.roots.every((r) => helpText.includes(r)), helpText);
+      check('restricted: server form collapsed under Advanced', (await page.locator('[data-el="server-path-audit"]').count()) === 1 && !(await page.locator('[data-el="server-path-audit"]').evaluate((e) => e.open)) && /Advanced: analyse a folder on the server/.test(await page.textContent('[data-el="server-path-audit"] summary')));
+      check('restricted: upload section is the primary option', await page.locator('[data-upload="audit"]').evaluate((e) => e.classList.contains('border-primary')));
+    }
+  }
+
   // ---- System
   await page.click('#tab-system');
   await page.waitForSelector('[data-el="health-grid"] dd');
@@ -358,6 +517,23 @@ function check(name, ok, extra) {
   const toolsText = await page.textContent('[data-el="tools-list"]');
   check('tools list documents the new filters', /minSeverity/.test(toolsText) && /maxFindings/.test(toolsText) && /enforcement/.test(toolsText));
   check('ops table has rows', (await page.locator('[data-el="ops-body"] tr').count()) > 0);
+  check('metrics links visible when metrics are public', (await page.locator('[data-metrics-link]:visible').count()) === 2);
+  check('build info shows the version', /Version \d/.test(await page.textContent('[data-el="build-info"]')), await page.textContent('[data-el="build-info"]'));
+  {
+    const p2 = await ctx.newPage();
+    await p2.route('**/api/config', async (route) => {
+      const res = await route.fetch();
+      const json = await res.json();
+      json.data.metrics = { public: false, tokenRequired: true };
+      json.data.build = { commit: 'abcdef1234567890', builtAt: '2026-10-04T10:00:00Z' };
+      await route.fulfill({ response: res, json });
+    });
+    await p2.goto(BASE_URL + '/dashboard#system');
+    await p2.waitForFunction(() => /abcdef1/.test(document.querySelector('[data-el="build-info"]').textContent), null, { timeout: 8000 }).then(() => check('build info shows short commit and build time', true), () => check('build info shows short commit and build time', false));
+    check('metrics links hidden when metrics are not public', (await p2.locator('[data-metrics-link]:visible').count()) === 0);
+    check('build info omits the full sha', !/abcdef1234567890/.test(await p2.textContent('[data-el="build-info"]')));
+    await p2.close();
+  }
 
   // ---- routing
   await page.goto(BASE_URL + '/dashboard#generate');
@@ -368,6 +544,138 @@ function check(name, ok, extra) {
   await page.focus('#tab-practices');
   await page.keyboard.press('ArrowRight');
   check('arrow-key tab nav', await page.locator('#panel-system').evaluate((e) => !e.hidden));
+
+  // ---- unrecognised folder: warning, never the green success state (#13)
+  const EMPTY = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-e2e-empty-'));
+  process.on('exit', () => fs.rmSync(EMPTY, { recursive: true, force: true }));
+  await page.goto(BASE_URL + '/dashboard#validate');
+  await page.fill('#audit-path', EMPTY);
+  await page.selectOption('[data-el="audit-workflow"]', '');
+  await page.click('[data-el="audit-btn"]');
+  await page.waitForSelector('[data-el="audit-warning"]', { timeout: 8000 });
+  const warnText = await page.textContent('[data-el="audit-warning"]');
+  check('unknown folder shows warning card', /no workflow-specific checks ran/.test(warnText), warnText.replace(/\s+/g, ' ').slice(0, 90));
+  check('unknown folder never shows green success', !/No issues found/.test(await page.textContent('[data-el="findings"]')) && (await page.locator('[data-el="findings"] .bg-emerald-50').count()) === 0);
+  check('LAST AUDIT says Not checked', (await page.textContent('[data-el="stat-audit"]')) === 'Not checked' && /no project type detected/.test(await page.textContent('[data-el="stat-audit-sub"]')));
+  check('issue badge hidden for unchecked project', await page.locator('[data-el="issue-badge"]').evaluate((e) => e.classList.contains('hidden')));
+  check('summary does not say Unknown project', !/Unknown project/.test(await page.textContent('[data-el="findings-summary"]')), await page.textContent('[data-el="findings-summary"]'));
+  const [warnJson] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="download-json"]')]);
+  const warnParsed = JSON.parse(fs.readFileSync(await warnJson.path(), 'utf8'));
+  check('JSON export includes warnings', Array.isArray(warnParsed.warnings) && warnParsed.warnings.length === 1);
+  const [warnMd] = await Promise.all([page.waitForEvent('download'), page.click('[data-action="download-md"]')]);
+  const warnMdText = fs.readFileSync(await warnMd.path(), 'utf8');
+  check('Markdown export includes warning and no success line', /Warning:/.test(warnMdText) && !/No issues found/.test(warnMdText));
+  await page.click('[data-action="choose-workflow"]');
+  check('Choose a workflow focuses the select', await page.evaluate(() => document.activeElement && document.activeElement.id === 'audit-workflow'));
+  // a genuinely clean project still shows green success
+  const CLEAN = fs.mkdtempSync(path.join(os.tmpdir(), 'rbp-e2e-clean-'));
+  process.on('exit', () => fs.rmSync(CLEAN, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(CLEAN, 'main.R'), '#!/usr/bin/env Rscript\n# Demo script\n\nprint("hi")\n');
+  await page.fill('#audit-path', CLEAN);
+  await page.selectOption('[data-el="audit-workflow"]', 'r-script');
+  await page.click('[data-el="audit-btn"]');
+  await page.waitForFunction(() => /R script|R Script|script/i.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+  const cleanFindings = await page.locator('[data-el="findings"] article').count();
+  if (cleanFindings === 0) {
+    check('clean project shows green success, no warning', (await page.locator('[data-el="audit-warning"]').count()) === 0 && /No issues found/.test(await page.textContent('[data-el="findings"]')));
+  } else {
+    check('clean fixture produced findings (success state not exercised)', true, cleanFindings);
+  }
+  await page.selectOption('[data-el="audit-workflow"]', '');
+
+  // ---- favicon, meta tags
+  const fav = await page.request.get(BASE_URL + '/favicon.svg');
+  check('favicon.svg is 200 image/svg+xml', fav.status() === 200 && /image\/svg\+xml/.test(fav.headers()['content-type'] || ''));
+  const icoRes = await page.request.get(BASE_URL + '/favicon.ico');
+  check('favicon.ico is 200 svg (after redirect)', icoRes.status() === 200 && /image\/svg\+xml/.test(icoRes.headers()['content-type'] || ''));
+  check('meta tags present', await page.evaluate(() => !!document.querySelector('meta[name="theme-color"][content="#0EA5E9"]') && !!document.querySelector('meta[property="og:title"]') && !!document.querySelector('meta[property="og:description"]') && !!document.querySelector('meta[name="twitter:card"][content="summary"]') && !!document.querySelector('link[rel="icon"][href="/favicon.svg"]')));
+
+  // ---- mobile tab bar and accessibility (#18): the precompiled stylesheet and self-hosted fonts must be applied
+  const SHOT_DIR = process.env.E2E_SHOT_DIR || OUT;
+  fs.mkdirSync(SHOT_DIR, { recursive: true });
+  const liveCtx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  await instrument(liveCtx);
+  const lp = await liveCtx.newPage();
+  await lp.goto(BASE_URL + '/dashboard#validate');
+  await lp.waitForSelector('[data-el="status-text"]');
+  const styled = await lp.evaluate(() => getComputedStyle(document.querySelector('[data-el="issue-badge"]')).display === 'none');
+  check('precompiled Tailwind CSS applied (hidden utility works)', styled);
+  const TABS = ['validate', 'detect', 'generate', 'practices', 'system'];
+  {
+    const fonts = await lp.evaluate(async () => {
+      await document.fonts.load('400 14px Geist');
+      await document.fonts.load('500 13px "JetBrains Mono"');
+      return { geist: document.fonts.check('400 14px Geist'), mono: document.fonts.check('500 13px "JetBrains Mono"'), loaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family + ' ' + f.weight) };
+    });
+    check('self-hosted fonts load (Geist, JetBrains Mono)', fonts.geist && fonts.mono && fonts.loaded.length >= 2, fonts.loaded.join(', '));
+    check('body uses Geist', await lp.evaluate(() => getComputedStyle(document.body).fontFamily.startsWith('Geist')));
+    check('icons render from the SVG sprite', await lp.evaluate(() => { const uses = [...document.querySelectorAll('svg.icon use')]; return uses.length >= 10 && uses.every((u) => /^\/icons\.svg#[a-z_]+$/.test(u.getAttribute('href'))) && [...document.querySelectorAll('svg.icon')].filter((s) => s.getClientRects().length).every((s) => s.getBoundingClientRect().width > 8); }));
+    const spriteIds = await lp.evaluate(async () => { const t = await (await fetch('/icons.svg')).text(); return [...t.matchAll(/id="([a-z_]+)"/g)].map((m) => m[1]); });
+    const usedIds = await lp.evaluate(() => [...new Set([...document.querySelectorAll('svg.icon use')].map((u) => u.getAttribute('href').split('#')[1]))]);
+    check('every icon used exists in the sprite', usedIds.every((id) => spriteIds.includes(id)), usedIds.filter((id) => !spriteIds.includes(id)).join(','));
+    await lp.screenshot({ path: path.join(SHOT_DIR, 'desktop-validate.png') });
+    for (const width of [320, 360, 390]) {
+      await lp.setViewportSize({ width, height: 800 });
+      await lp.click('#tab-validate');
+      await lp.waitForTimeout(300);
+      const boxes = await lp.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((b) => { const r = b.getBoundingClientRect(); return { l: r.left, r: r.right, w: r.width }; }));
+      check('all tab buttons inside viewport @' + width, boxes.length === 5 && boxes.every((b) => b.l >= 0 && b.r <= width + 0.5 && b.w > 20), JSON.stringify(boxes.map((b) => Math.round(b.r))));
+      check('tab buttons keep titles and accessible text @' + width, await lp.evaluate(() => [...document.querySelectorAll('[role="tab"]')].every((b) => b.getAttribute('title') && b.textContent.trim().length > 0)));
+      for (const t of TABS) {
+        await lp.click('#tab-' + t);
+        const ok = await lp.evaluate((name) => [...document.querySelectorAll('[role="tabpanel"]')].every((p) => (p.dataset.panel === name) === !p.hidden), t);
+        const overflow = await lp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        check('tab ' + t + ' switches, no horizontal overflow @' + width, ok && overflow <= 0, 'overflow ' + overflow);
+        if (width === 390) await lp.screenshot({ path: path.join(SHOT_DIR, 'mobile390-' + t + '.png'), fullPage: true });
+      }
+    }
+    await lp.setViewportSize({ width: 1400, height: 1000 });
+    // axe-core comes from the devDependency (injected as inline content), not from a CDN: the dashboard's
+    // CSP does not allow third-party scripts, and a check that silently skips itself is worthless.
+    let axePath = null;
+    try {
+      axePath = require.resolve('axe-core/axe.min.js');
+    } catch (e) {
+      axePath = null;
+    }
+    let axeLoaded = false;
+    if (axePath) {
+      // evaluated through the DevTools protocol: an injected <script> would (rightly) be blocked by the CSP
+      await lp.evaluate(fs.readFileSync(axePath, 'utf8'));
+      axeLoaded = await lp.evaluate(() => typeof window.axe !== 'undefined');
+      check('axe-core loaded into the page', axeLoaded, 'inline injection blocked?');
+    }
+    if (!axeLoaded) {
+      console.log('SKIP axe-core checks: the axe-core package is not installed (npm ci installs it)');
+    } else {
+      for (const t of TABS) {
+        await lp.click('#tab-' + t);
+        if (t === 'system') await lp.waitForSelector('[data-el="health-grid"] dd');
+        const violations = await lp.evaluate(async () => (await window.axe.run(document)).violations.map((v) => v.id + ': ' + v.nodes.length + ' node(s)'));
+        check('axe: no violations on ' + t + ' tab', violations.length === 0, violations.join('; '));
+      }
+    }
+  }
+  await collectCsp(lp);
+
+  // ---- API docs: Swagger UI served locally (#19)
+  const docs = await liveCtx.newPage();
+  await docs.goto(BASE_URL + '/api-docs');
+  await docs.waitForSelector('.swagger-ui .info .title', { timeout: 15000 }).then(() => check('/api-docs renders Swagger UI from the local package', true), () => check('/api-docs renders Swagger UI from the local package', false));
+  await docs.waitForSelector('.swagger-ui .opblock', { timeout: 15000 }).then(() => check('/api-docs lists the operations of /openapi.json', true), () => check('/api-docs lists the operations of /openapi.json', false));
+  const docsCsp = (await docs.request.get(BASE_URL + '/api-docs')).headers()['content-security-policy'];
+  check('/api-docs CSP has no third-party origin or unsafe source', !!docsCsp && !/https?:|unsafe-/.test(docsCsp), docsCsp);
+  await docs.screenshot({ path: path.join(SHOT_DIR, 'desktop-api-docs.png') });
+  await collectCsp(docs);
+  await liveCtx.close();
+  await collectCsp(page);
+
+  // ---- self-hosted (#19): nothing left the origin, no CSP violation
+  const external = [...new Set(requested.filter((u) => new URL(u).origin !== BASE_ORIGIN))];
+  check('no request to an external origin during the whole tour', external.length === 0, external.length ? external.join(', ') : requested.length + ' same-origin requests');
+  check('0 Content-Security-Policy violations', cspViolations.length === 0, cspViolations.join(' | '));
+  const dashCsp = (await ctx.request.get(BASE_URL + '/dashboard')).headers()['content-security-policy'];
+  check('dashboard CSP is self-only (no inline, eval or third-party sources)', !!dashCsp && !/https?:|unsafe-/.test(dashCsp), dashCsp);
 
   await page.screenshot({ path: path.join(OUT, 'shot.png'), fullPage: false });
   check('no JS errors', errors.length === 0, errors.join(' | '));

@@ -21,12 +21,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute build time
+        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
           load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           tags: |
             r-best-practices-mcp:latest
             r-best-practices-mcp:${{ github.sha }}
@@ -78,12 +84,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute build time
+        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Build Docker image for scanning
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
           load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           tags: r-best-practices-mcp:scan
           cache-from: type=gha
 

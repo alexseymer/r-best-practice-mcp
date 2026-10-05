@@ -8,6 +8,10 @@ describe('RateLimiter', () => {
     limiter = new RateLimiter(1000, 5); // 5 requests per 1 second for testing
   });
 
+  afterEach(() => {
+    limiter.stop();
+  });
+
   describe('middleware', () => {
     it('should allow requests under the limit', () => {
       const middleware = limiter.middleware();
@@ -128,28 +132,28 @@ describe('RateLimiter', () => {
       expect(res.status).not.toHaveBeenCalledWith(429);
     });
 
-    it('should extract IP from X-Forwarded-For header', () => {
+    it('should ignore X-Forwarded-For (identity comes from req.ip)', () => {
       const middleware = limiter.middleware();
-
-      const req = {
-        headers: { 'x-forwarded-for': '203.0.113.1, 198.51.100.1' },
-        socket: { remoteAddress: '192.168.1.1' },
-      } as any;
-
       const res = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),
         setHeader: jest.fn(),
       } as any;
-
       const next = jest.fn();
 
-      // Make requests with forwarded IP
       for (let i = 0; i < 5; i++) {
+        const req = {
+          ip: '192.168.1.1',
+          headers: { 'x-forwarded-for': `203.0.113.${i}` },
+          socket: { remoteAddress: '192.168.1.1' },
+        } as any;
         middleware(req, res, next);
       }
-
-      // The 6th should be rate limited for that specific IP
+      const req = {
+        ip: '192.168.1.1',
+        headers: { 'x-forwarded-for': '203.0.113.99' },
+        socket: { remoteAddress: '192.168.1.1' },
+      } as any;
       middleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(429);
     });
@@ -241,6 +245,23 @@ describe('RateLimiter', () => {
       const entry = stats.entries[0];
       expect(entry.count).toBe(3);
     });
+
+    it('should not expose raw client addresses', () => {
+      const middleware = limiter.middleware();
+      const req = { ip: '203.0.113.77', headers: {}, socket: {} } as any;
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn(), setHeader: jest.fn() } as any;
+      middleware(req, res, jest.fn());
+
+      const stats = limiter.getStats();
+      expect(JSON.stringify(stats)).not.toContain('203.0.113.77');
+      expect(stats.entries[0].key).toMatch(/^[0-9a-f]{12}$/);
+      // stable within the process, different per client and per limiter instance
+      expect(limiter.getStats().entries[0].key).toBe(stats.entries[0].key);
+      const other = new RateLimiter(1000, 5);
+      other.middleware()(req, res, jest.fn());
+      expect(other.getStats().entries[0].key).not.toBe(stats.entries[0].key);
+      other.stop();
+    });
   });
 
   describe('custom message', () => {
@@ -273,5 +294,116 @@ describe('RateLimiter', () => {
         })
       );
     });
+  });
+});
+
+describe('RateLimiter headers and lifecycle', () => {
+  function makeRes() {
+    const headers: Record<string, unknown> = {};
+    const res = {
+      headers,
+      statusCode: 200,
+      status: jest.fn(function (this: any, code: number) {
+        this.statusCode = code;
+        return this;
+      }),
+      json: jest.fn(),
+      setHeader: jest.fn((k: string, v: unknown) => {
+        headers[k] = v;
+      }),
+    } as any;
+    return res;
+  }
+  const req = { ip: '10.1.1.1', headers: {}, socket: {} } as any;
+
+  it('sets limit headers on the first request of a window', () => {
+    const l = new RateLimiter(1000, 3);
+    const res = makeRes();
+    const next = jest.fn();
+    l.middleware()(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(res.headers['X-RateLimit-Limit']).toBe(3);
+    expect(res.headers['X-RateLimit-Remaining']).toBe(2);
+    expect(typeof res.headers['X-RateLimit-Reset']).toBe('string');
+    l.stop();
+  });
+
+  it('counts down remaining and sets headers on the last allowed request', () => {
+    const l = new RateLimiter(1000, 3);
+    const seen: unknown[] = [];
+    for (let i = 0; i < 3; i++) {
+      const res = makeRes();
+      l.middleware()(req, res, jest.fn());
+      seen.push(res.headers['X-RateLimit-Remaining']);
+    }
+    expect(seen).toEqual([2, 1, 0]);
+    l.stop();
+  });
+
+  it('sets headers and Retry-After on 429', () => {
+    const l = new RateLimiter(1000, 1);
+    l.middleware()(req, makeRes(), jest.fn());
+    const res = makeRes();
+    const next = jest.fn();
+    l.middleware()(req, res, next);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(429);
+    expect(res.headers['X-RateLimit-Limit']).toBe(1);
+    expect(res.headers['X-RateLimit-Remaining']).toBe(0);
+    expect(res.headers['X-RateLimit-Reset']).toBeDefined();
+    const retry = res.headers['Retry-After'] as number;
+    expect(retry).toBeGreaterThanOrEqual(1);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ retryAfter: retry }));
+    l.stop();
+  });
+
+  it('sets headers on the request that resets the window', async () => {
+    const l = new RateLimiter(60, 1);
+    l.middleware()(req, makeRes(), jest.fn());
+    await new Promise((r) => setTimeout(r, 90));
+    const res = makeRes();
+    const next = jest.fn();
+    l.middleware()(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(res.headers['X-RateLimit-Remaining']).toBe(0);
+    expect(res.headers['X-RateLimit-Limit']).toBe(1);
+    expect(res.headers['X-RateLimit-Reset']).toBeDefined();
+    l.stop();
+  });
+
+  it('skips requests matched by skip() without consuming budget', () => {
+    const l = new RateLimiter(1000, 1);
+    const mw = l.middleware({ skip: (r) => (r as any).path === '/health' });
+    for (let i = 0; i < 5; i++) {
+      const res = makeRes();
+      const next = jest.fn();
+      mw({ ...req, path: '/health' }, res, next);
+      expect(next).toHaveBeenCalled();
+      expect(res.setHeader).not.toHaveBeenCalled();
+    }
+    expect(l.getStats().totalKeys).toBe(0);
+    l.stop();
+  });
+
+  it('stop() clears the cleanup timer and is idempotent', () => {
+    jest.useFakeTimers();
+    try {
+      const l = new RateLimiter(1000, 1);
+      expect(jest.getTimerCount()).toBe(1);
+      l.stop();
+      expect(jest.getTimerCount()).toBe(0);
+      l.stop();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('cleanup timer is unref()d', () => {
+    const spy = jest.spyOn(global, 'setInterval');
+    const l = new RateLimiter(1000, 1);
+    const timer = spy.mock.results[0].value as NodeJS.Timeout;
+    expect(timer.hasRef()).toBe(false);
+    spy.mockRestore();
+    l.stop();
   });
 });

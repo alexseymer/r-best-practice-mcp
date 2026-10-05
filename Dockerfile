@@ -11,10 +11,10 @@ RUN npm ci
 
 # Copy source code
 COPY src ./src
-COPY tsconfig.json ./
+COPY tsconfig.json tailwind.config.cjs ./
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript and the precompiled Tailwind stylesheet (src/public/dashboard.css, not committed)
+RUN npm run build && test -s src/public/dashboard.css
 
 # Runtime stage
 FROM node:20-alpine
@@ -36,6 +36,12 @@ COPY --from=builder /app/dist ./dist
 
 # Web dashboard static assets (served from ./src/public at runtime)
 COPY --from=builder /app/src/public ./src/public
+
+# Build information shown by /health and /api/config (pass with --build-arg)
+ARG GIT_SHA=""
+ARG BUILD_TIME=""
+ENV GIT_SHA=$GIT_SHA \
+    BUILD_TIME=$BUILD_TIME
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
