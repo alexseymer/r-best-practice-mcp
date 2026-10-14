@@ -55,25 +55,51 @@ New features should follow the existing structure:
 
 #### Adding a Best Practice
 
-Edit `src/data/knowledge-base.ts` and add to the practices array:
+Practices live in `src/data/practices/<workflow>.ts`. A practice is plain data:
 
 ```typescript
 {
-  id: 'unique-practice-id',
+  id: 'pkg-example',               // lowercase words joined by hyphens, unique across all workflows
   title: 'Practice Title',
-  workflow: 'package',  // or other workflow
-  category: 'documentation',  // structure, naming, testing, etc.
-  severity: 'important',  // critical, important, recommended, info
-  description: 'Detailed explanation of why this practice matters.',
-  examples: [
-    '// Good example',
-    '# Bad example'
-  ],
-  tags: ['optional', 'tags']
+  workflow: 'package',             // one of the 12 workflows
+  category: 'documentation',
+  severity: 'important',           // critical, important, recommended, info
+  enforcement: 'guidance',         // new community practices must be 'guidance'
+  description: 'One-sentence summary.',
+  details: 'Why it matters, at least 60 characters.',
+  goodExample: `# the good way`,
+  badExample: `# the bad way`,
+  tags: ['optional'],
+  references: ['https://r-pkgs.org/'],   // https only, at most 5
 }
 ```
 
-Then add a corresponding test in `tests/unit/knowledge-base.test.ts`.
+Rules for practice files (CI enforces them, see `src/utils/practice-contribution.ts`):
+- Only plain strings and arrays of strings. No code, no imports of values, no template substitutions, no spreads or computed keys.
+- Put links in `references`, not in prose. Text must not address AI assistants or ask them to do anything.
+- New practices use `enforcement: 'guidance'`. A practice with an automated check needs rule code, which a maintainer adds.
+- Existing practices can be improved, but their `enforcement` and `workflow` cannot change in a community PR.
+
+Before you open a PR:
+```bash
+npm test -- practice-contribution practice-content
+npm run build
+```
+
+#### How practice PRs get merged
+
+Practice PRs merge without a single maintainer deciding:
+
+1. Open a PR that changes only files in `src/data/practices/`. It is labelled `community-practice` automatically. Any PR that also touches other files is not labelled and is reviewed by a maintainer.
+2. CI checks the contribution. Any error, or any text the checker flags, blocks auto-merge until a reviewer reads it.
+3. A PR merges when all of these hold:
+   - it is at least 7 days old and not a draft;
+   - at least 3 eligible reviewers have approved it (the latest review from each);
+   - every check passes, including *Lint, Build & Test*;
+   - nobody's latest review requests changes, and the PR has no `objection` label.
+4. An eligible reviewer has write access to the repository, or has at least 2 merged pull requests in it. Your first merged PR makes you a reviewer.
+
+Anyone can object: request changes, or add the `objection` label. An objection holds the PR until the author responds.
 
 #### Adding a Workflow Validator
 
