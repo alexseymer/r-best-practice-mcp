@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
 
@@ -7,9 +6,9 @@ function stripComments(text: string): string {
   return maskRSource(text, false);
 }
 
-async function isDir(p: string): Promise<boolean> {
+async function isDir(fsys: ProjectFs, p: string): Promise<boolean> {
   try {
-    return (await fs.promises.stat(p)).isDirectory();
+    return (await fsys.stat(p)).isDirectory;
   } catch {
     return false;
   }
@@ -36,10 +35,10 @@ export const shinytestRules: RuleDef[] = [
   {
     id: 'shinytest-recordings',
     workflows: ['shinytest'],
-    async run({ dirPath }) {
-      const testFiles = await findFiles(path.join(dirPath, 'tests'), /\.[Rr]$/);
+    async run({ dirPath, fsys }) {
+      const testFiles = await findFiles(fsys, fsys.join(dirPath, 'tests'), /\.[Rr]$/);
       for (const file of testFiles) {
-        const text = await readText(file);
+        const text = await readText(fsys, file);
         if (text !== null && RECORDING_PATTERN.test(stripComments(text))) return [];
       }
       return [
@@ -61,8 +60,8 @@ export const shinytestRules: RuleDef[] = [
   {
     id: 'shinytest-unit-tests',
     workflows: ['shinytest'],
-    async run({ dirPath }) {
-      if (await isDir(path.join(dirPath, 'tests', 'testthat'))) return [];
+    async run({ dirPath, fsys }) {
+      if (await isDir(fsys, fsys.join(dirPath, 'tests', 'testthat'))) return [];
       return [
         {
           id: 'shinytest-unit-tests',
@@ -81,19 +80,24 @@ export const shinytestRules: RuleDef[] = [
   {
     id: 'shinytest-ci-integration',
     workflows: ['shinytest'],
-    async run({ dirPath }) {
-      const workflows = await findFiles(path.join(dirPath, '.github', 'workflows'), /\.ya?ml$/i, {
-        includeHidden: true,
-      });
+    async run({ dirPath, fsys }) {
+      const workflows = await findFiles(
+        fsys,
+        fsys.join(dirPath, '.github', 'workflows'),
+        /\.ya?ml$/i,
+        {
+          includeHidden: true,
+        }
+      );
       const otherCi = [
-        path.join(dirPath, '.gitlab-ci.yml'),
-        path.join(dirPath, '.travis.yml'),
-        path.join(dirPath, '.circleci', 'config.yml'),
-        path.join(dirPath, 'azure-pipelines.yml'),
+        fsys.join(dirPath, '.gitlab-ci.yml'),
+        fsys.join(dirPath, '.travis.yml'),
+        fsys.join(dirPath, '.circleci', 'config.yml'),
+        fsys.join(dirPath, 'azure-pipelines.yml'),
       ];
       for (const file of [...workflows, ...otherCi]) {
-        if (!(await pathExists(file))) continue;
-        const text = await readText(file);
+        if (!(await pathExists(fsys, file))) continue;
+        const text = await readText(fsys, file);
         if (text !== null && CI_PATTERN.test(yamlWithoutComments(text))) return [];
       }
       return [

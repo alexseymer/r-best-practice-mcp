@@ -1,4 +1,4 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, maskRSource, readText } from './helpers.js';
 
@@ -53,11 +53,11 @@ function parseEndpoints(file: string, text: string): Endpoint[] {
   return endpoints;
 }
 
-async function loadPlumberFiles(dirPath: string): Promise<PlumberFile[]> {
-  const files = await findFiles(dirPath, /\.[Rr]$/);
+async function loadPlumberFiles(fsys: ProjectFs, dirPath: string): Promise<PlumberFile[]> {
+  const files = await findFiles(fsys, dirPath, /\.[Rr]$/);
   const out: PlumberFile[] = [];
   for (const file of files) {
-    const text = await readText(file);
+    const text = await readText(fsys, file);
     if (text === null || !(text.includes('#*') || text.includes("#'"))) continue;
     const endpoints = parseEndpoints(file, text);
     if (endpoints.length > 0) out.push({ file, endpoints });
@@ -81,8 +81,8 @@ export const plumberRules: RuleDef[] = [
   {
     id: 'plumber-docs',
     workflows: ['plumber'],
-    async run({ dirPath }) {
-      const files = await loadPlumberFiles(dirPath);
+    async run({ dirPath, fsys }) {
+      const files = await loadPlumberFiles(fsys, dirPath);
       const undocumented = files.flatMap((f) => f.endpoints).filter((e) => !e.documented);
       if (undocumented.length === 0) return [];
       const first = undocumented[0];
@@ -90,7 +90,7 @@ export const plumberRules: RuleDef[] = [
         .slice(0, 5)
         .map(
           (e) =>
-            `${path.relative(dirPath, e.file)}:${e.line} (${e.method.toUpperCase()} ${e.route})`
+            `${fsys.relative(dirPath, e.file)}:${e.line} (${e.method.toUpperCase()} ${e.route})`
         )
         .join(', ');
       return [
@@ -113,8 +113,8 @@ export const plumberRules: RuleDef[] = [
   {
     id: 'plumber-paths',
     workflows: ['plumber'],
-    async run({ dirPath }) {
-      const files = await loadPlumberFiles(dirPath);
+    async run({ dirPath, fsys }) {
+      const files = await loadPlumberFiles(fsys, dirPath);
       const bad = files
         .flatMap((f) => f.endpoints)
         .filter((e) => e.route.length > 0 && pathIssue(e.route));
@@ -141,12 +141,12 @@ export const plumberRules: RuleDef[] = [
   {
     id: 'plumber-status',
     workflows: ['plumber'],
-    async run({ dirPath }) {
-      const files = await loadPlumberFiles(dirPath);
+    async run({ dirPath, fsys }) {
+      const files = await loadPlumberFiles(fsys, dirPath);
       if (files.length === 0) return [];
-      const allR = await findFiles(dirPath, /\.[Rr]$/);
+      const allR = await findFiles(fsys, dirPath, /\.[Rr]$/);
       for (const file of allR) {
-        const text = await readText(file);
+        const text = await readText(fsys, file);
         if (
           text !== null &&
           /\bres(\$status|\[\[\s*["']status["']\s*\]\])/.test(stripComments(text))

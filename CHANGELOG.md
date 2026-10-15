@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Validation reads project files through a `ProjectFs` interface (`src/engine/project-fs.ts`), so the same rules can run on the server's disk or on files held in memory. The dashboard still uploads files to the server; the browser-only path comes next.
+- Known difference: the analysis rule checks parent folders for `.git`. The server can see them; a browser upload cannot, so an upload is never reported as inside a repository because of its parents.
+
 ### Added
 - Server hardening: path confinement to `ALLOWED_PROJECT_ROOTS` (default `/projects` in production), security headers and
   CSP (`src/middleware/security-headers.ts`), gzip compression, 1 MB body limit (`MAX_BODY_BYTES`), `/metrics*` protected by

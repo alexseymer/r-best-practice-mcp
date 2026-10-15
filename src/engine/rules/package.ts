@@ -1,19 +1,19 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { anyExists, findFiles, pathExists, readText, stripBom } from './helpers.js';
 
 const ROXYGEN_LINE = /^[ \t]*#'/m;
 
-async function rSourceFiles(dirPath: string): Promise<string[]> {
-  return findFiles(path.join(dirPath, 'R'), /\.[Rr]$/, { recursive: false });
+async function rSourceFiles(fsys: ProjectFs, dirPath: string): Promise<string[]> {
+  return findFiles(fsys, fsys.join(dirPath, 'R'), /\.[Rr]$/, { recursive: false });
 }
 
 export const packageRules: RuleDef[] = [
   {
     id: 'pkg-readme',
     workflows: ['package'],
-    async run({ dirPath }) {
-      if (await anyExists(dirPath, ['README.md', 'README.Rmd'])) return [];
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['README.md', 'README.Rmd'])) return [];
       return [
         {
           id: 'pkg-readme',
@@ -30,9 +30,9 @@ export const packageRules: RuleDef[] = [
   {
     id: 'pkg-namespace',
     workflows: ['package'],
-    async run({ dirPath }) {
-      if (!(await pathExists(path.join(dirPath, 'DESCRIPTION')))) return [];
-      if (await pathExists(path.join(dirPath, 'NAMESPACE'))) return [];
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, fsys.join(dirPath, 'DESCRIPTION')))) return [];
+      if (await pathExists(fsys, fsys.join(dirPath, 'NAMESPACE'))) return [];
       return [
         {
           id: 'pkg-namespace',
@@ -50,11 +50,11 @@ export const packageRules: RuleDef[] = [
   {
     id: 'pkg-roxygen',
     workflows: ['package'],
-    async run({ dirPath }) {
-      const files = await rSourceFiles(dirPath);
+    async run({ dirPath, fsys }) {
+      const files = await rSourceFiles(fsys, dirPath);
       if (files.length === 0) return [];
       for (const file of files) {
-        const text = await readText(file);
+        const text = await readText(fsys, file);
         // Unreadable or oversized files: stay silent rather than risk a false positive.
         if (text === null || ROXYGEN_LINE.test(stripBom(text))) return [];
       }
@@ -77,9 +77,9 @@ export const packageRules: RuleDef[] = [
   {
     id: 'pkg-vignettes',
     workflows: ['package'],
-    async run({ dirPath }) {
-      if (await pathExists(path.join(dirPath, 'vignettes'))) return [];
-      const files = await rSourceFiles(dirPath);
+    async run({ dirPath, fsys }) {
+      if (await pathExists(fsys, fsys.join(dirPath, 'vignettes'))) return [];
+      const files = await rSourceFiles(fsys, dirPath);
       if (files.length < 3) return [];
       return [
         {

@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
 
@@ -23,26 +22,26 @@ function countLines(text: string): number {
   return lines.length;
 }
 
-async function isDir(p: string): Promise<boolean> {
+async function isDir(fsys: ProjectFs, p: string): Promise<boolean> {
   try {
-    return (await fs.promises.stat(p)).isDirectory();
+    return (await fsys.stat(p)).isDirectory;
   } catch {
     return false;
   }
 }
 
 /** Shiny source: app.R, server.R, ui.R, global.R and R/*.R inside the project. */
-async function loadShinySources(dirPath: string): Promise<SourceFile[]> {
+async function loadShinySources(fsys: ProjectFs, dirPath: string): Promise<SourceFile[]> {
   const files: string[] = [];
   for (const name of TOP_LEVEL_FILES) {
-    const full = path.join(dirPath, name);
-    if (await pathExists(full)) files.push(full);
+    const full = fsys.join(dirPath, name);
+    if (await pathExists(fsys, full)) files.push(full);
   }
-  files.push(...(await findFiles(path.join(dirPath, 'R'), /\.[Rr]$/)));
+  files.push(...(await findFiles(fsys, fsys.join(dirPath, 'R'), /\.[Rr]$/)));
 
   const sources: SourceFile[] = [];
   for (const file of files) {
-    const text = await readText(file);
+    const text = await readText(fsys, file);
     if (text !== null) sources.push({ file, text, code: stripComments(text) });
   }
   return sources;
@@ -60,8 +59,8 @@ export const shinyRules: RuleDef[] = [
   {
     id: 'shiny-validation',
     workflows: ['shiny'],
-    async run({ dirPath }) {
-      const sources = await loadShinySources(dirPath);
+    async run({ dirPath, fsys }) {
+      const sources = await loadShinySources(fsys, dirPath);
       const usesInput = sources.filter((s) => /\binput(\$|\[\[)/.test(s.code));
       if (usesInput.length === 0) return [];
       const hasValidation = sources.some((s) => VALIDATION_PATTERNS.some((p) => p.test(s.code)));
@@ -76,7 +75,7 @@ export const shinyRules: RuleDef[] = [
             'Consider validating user inputs: the app reads input values but never uses req(), validate()/need(), shinyvalidate or shinyFeedback',
           details: `Files reading input: ${usesInput
             .slice(0, 5)
-            .map((s) => path.relative(dirPath, s.file))
+            .map((s) => fsys.relative(dirPath, s.file))
             .join(', ')}. This is a heuristic based on keyword search.`,
           suggestions: [
             'Guard reactives and outputs with req(input$x) so they wait for valid input',
@@ -90,8 +89,8 @@ export const shinyRules: RuleDef[] = [
   {
     id: 'shiny-modules',
     workflows: ['shiny'],
-    async run({ dirPath }) {
-      const sources = await loadShinySources(dirPath);
+    async run({ dirPath, fsys }) {
+      const sources = await loadShinySources(fsys, dirPath);
       const total = sources.reduce((sum, s) => sum + countLines(s.text), 0);
       if (total <= 300) return [];
       if (sources.some((s) => /\b(moduleServer|callModule)\(/.test(s.code))) return [];
@@ -115,18 +114,18 @@ export const shinyRules: RuleDef[] = [
   {
     id: 'shiny-separation',
     workflows: ['shiny'],
-    async run({ dirPath }) {
-      const appFile = path.join(dirPath, 'app.R');
-      const text = await readText(appFile);
+    async run({ dirPath, fsys }) {
+      const appFile = fsys.join(dirPath, 'app.R');
+      const text = await readText(fsys, appFile);
       if (text === null) return [];
       const lines = countLines(text);
       if (lines <= 200) return [];
       const code = stripComments(text);
       if (!/^\s*ui\s*(<-|=)/m.test(code) || !/^\s*server\s*(<-|=)/m.test(code)) return [];
-      if (await isDir(path.join(dirPath, 'R'))) return [];
+      if (await isDir(fsys, fsys.join(dirPath, 'R'))) return [];
       if (
-        (await pathExists(path.join(dirPath, 'ui.R'))) ||
-        (await pathExists(path.join(dirPath, 'server.R')))
+        (await pathExists(fsys, fsys.join(dirPath, 'ui.R'))) ||
+        (await pathExists(fsys, fsys.join(dirPath, 'server.R')))
       ) {
         return [];
       }

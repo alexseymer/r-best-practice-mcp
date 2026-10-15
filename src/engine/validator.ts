@@ -1,10 +1,16 @@
-import path from 'path';
 import { FileValidationResult, Finding, ValidationResult } from '../types/finding.js';
 import { Workflow } from '../types/workflow.js';
-import { FileUtils } from '../utils/file.js';
 import { logger } from '../utils/logger.js';
 import { runRegisteredRules } from './rules/index.js';
-import { compareNames, findFiles, maskRSource, readText, stripBom } from './rules/helpers.js';
+import { nodeProjectFs, ProjectFs } from './project-fs.js';
+import {
+  compareNames,
+  findFiles,
+  maskRSource,
+  pathExists,
+  readText,
+  stripBom,
+} from './rules/helpers.js';
 import { applyFindingFilters, FindingFilterOptions, summarizeFindings } from './finding-filters.js';
 
 const RSCRIPT_GLOBALS_THRESHOLD = 15;
@@ -30,6 +36,46 @@ export const UNKNOWN_WORKFLOW_WARNING =
   'No R project type was detected in this folder, so no workflow-specific checks ran. Choose a workflow type or check the path.';
 
 export class Validator {
+  /** Where project files are read from: the server's disk by default, or an in-memory copy. */
+  constructor(private readonly fsys: ProjectFs = nodeProjectFs) {}
+
+  private exists(p: string): Promise<boolean> {
+    return pathExists(this.fsys, p);
+  }
+
+  private async isDirectory(p: string): Promise<boolean> {
+    try {
+      return (await this.fsys.stat(p)).isDirectory;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Same contract as the former FileUtils.listFiles: skips hidden entries and node_modules. */
+  private async listFiles(dirPath: string, pattern?: RegExp, recursive = false): Promise<string[]> {
+    const files: string[] = [];
+    const traverse = async (dir: string): Promise<void> => {
+      for (const entry of await this.fsys.readdir(dir)) {
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const fullPath = this.fsys.join(dir, entry.name);
+        if (entry.isDirectory && recursive) {
+          await traverse(fullPath);
+        } else if (entry.isFile && (!pattern || pattern.test(entry.name))) {
+          files.push(fullPath);
+        }
+      }
+    };
+    await traverse(dirPath);
+    return files;
+  }
+
+  /** Same result as path.extname: '' for names without a dot or starting with one. */
+  private getExtension(filePath: string): string {
+    const name = this.fsys.basename(filePath);
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(dot) : '';
+  }
+
   async validateProject(
     dirPath: string,
     workflow: Workflow,
@@ -80,7 +126,7 @@ export class Validator {
           break;
       }
 
-      findings.push(...(await runRegisteredRules({ dirPath, workflow })));
+      findings.push(...(await runRegisteredRules({ dirPath, workflow, fsys: this.fsys })));
 
       // Summary counts everything found; filters only narrow the returned list.
       const summary = summarizeFindings(findings);
@@ -142,10 +188,10 @@ export class Validator {
 
   private async collectFileFindings(filePath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const ext = FileUtils.getExtension(filePath);
+    const ext = this.getExtension(filePath);
 
     try {
-      const content = await FileUtils.readFile(filePath);
+      const content = await this.fsys.readFile(filePath);
       const lines = content.split('\n');
 
       // Check file structure
@@ -166,14 +212,14 @@ export class Validator {
   // ============== R SCRIPT VALIDATORS ==============
   private async validateRScript(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+    const rFiles = await this.listFiles(dirPath, /\.R$/, false);
 
     // Check for a header comment: one finding, for the first script (sorted) that lacks one
-    const scripts = (await findFiles(dirPath, /\.[Rr]$/, { recursive: false })).sort((x, y) =>
-      compareNames(path.basename(x), path.basename(y))
+    const scripts = (await findFiles(this.fsys, dirPath, /\.[Rr]$/, { recursive: false })).sort(
+      (x, y) => compareNames(this.fsys.basename(x), this.fsys.basename(y))
     );
     for (const file of scripts) {
-      const text = await readText(file);
+      const text = await readText(this.fsys, file);
       if (text === null) continue;
       if (!stripBom(text).startsWith('#')) {
         findings.push({
@@ -191,7 +237,7 @@ export class Validator {
 
     // One finding for the project: the first long root script without any function
     for (const file of scripts) {
-      const text = await readText(file);
+      const text = await readText(this.fsys, file);
       if (text === null) continue;
       const found = this.validateRFile(file, stripBom(text).split('\n'));
       if (found.length > 0) {
@@ -202,7 +248,7 @@ export class Validator {
 
     // One finding for the project: the first root script that is mostly top-level assignments
     for (const file of rFiles) {
-      const content = await FileUtils.readFile(file);
+      const content = await this.fsys.readFile(file);
       const globals = this.findTopLevelAssignments(content.split(/\r?\n/));
       if (globals.length > RSCRIPT_GLOBALS_THRESHOLD) {
         findings.push({
@@ -242,7 +288,7 @@ export class Validator {
   // ============== QUARTO VALIDATORS ==============
   private async validateQuarto(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const qmdFiles = await FileUtils.listFiles(dirPath, /\.qmd$/, false);
+    const qmdFiles = await this.listFiles(dirPath, /\.qmd$/, false);
 
     for (const file of qmdFiles) {
       const fileFindings = await this.validateFile(file);
@@ -257,9 +303,9 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for app.R or ui.R/server.R
-    const appRExists = await FileUtils.exists(`${dirPath}/app.R`);
-    const uiRExists = await FileUtils.exists(`${dirPath}/ui.R`);
-    const serverRExists = await FileUtils.exists(`${dirPath}/server.R`);
+    const appRExists = await this.exists(`${dirPath}/app.R`);
+    const uiRExists = await this.exists(`${dirPath}/ui.R`);
+    const serverRExists = await this.exists(`${dirPath}/server.R`);
 
     if (!appRExists && !(uiRExists && serverRExists)) {
       findings.push({
@@ -276,8 +322,7 @@ export class Validator {
 
     // Check for README
     const readmeExists =
-      (await FileUtils.exists(`${dirPath}/README.md`)) ||
-      (await FileUtils.exists(`${dirPath}/README.Rmd`));
+      (await this.exists(`${dirPath}/README.md`)) || (await this.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'shiny-readme',
@@ -296,7 +341,7 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check DESCRIPTION
-    const descExists = await FileUtils.exists(`${dirPath}/DESCRIPTION`);
+    const descExists = await this.exists(`${dirPath}/DESCRIPTION`);
     if (!descExists) {
       findings.push({
         id: 'pkg-description',
@@ -308,7 +353,7 @@ export class Validator {
       return findings;
     }
 
-    const desc = await FileUtils.readFile(`${dirPath}/DESCRIPTION`);
+    const desc = await this.fsys.readFile(`${dirPath}/DESCRIPTION`);
 
     // Check required fields (matched at line start, not as substrings)
     const hasField = (field: string) => new RegExp(`^${field}:`, 'm').test(desc.replace(/\r/g, ''));
@@ -332,7 +377,7 @@ export class Validator {
     }
 
     // Check for R directory
-    const rDirExists = await FileUtils.isDirectory(`${dirPath}/R`);
+    const rDirExists = await this.isDirectory(`${dirPath}/R`);
     if (!rDirExists) {
       findings.push({
         id: 'pkg-structure',
@@ -344,7 +389,7 @@ export class Validator {
     }
 
     // Check for tests
-    const testsExist = await FileUtils.isDirectory(`${dirPath}/tests`);
+    const testsExist = await this.isDirectory(`${dirPath}/tests`);
     if (!testsExist) {
       findings.push({
         id: 'pkg-tests',
@@ -371,7 +416,7 @@ export class Validator {
     } else if (/file\s+LICEN[CS]E/.test(licenseMatch[1])) {
       let licenseFileExists = false;
       for (const name of ['LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md']) {
-        if (await FileUtils.exists(`${dirPath}/${name}`)) {
+        if (await this.exists(`${dirPath}/${name}`)) {
           licenseFileExists = true;
           break;
         }
@@ -397,7 +442,7 @@ export class Validator {
   private async validateRenv(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    const lockExists = await FileUtils.exists(`${dirPath}/renv.lock`);
+    const lockExists = await this.exists(`${dirPath}/renv.lock`);
     if (!lockExists) {
       findings.push({
         id: 'renv-lock',
@@ -415,7 +460,7 @@ export class Validator {
   private async validateTargets(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
 
-    const targetsExists = await FileUtils.exists(`${dirPath}/_targets.R`);
+    const targetsExists = await this.exists(`${dirPath}/_targets.R`);
     if (!targetsExists) {
       findings.push({
         id: 'targets-structure',
@@ -427,7 +472,7 @@ export class Validator {
       return findings;
     }
 
-    const content = await FileUtils.readFile(`${dirPath}/_targets.R`);
+    const content = await this.fsys.readFile(`${dirPath}/_targets.R`);
 
     // Check for a target list: list() or tarchetypes::tar_plan() (comments do not count)
     if (!/(^|[^A-Za-z0-9_.])(list|tar_plan)\s*\(/.test(maskRSource(content, true))) {
@@ -448,12 +493,12 @@ export class Validator {
   // ============== PLUMBER VALIDATORS ==============
   private async validatePlumber(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const rFiles = await findFiles(dirPath, /\.[Rr]$/);
+    const rFiles = await findFiles(this.fsys, dirPath, /\.[Rr]$/);
 
     const endpoint = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b/im;
 
     for (const file of rFiles) {
-      const raw = await readText(file);
+      const raw = await readText(this.fsys, file);
       if (raw === null || !endpoint.test(raw)) continue;
       // Comments (including annotations) and string contents must not satisfy the checks
       const content = maskRSource(raw, true);
@@ -494,7 +539,7 @@ export class Validator {
   // ============== R MARKDOWN VALIDATORS ==============
   private async validateRMarkdown(dirPath: string): Promise<Finding[]> {
     const findings: Finding[] = [];
-    const rmdFiles = await FileUtils.listFiles(dirPath, /\.Rmd$/, false);
+    const rmdFiles = await this.listFiles(dirPath, /\.Rmd$/, false);
 
     for (const file of rmdFiles) {
       const fileFindings = await this.validateFile(file);
@@ -512,7 +557,7 @@ export class Validator {
     const readmeNames = ['README.md', 'README.Rmd', 'README'];
     let readmeExists = false;
     for (const name of readmeNames) {
-      if (await FileUtils.exists(`${dirPath}/${name}`)) {
+      if (await this.exists(`${dirPath}/${name}`)) {
         readmeExists = true;
         break;
       }
@@ -530,7 +575,7 @@ export class Validator {
     // Check directory structure
     const dirs = ['data', 'R', 'output'];
     for (const dir of dirs) {
-      const exists = await FileUtils.isDirectory(`${dirPath}/${dir}`);
+      const exists = await this.isDirectory(`${dirPath}/${dir}`);
       if (!exists) {
         findings.push({
           id: 'analysis-structure',
@@ -650,8 +695,8 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for _bookdown.yml or _bookdown.yaml
-    const bookdownYml = await FileUtils.exists(`${dirPath}/_bookdown.yml`);
-    const bookdownYaml = await FileUtils.exists(`${dirPath}/_bookdown.yaml`);
+    const bookdownYml = await this.exists(`${dirPath}/_bookdown.yml`);
+    const bookdownYaml = await this.exists(`${dirPath}/_bookdown.yaml`);
 
     if (!bookdownYml && !bookdownYaml) {
       findings.push({
@@ -664,7 +709,7 @@ export class Validator {
     }
 
     // Check for index.Rmd
-    const indexRmd = await FileUtils.exists(`${dirPath}/index.Rmd`);
+    const indexRmd = await this.exists(`${dirPath}/index.Rmd`);
     if (!indexRmd) {
       findings.push({
         id: 'bookdown-index',
@@ -677,8 +722,7 @@ export class Validator {
 
     // Check for README
     const readmeExists =
-      (await FileUtils.exists(`${dirPath}/README.md`)) ||
-      (await FileUtils.exists(`${dirPath}/README.Rmd`));
+      (await this.exists(`${dirPath}/README.md`)) || (await this.exists(`${dirPath}/README.Rmd`));
     if (!readmeExists) {
       findings.push({
         id: 'bookdown-readme',
@@ -697,7 +741,7 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for config file (Hugo accepts several names and a config directory)
-    let hasConfig = await FileUtils.isDirectory(`${dirPath}/config/_default`);
+    let hasConfig = await this.isDirectory(`${dirPath}/config/_default`);
     for (const name of [
       'config.toml',
       'config.yaml',
@@ -708,7 +752,7 @@ export class Validator {
       'config.json',
       'hugo.json',
     ]) {
-      if (!hasConfig && (await FileUtils.exists(`${dirPath}/${name}`))) hasConfig = true;
+      if (!hasConfig && (await this.exists(`${dirPath}/${name}`))) hasConfig = true;
     }
 
     if (!hasConfig) {
@@ -723,7 +767,7 @@ export class Validator {
     }
 
     // Check for content directory
-    const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
+    const contentDir = await this.isDirectory(`${dirPath}/content`);
     if (!contentDir) {
       findings.push({
         id: 'blogdown-content-structure',
@@ -735,7 +779,7 @@ export class Validator {
     }
 
     // Check for themes directory
-    const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
+    const themesDir = await this.isDirectory(`${dirPath}/themes`);
     if (!themesDir) {
       findings.push({
         id: 'blogdown-theme',
@@ -754,8 +798,8 @@ export class Validator {
     const findings: Finding[] = [];
 
     // Check for test directory (shinytest2 runs through testthat)
-    const shinytestDir = await FileUtils.isDirectory(`${dirPath}/tests/shinytest`);
-    const testthatDir = await FileUtils.isDirectory(`${dirPath}/tests/testthat`);
+    const shinytestDir = await this.isDirectory(`${dirPath}/tests/shinytest`);
+    const testthatDir = await this.isDirectory(`${dirPath}/tests/testthat`);
     const testDir = shinytestDir || testthatDir;
     if (!testDir) {
       findings.push({
@@ -771,10 +815,9 @@ export class Validator {
     }
 
     // Check for app.R or ui.R/server.R
-    const appR = await FileUtils.exists(`${dirPath}/app.R`);
+    const appR = await this.exists(`${dirPath}/app.R`);
     const uiServer =
-      (await FileUtils.exists(`${dirPath}/ui.R`)) &&
-      (await FileUtils.exists(`${dirPath}/server.R`));
+      (await this.exists(`${dirPath}/ui.R`)) && (await this.exists(`${dirPath}/server.R`));
     if (!appR && !uiServer) {
       findings.push({
         id: 'shinytest-app',
@@ -794,7 +837,7 @@ export class Validator {
       'tests/setup.R',
       'tests/shinytest/setup.R',
     ]) {
-      if (await FileUtils.exists(`${dirPath}/${rel}`)) {
+      if (await this.exists(`${dirPath}/${rel}`)) {
         testSetup = true;
         break;
       }

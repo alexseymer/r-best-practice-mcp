@@ -1,4 +1,3 @@
-import path from 'path';
 import { RuleDef } from './types.js';
 import { pathExists } from './helpers.js';
 
@@ -6,9 +5,9 @@ export const renvRules: RuleDef[] = [
   {
     id: 'renv-init',
     workflows: ['renv'],
-    async run({ dirPath }) {
-      if (!(await pathExists(path.join(dirPath, 'renv.lock')))) return [];
-      if (await pathExists(path.join(dirPath, 'renv', 'activate.R'))) return [];
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, fsys.join(dirPath, 'renv.lock')))) return [];
+      if (await pathExists(fsys, fsys.join(dirPath, 'renv', 'activate.R'))) return [];
       return [
         {
           id: 'renv-init',

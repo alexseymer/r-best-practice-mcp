@@ -1,4 +1,4 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { pathExists } from './helpers.js';
 
@@ -6,13 +6,17 @@ import { pathExists } from './helpers.js';
  * True if `dirPath` or any parent directory contains a `.git` entry.
  * The walk checks `stopAt` (inclusive) and then stops; without it, it walks to the filesystem root.
  */
-export async function hasGitRepo(dirPath: string, stopAt?: string): Promise<boolean> {
-  let current = path.resolve(dirPath);
-  const stop = stopAt ? path.resolve(stopAt) : undefined;
+export async function hasGitRepo(
+  fsys: ProjectFs,
+  dirPath: string,
+  stopAt?: string
+): Promise<boolean> {
+  let current = fsys.resolve(dirPath);
+  const stop = stopAt ? fsys.resolve(stopAt) : undefined;
   for (;;) {
-    if (await pathExists(path.join(current, '.git'))) return true;
+    if (await pathExists(fsys, fsys.join(current, '.git'))) return true;
     if (stop !== undefined && current === stop) return false;
-    const parent = path.dirname(current);
+    const parent = fsys.dirname(current);
     if (parent === current) return false;
     current = parent;
   }
@@ -22,8 +26,8 @@ export const analysisRules: RuleDef[] = [
   {
     id: 'analysis-versioning',
     workflows: ['analysis'],
-    async run({ dirPath }) {
-      if (await hasGitRepo(dirPath)) return [];
+    async run({ dirPath, fsys }) {
+      if (await hasGitRepo(fsys, dirPath)) return [];
       return [
         {
           id: 'analysis-versioning',
