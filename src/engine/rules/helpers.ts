@@ -1,5 +1,4 @@
-import fs from 'fs';
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 
 export const MAX_FILES = 200;
 export const MAX_BYTES = 1_000_000;
@@ -76,6 +75,7 @@ export function stripLineComment(line: string): string {
 
 /** Sorted, capped file listing. `pattern` is matched against the file name. */
 export async function findFiles(
+  fsys: ProjectFs,
   dirPath: string,
   pattern: RegExp,
   options: FindFilesOptions = {}
@@ -85,9 +85,9 @@ export async function findFiles(
   const out: string[] = [];
 
   const walk = async (dir: string): Promise<void> => {
-    let entries: fs.Dirent[];
+    let entries: Awaited<ReturnType<ProjectFs['readdir']>>;
     try {
-      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+      entries = await fsys.readdir(dir);
     } catch {
       return;
     }
@@ -96,10 +96,10 @@ export async function findFiles(
       if (out.length >= MAX_FILES) return;
       if (skipped.has(entry.name)) continue;
       if (!includeHidden && entry.name.startsWith('.')) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
+      const full = fsys.join(dir, entry.name);
+      if (entry.isDirectory) {
         if (recursive) await walk(full);
-      } else if (entry.isFile() && pattern.test(entry.name)) {
+      } else if (entry.isFile && pattern.test(entry.name)) {
         out.push(full);
       }
     }
@@ -110,19 +110,19 @@ export async function findFiles(
 }
 
 /** Reads a UTF-8 text file; returns null if it is missing, unreadable or larger than MAX_BYTES. */
-export async function readText(filePath: string): Promise<string | null> {
+export async function readText(fsys: ProjectFs, filePath: string): Promise<string | null> {
   try {
-    const stat = await fs.promises.stat(filePath);
-    if (!stat.isFile() || stat.size > MAX_BYTES) return null;
-    return await fs.promises.readFile(filePath, 'utf-8');
+    const stat = await fsys.stat(filePath);
+    if (!stat.isFile || stat.size > MAX_BYTES) return null;
+    return await fsys.readFile(filePath);
   } catch {
     return null;
   }
 }
 
-export async function pathExists(p: string): Promise<boolean> {
+export async function pathExists(fsys: ProjectFs, p: string): Promise<boolean> {
   try {
-    await fs.promises.access(p);
+    await fsys.stat(p);
     return true;
   } catch {
     return false;
@@ -130,7 +130,11 @@ export async function pathExists(p: string): Promise<boolean> {
 }
 
 /** True if any of the candidate names exists directly inside dirPath. */
-export async function anyExists(dirPath: string, names: string[]): Promise<boolean> {
-  const results = await Promise.all(names.map((n) => pathExists(path.join(dirPath, n))));
+export async function anyExists(
+  fsys: ProjectFs,
+  dirPath: string,
+  names: string[]
+): Promise<boolean> {
+  const results = await Promise.all(names.map((n) => pathExists(fsys, fsys.join(dirPath, n))));
   return results.some(Boolean);
 }

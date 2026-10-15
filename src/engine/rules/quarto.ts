@@ -1,4 +1,4 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, readText } from './helpers.js';
 
@@ -99,16 +99,17 @@ export interface LoadedDoc extends ParsedDoc {
 }
 
 export async function loadDocs(
+  fsys: ProjectFs,
   dirPath: string,
   pattern: RegExp,
   recursive = true
 ): Promise<LoadedDoc[]> {
-  const files = await findFiles(dirPath, pattern, { recursive });
+  const files = await findFiles(fsys, dirPath, pattern, { recursive });
   const docs: LoadedDoc[] = [];
   for (const file of files) {
-    const text = await readText(file);
+    const text = await readText(fsys, file);
     if (text === null) continue;
-    docs.push({ ...parseDoc(text), file, name: path.relative(dirPath, file) || file });
+    docs.push({ ...parseDoc(text), file, name: fsys.relative(dirPath, file) || file });
   }
   return docs;
 }
@@ -119,10 +120,10 @@ export function summarize(items: string[]): string {
   return items.length > 5 ? `${shown} (and ${items.length - 5} more)` : shown;
 }
 
-async function readProjectConfig(dirPath: string): Promise<string> {
+async function readProjectConfig(fsys: ProjectFs, dirPath: string): Promise<string> {
   const parts: string[] = [];
   for (const name of ['_quarto.yml', '_quarto.yaml']) {
-    const t = await readText(path.join(dirPath, name));
+    const t = await readText(fsys, fsys.join(dirPath, name));
     if (t !== null) parts.push(t);
   }
   return parts.join('\n');
@@ -198,8 +199,8 @@ export const quartoRules: RuleDef[] = [
   {
     id: 'quarto-options',
     workflows: ['quarto'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.qmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.qmd$/);
       const chunks = docs.flatMap((d) => d.chunks);
       if (chunks.length === 0) return [];
       if (chunks.some((c) => c.optionLines.length > 0)) return [];
@@ -207,7 +208,7 @@ export const quartoRules: RuleDef[] = [
       if (chunks.some((c) => hasHeaderOption(c) || callsOptsChunkSet(c.code))) return [];
       const execRe = /^execute\s*:/m;
       if (docs.some((d) => execRe.test(d.frontMatter))) return [];
-      if (execRe.test(await readProjectConfig(dirPath))) return [];
+      if (execRe.test(await readProjectConfig(fsys, dirPath))) return [];
       const first = docs.find((d) => d.chunks.length > 0)!;
       return [
         {
@@ -230,12 +231,12 @@ export const quartoRules: RuleDef[] = [
   {
     id: 'quarto-caching',
     workflows: ['quarto'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.qmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.qmd$/);
       const total = docs.reduce((n, d) => n + d.chunks.length, 0);
       if (total < 3) return [];
       const setting = /(^|[^A-Za-z0-9_])(cache|freeze)\s*[:=]/m;
-      if (setting.test(await readProjectConfig(dirPath))) return [];
+      if (setting.test(await readProjectConfig(fsys, dirPath))) return [];
       for (const d of docs) {
         if (setting.test(d.frontMatter)) return [];
         for (const c of d.chunks) {
@@ -262,8 +263,8 @@ export const quartoRules: RuleDef[] = [
   {
     id: 'quarto-text',
     workflows: ['quarto'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.qmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.qmd$/);
       const sparse = docs.filter((d) => d.chunks.length >= 2 && d.narrative.length < 3);
       if (sparse.length === 0) return [];
       return [
@@ -284,8 +285,8 @@ export const quartoRules: RuleDef[] = [
   {
     id: 'quarto-figures',
     workflows: ['quarto'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.qmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.qmd$/);
       const hits: { doc: LoadedDoc; chunk: Chunk }[] = [];
       for (const doc of docs) {
         for (const chunk of doc.chunks) {
@@ -314,8 +315,8 @@ export const quartoRules: RuleDef[] = [
   {
     id: 'quarto-tables',
     workflows: ['quarto'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.qmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.qmd$/);
       const hits: { doc: LoadedDoc; chunk: Chunk }[] = [];
       for (const doc of docs) {
         for (const chunk of doc.chunks) {

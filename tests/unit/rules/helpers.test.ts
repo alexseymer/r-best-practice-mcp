@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../../../src/engine/project-fs';
 import path from 'path';
 import { createTempDir, cleanupTempDir, createFile } from '../../fixtures/setup';
 import {
@@ -41,7 +42,10 @@ describe('rule helpers', () => {
     it('skips the default directories at any depth, and hidden files', async () => {
       layout();
       createFile(dir, 'content/docs/nested.md', 'x');
-      expect(rel(dir, await findFiles(dir, /\.md$/))).toEqual(['keep/a.md', 'top.md']);
+      expect(rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/))).toEqual([
+        'keep/a.md',
+        'top.md',
+      ]);
     });
 
     it('exports the default skip list', () => {
@@ -53,7 +57,10 @@ describe('rule helpers', () => {
     it('skipDirs replaces the default list', async () => {
       layout();
       createFile(dir, 'content/docs/nested.md', 'x');
-      const files = rel(dir, await findFiles(dir, /\.md$/, { skipDirs: ['node_modules', '.git'] }));
+      const files = rel(
+        dir,
+        await findFiles(nodeProjectFs, dir, /\.md$/, { skipDirs: ['node_modules', '.git'] })
+      );
       expect(files).toEqual([
         '_book/a.md',
         '_site/a.md',
@@ -68,7 +75,7 @@ describe('rule helpers', () => {
 
     it('an empty skipDirs list skips nothing but hidden entries', async () => {
       layout();
-      const files = rel(dir, await findFiles(dir, /\.md$/, { skipDirs: [] }));
+      const files = rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/, { skipDirs: [] }));
       expect(files).toContain('docs/a.md');
       expect(files).toContain('node_modules/a.md');
       expect(files).not.toContain('.git/a.md');
@@ -79,7 +86,10 @@ describe('rule helpers', () => {
       layout();
       const files = rel(
         dir,
-        await findFiles(dir, /\.md$/, { includeHidden: true, skipDirs: ['node_modules'] })
+        await findFiles(nodeProjectFs, dir, /\.md$/, {
+          includeHidden: true,
+          skipDirs: ['node_modules'],
+        })
       );
       expect(files).toContain('.git/a.md');
       expect(files).toContain('.hidden.md');
@@ -89,18 +99,20 @@ describe('rule helpers', () => {
     it('recursive: false lists only the top level', async () => {
       createFile(dir, 'a.md', 'x');
       createFile(dir, 'sub/b.md', 'x');
-      expect(rel(dir, await findFiles(dir, /\.md$/, { recursive: false }))).toEqual(['a.md']);
+      expect(rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/, { recursive: false }))).toEqual([
+        'a.md',
+      ]);
     });
 
     it('returns an empty list for a missing directory', async () => {
-      expect(await findFiles(path.join(dir, 'nope'), /./)).toEqual([]);
+      expect(await findFiles(nodeProjectFs, path.join(dir, 'nope'), /./)).toEqual([]);
     });
 
     it('orders names locale-independently (code unit order)', async () => {
       for (const n of ['b.md', 'B.md', 'a.md', 'A.md', '_x.md', '10.md', '9.md']) {
         createFile(dir, n, 'x');
       }
-      expect(rel(dir, await findFiles(dir, /\.md$/))).toEqual([
+      expect(rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/))).toEqual([
         '10.md',
         '9.md',
         'A.md',
@@ -114,7 +126,7 @@ describe('rule helpers', () => {
     it('caps the result at MAX_FILES and returns the first files in sorted order', async () => {
       expect(MAX_FILES).toBe(200);
       for (let i = 0; i < 250; i++) createFile(dir, `f${String(i).padStart(3, '0')}.md`, 'x');
-      const files = rel(dir, await findFiles(dir, /\.md$/));
+      const files = rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/));
       expect(files).toHaveLength(200);
       expect(files[0]).toBe('f000.md');
       expect(files[199]).toBe('f199.md');
@@ -124,7 +136,7 @@ describe('rule helpers', () => {
     it('caps across subdirectories deterministically', async () => {
       for (let i = 0; i < 150; i++) createFile(dir, `a/f${String(i).padStart(3, '0')}.md`, 'x');
       for (let i = 0; i < 150; i++) createFile(dir, `b/f${String(i).padStart(3, '0')}.md`, 'x');
-      const files = rel(dir, await findFiles(dir, /\.md$/));
+      const files = rel(dir, await findFiles(nodeProjectFs, dir, /\.md$/));
       expect(files).toHaveLength(200);
       expect(files.filter((f) => f.startsWith('a/'))).toHaveLength(150);
       expect(files.filter((f) => f.startsWith('b/'))).toHaveLength(50);

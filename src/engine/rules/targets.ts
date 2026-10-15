@@ -1,4 +1,3 @@
-import path from 'path';
 import { RuleDef } from './types.js';
 import { findFiles, maskRSource, readText } from './helpers.js';
 
@@ -18,14 +17,14 @@ export const targetsRules: RuleDef[] = [
   {
     id: 'targets-naming',
     workflows: ['targets'],
-    async run({ dirPath }) {
+    async run({ dirPath, fsys }) {
       const files = [
-        path.join(dirPath, '_targets.R'),
-        ...(await findFiles(path.join(dirPath, 'R'), /\.[Rr]$/)),
+        fsys.join(dirPath, '_targets.R'),
+        ...(await findFiles(fsys, fsys.join(dirPath, 'R'), /\.[Rr]$/)),
       ];
       const bad: { name: string; file: string; line: number }[] = [];
       for (const file of files) {
-        const content = await readText(file);
+        const content = await readText(fsys, file);
         if (content === null) continue;
         // Comments and string contents are blanked (same length), so calls spanning several
         // lines are matched as a whole and the line comes from the match index.

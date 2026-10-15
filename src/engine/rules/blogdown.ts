@@ -1,4 +1,4 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, readText, anyExists } from './helpers.js';
 
@@ -18,13 +18,13 @@ const HUGO_CONFIGS = [
 ];
 const PUBLISH_DIR = /^\s*["']?publishDir["']?\s*[:=]/im;
 
-async function hasPublishDir(dirPath: string): Promise<boolean> {
+async function hasPublishDir(fsys: ProjectFs, dirPath: string): Promise<boolean> {
   const files = [
-    ...HUGO_CONFIGS.map((n) => path.join(dirPath, n)),
-    ...(await findFiles(path.join(dirPath, 'config'), /\.(toml|ya?ml|json)$/i)),
+    ...HUGO_CONFIGS.map((n) => fsys.join(dirPath, n)),
+    ...(await findFiles(fsys, fsys.join(dirPath, 'config'), /\.(toml|ya?ml|json)$/i)),
   ];
   for (const file of files) {
-    const text = await readText(file);
+    const text = await readText(fsys, file);
     if (text !== null && PUBLISH_DIR.test(text)) return true;
   }
   return false;
@@ -42,18 +42,18 @@ export const blogdownRules: RuleDef[] = [
   {
     id: 'blogdown-metadata',
     workflows: ['blogdown'],
-    async run({ dirPath }) {
-      const files = await findFiles(path.join(dirPath, 'content'), POST_FILE, {
+    async run({ dirPath, fsys }) {
+      const files = await findFiles(fsys, fsys.join(dirPath, 'content'), POST_FILE, {
         skipDirs: CONTENT_SKIPPED_DIRS,
       });
       const missing: string[] = [];
       for (const file of files) {
-        const content = await readText(file);
+        const content = await readText(fsys, file);
         if (content === null || content.trim() === '') continue;
         if (!hasFrontMatter(content)) missing.push(file);
       }
       if (missing.length === 0) return [];
-      const names = missing.slice(0, 5).map((f) => path.relative(dirPath, f));
+      const names = missing.slice(0, 5).map((f) => fsys.relative(dirPath, f));
       return [
         {
           id: 'blogdown-metadata',
@@ -76,9 +76,9 @@ export const blogdownRules: RuleDef[] = [
   {
     id: 'blogdown-deployment',
     workflows: ['blogdown'],
-    async run({ dirPath }) {
+    async run({ dirPath, fsys }) {
       if (
-        await anyExists(dirPath, [
+        await anyExists(fsys, dirPath, [
           'netlify.toml',
           'vercel.json',
           'render.yaml',
@@ -86,13 +86,13 @@ export const blogdownRules: RuleDef[] = [
           '.travis.yml',
           'azure-pipelines.yml',
           '.netlify',
-          path.join('.circleci', 'config.yml'),
+          fsys.join('.circleci', 'config.yml'),
         ])
       ) {
         return [];
       }
-      if (await hasPublishDir(dirPath)) return [];
-      const workflows = await findFiles(path.join(dirPath, '.github', 'workflows'), /./, {
+      if (await hasPublishDir(fsys, dirPath)) return [];
+      const workflows = await findFiles(fsys, fsys.join(dirPath, '.github', 'workflows'), /./, {
         includeHidden: true,
       });
       if (workflows.length > 0) return [];
