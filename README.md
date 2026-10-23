@@ -17,6 +17,10 @@ The R Best Practices MCP Server helps developers write better R code by:
 - **Validating** projects against best practices with detailed findings
 - **Generating** scaffold templates for new projects
 - **Providing** knowledge base access to 70 best practices (59 checked automatically, 11 guidance-only)
+- **Validating uploads** from the browser: a visitor can send a project folder to the server, or (planned) check it in the browser
+- **Taking contributions** from the community: new practices are proposed by pull request, see [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+The product and its requirements are described in [SPEC.md](./SPEC.md).
 
 ### Supported Workflows
 
@@ -69,11 +73,11 @@ Access to 70 best practices:
 
 ### 🔐 Security & Rate Limiting
 Production-ready security features:
-- **Path traversal protection** — Prevents directory traversal attacks
-- **Input sanitization** — Removes shell metacharacters and validates paths
-- **Rate limiting** — 100 requests per 60 seconds per IP address
-- **Request size limits** — 50MB maximum request body
-- **HTTPS/TLS support** — Full SSL configuration with reverse proxy
+- **Path confinement** — Server paths must lie under the configured roots (`/projects` in production); a rejected path returns the same error whether or not it exists
+- **Rate limiting** — 100 requests per 60 seconds per client IP (`TRUST_PROXY` is needed behind a reverse proxy)
+- **Request size limits** — 1 MB per request body; 8 MB for the upload route only
+- **Security headers** — strict Content-Security-Policy (`'self'` only), no third-party requests from the dashboard
+- **TLS** — terminate HTTPS at a reverse proxy in front of the server
 - See [SECURITY.md](./SECURITY.md) for comprehensive security documentation
 
 ### 📊 API Documentation & Versioning
@@ -81,35 +85,24 @@ Professional API standards:
 - **OpenAPI 3.0 specification** — Access at `/openapi.json`
 - **Swagger UI** — Interactive API explorer at `/api-docs`
 - **Pagination support** — Offset-based pagination with metadata
-- **Dual versioning** — `/api/` (v0 - backward compatible) and `/api/v1/` (current - recommended)
+- **Two route sets** — `/api/v1/` (recommended for new code) and the unversioned `/api/` routes, which are supported indefinitely
 - **Enhanced rate limit headers** — `X-RateLimit-*` and `X-Pagination-*` headers
 - See [API_VERSIONING.md](./API_VERSIONING.md) for migration guides
 
-## Phase 3: Production Hardening (v0.3.0)
+## Production hardening
 
-This release includes comprehensive security, standards compliance, and deployment improvements:
+The server is built to be run on the internet: path confinement, rate limits, body size limits, security
+headers, protected metrics, and build information on `/health`. The details and their configuration are in
+[SECURITY.md](./SECURITY.md), the environment variables below, and [SPEC.md](./SPEC.md) §6.
 
-### Phase 3A: Security Hardening
-- ✅ Path traversal protection with canonical path validation
-- ✅ Input sanitization removing shell metacharacters
-- ✅ In-memory rate limiting (100 req/60s per IP)
-- ✅ Request body size limits (50MB default)
-- ✅ Client IP extraction from proxy headers
-- ✅ Comprehensive test coverage (30 tests, 100% coverage)
+## Contributing best practices
 
-### Phase 3B: API Standards & Versioning
-- ✅ OpenAPI 3.0 specification generation
-- ✅ Swagger UI interactive documentation at `/api-docs`
-- ✅ Offset-based pagination with metadata
-- ✅ Dual versioning (v0 backward compatible, v1 current)
-- ✅ Rate limit and pagination response headers
-- ✅ 100+ total test cases (61 new tests for Phase 3)
-
-### Phase 3C: Documentation
-- ✅ [SECURITY.md](./SECURITY.md) — Comprehensive security best practices
-- ✅ [DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md) — Production deployment guide
-- ✅ [API_VERSIONING.md](./API_VERSIONING.md) — Versioning strategy and migration guides
-- ✅ Updated README with new features and examples
+Anyone can propose a practice by pull request. A practice PR changes only `src/data/practices/*.ts`; its
+contents are checked as data and never executed. New practices are `guidance`; a new automated check
+(rule code) is written by a maintainer. A practice merges automatically once it has three approvals from
+eligible reviewers, has been open for seven days and passes every check. Eligible means write access or two
+merged pull requests in this repository. The gate is switched on by the repository variable
+`PRACTICE_AUTOMERGE`. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the format and the rules.
 
 ## Installation
 
@@ -219,9 +212,10 @@ curl http://localhost:3000/health
 | `ALLOWED_PROJECT_ROOTS` | `/projects` in production | Comma separated directories the web server may analyse. |
 | `ALLOW_ANY_PATH` | `false` | `true` allows any absolute path (never on a public server). |
 | `METRICS_TOKEN` | unset | Bearer token required for `/metrics*`. |
-| `METRICS_PUBLIC` | `false` | `true` serves `/metrics*` without credentials (default outside production). |
+| `METRICS_PUBLIC` | `false` | Development only: `true` serves `/metrics*` without credentials. Production should use `METRICS_TOKEN`. |
 | `TRUST_PROXY` | unset (trust nothing) | Reverse proxy hops whose `X-Forwarded-*` headers are trusted: a number (`1`) or an Express value (`loopback`). Needed behind a proxy for per-client rate limits and HSTS. |
-| `MAX_BODY_BYTES` | `1048576` | Maximum JSON/form request body. |
+| `MAX_BODY_BYTES` | `1048576` | Maximum JSON/form request body (the upload route has its own 8 MB limit). |
+| `UPLOAD_TMP_DIR` | system temp dir | Private directory for uploaded projects, which are deleted after each request. |
 | `GIT_SHA`, `BUILD_TIME` | unset | Build information returned by `/health` and `/api/config` (Docker build args of the same name). |
 
 `LOG_LEVEL` appears in `docker-compose.yml` but is not read by the server.
@@ -434,18 +428,19 @@ open http://localhost:3000/api-docs
 curl http://localhost:3000/metrics/rate-limit
 ```
 
-#### Legacy: v0 Endpoints (backward compatible)
+#### Unversioned endpoints (`/api/`)
 
-v0 endpoints are still available for backward compatibility (no pagination, legacy format):
+The unversioned routes are supported indefinitely and run the same operations as `/api/v1/`, in the earlier response
+format (no pagination). New code should use `/api/v1/`:
 
 ```bash
-# v0 endpoints (deprecated for new code)
+# unversioned endpoints (supported; /api/v1/ is recommended for new code)
 curl http://localhost:3000/api/detect-workflow
 curl http://localhost:3000/api/practices
 curl http://localhost:3000/api/practice/practice-id
 ```
 
-See [API_VERSIONING.md](./API_VERSIONING.md) for migration guides from v0 to v1.
+See [API_VERSIONING.md](./API_VERSIONING.md) for the differences between the two route sets.
 
 **Docker Hub:** Pull pre-built images from [Docker Hub](https://hub.docker.com/r/alexseymer/r-best-practices-mcp)
 
@@ -461,70 +456,33 @@ See [API_VERSIONING.md](./API_VERSIONING.md) for migration guides from v0 to v1.
 ```
 r-best-practice-mcp/
 ├── src/
-│   ├── engine/
-│   │   ├── detector.ts            # Workflow detection (208 lines)
-│   │   ├── validator.ts           # Project validation (503 lines)
-│   │   └── template-generator.ts  # Template generation (833 lines)
-│   ├── data/
-│   │   └── knowledge-base.ts      # Loads the 70 practices from data/practices/
-│   ├── analysis/                  # Phase 6: Advanced features
-│   │   ├── complexity.ts          # Complexity analysis
-│   │   ├── dependencies.ts        # Dependency tracking
-│   │   ├── performance.ts         # Performance profiling
-│   │   ├── auto-fixes.ts          # Automated fixes
-│   │   └── index.ts               # Exports
-│   ├── cli/                       # Phase 4: CLI interface
-│   │   ├── index.ts               # Command setup
-│   │   └── commands/
-│   │       ├── detect.ts          # Detect workflow
-│   │       ├── validate.ts        # Validate project
-│   │       ├── template.ts        # Generate template
-│   │       └── report.ts          # Generate report
-│   ├── config/
-│   │   └── rules-engine.ts        # Custom validation rules
-│   ├── types/
-│   │   ├── workflow.ts, finding.ts, practice.ts, etc.
+│   ├── engine/                    # Detection, validation, upload, templates
+│   │   ├── detector.ts            # Workflow detection
+│   │   ├── validator.ts           # Project and file validation
+│   │   ├── project-fs.ts          # File access: server disk or in-memory files
+│   │   ├── upload.ts              # Browser uploads: sanitising and temporary projects
+│   │   ├── template-generator.ts  # Starter projects per workflow
+│   │   └── rules/                 # One rule per automated practice, per workflow
+│   ├── data/practices/            # The 70 practices, one file per workflow (data only)
 │   ├── utils/
-│   │   ├── file.ts, logger.ts
-│   │   ├── security.ts            # Path validation, input sanitization (Phase 3A)
-│   │   ├── rate-limiter.ts        # Rate limiting middleware (Phase 3A)
-│   │   ├── pagination.ts          # Pagination utilities (Phase 3B)
-│   │   └── openapi.ts             # OpenAPI spec generation (Phase 3B)
-│   ├── server.ts                  # MCP server (358 lines)
-│   ├── web-server.ts              # Express web server with security (Phase 3A/3B)
-│   └── index.ts
-├── vscode-extension/              # Phase 5: VS Code integration
-│   ├── package.json
-│   ├── src/
-│   │   ├── extension.ts           # Main extension
-│   │   ├── client.ts              # MCP communication
-│   │   ├── diagnostics.ts         # VS Code diagnostics
-│   │   └── commands.ts            # Command handlers
-├── rstudio-addin/                 # Phase 7: RStudio integration
-│   ├── DESCRIPTION, NAMESPACE
-│   ├── R/
-│   │   ├── addins.R               # 4 addin functions (337 lines)
-│   │   └── utils.R                # MCP utilities (300+ lines)
-│   ├── inst/rstudio/
-│   │   └── addins.dcf             # RStudio registration
-│   └── tests/
-├── tests/
-│   ├── unit/                      # Unit tests (100+ tests)
-│   │   ├── detector.test.ts
-│   │   ├── validator.test.ts
-│   │   ├── template-generator.test.ts
-│   │   ├── knowledge-base.test.ts
-│   │   ├── security.test.ts       # Phase 3A: 30 tests
-│   │   ├── rate-limiter.test.ts   # Phase 3A: 10 tests
-│   │   └── pagination.test.ts     # Phase 3B: 21 tests
-│   └── fixtures/
-├── dist/, jest.config.js, tsconfig.json, package.json
-├── CLAUDE.md                      # Architecture & development guide
-├── SECURITY.md                    # Security best practices (Phase 3C)
-├── DEPLOYMENT_CHECKLIST.md        # Production deployment guide (Phase 3C)
-├── API_VERSIONING.md              # API versioning strategy (Phase 3C)
-├── DOCKER.md                      # Docker deployment guide
-├── CONTRIBUTING.md
+│   │   └── practice-contribution.ts  # Checks community practice contributions
+│   ├── cli/                       # The r-practices command line
+│   ├── config/                    # Runtime settings and upload limits
+│   ├── middleware/                # Path confinement, rate limits, headers, body limits
+│   ├── routes/                    # Upload route
+│   ├── public/                    # Dashboard (HTML, JavaScript, icons, fonts)
+│   ├── server.ts                  # MCP server
+│   └── web-server.ts              # REST API and dashboard
+├── scripts/                       # Build helpers and the community practice gate
+├── tests/                         # Unit, integration, rule and parity tests
+├── examples/                      # Example projects used by the tests
+├── vscode-extension/              # VS Code extension
+├── rstudio-addin/                 # RStudio add-in
+├── docs/                          # Architecture, dashboard guide, performance, testing
+├── SPEC.md                        # Product and repository specification
+├── CONTRIBUTING.md                # How to contribute, including practices
+├── SECURITY.md                    # Security guidance
+├── DOCKER.md                      # Docker deployment
 └── README.md
 ```
 
@@ -538,6 +496,8 @@ This project uses **GitHub Actions** for automated testing, building, and releas
   - Jest unit tests with coverage
   - Type checking
   - Matrix testing on Node 18.x and 20.x
+
+- **Community Practices** — Labels practice-only pull requests and runs the merge gate on a schedule and on reviews (see *Contributing best practices*)
 
 - **Publish Workflow** — Triggered by version tags (v*.*.*)
   - Runs full test suite
@@ -581,12 +541,8 @@ npm run format
 
 ### Testing
 
-Comprehensive test coverage (91 tests):
-- ✓ Workflow detection for all 9 types
-- ✓ Project validation across workflows
-- ✓ Template generation and content
-- ✓ Knowledge base functionality
-- ✓ File system utilities
+The suite covers unit, integration and rule tests, including a parity test that checks the validator gives the same
+findings for files on disk and in memory. CI requires at least 80% line coverage. Run `npm test` for the current count.
 
 ## Best Practices Coverage
 

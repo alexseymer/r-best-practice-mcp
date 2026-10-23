@@ -2,10 +2,15 @@
 
 ## Unreleased
 
-- Validation reads project files through a `ProjectFs` interface (`src/engine/project-fs.ts`), so the same rules can run on the server's disk or on files held in memory. The dashboard still uploads files to the server; the browser-only path comes next.
-- Known difference: the analysis rule checks parent folders for `.git`. The server can see them; a browser upload cannot, so an upload is never reported as inside a repository because of its parents.
-
 ### Added
+- Validation reads project files through a `ProjectFs` interface (`src/engine/project-fs.ts`), so the same rules can run on
+  the server's disk or on files held in memory. A parity test checks that both give the same findings. The dashboard still
+  uploads files to the server; in-browser validation is the next step.
+- Community practice contributions: practice PRs are parsed as data (`src/utils/practice-contribution.ts`), labelled
+  `community-practice`, and merged by a gate (`scripts/community-practice-gate.mjs`) once they have three approvals from
+  eligible reviewers, seven days, passing checks and no objection. Off until `PRACTICE_AUTOMERGE=enabled`. See `CONTRIBUTING.md`.
+- `SPEC.md`: the product and repository specification.
+- `UPLOAD_TMP_DIR` is documented in the README environment table.
 - Server hardening: path confinement to `ALLOWED_PROJECT_ROOTS` (default `/projects` in production), security headers and
   CSP (`src/middleware/security-headers.ts`), gzip compression, 1 MB body limit (`MAX_BODY_BYTES`), `/metrics*` protected by
   `METRICS_TOKEN` (404 when neither a token nor `METRICS_PUBLIC=true` is set in production), `TRUST_PROXY`.
@@ -34,6 +39,10 @@
   Playwright asserts no request leaves the origin and 0 CSP violations. Front-end files are exempt from the API rate limit.
 
 ### Changed
+- The request body limit for ordinary routes is 1 MB (`MAX_BODY_BYTES`); earlier documentation said 50 MB. The upload route keeps its own 8 MB limit.
+- The unversioned `/api/*` routes are supported indefinitely, alongside `/api/v1/*`. They are not deprecated.
+- `METRICS_PUBLIC` is for development only; production uses `METRICS_TOKEN`.
+- The README, SPEC and CONTRIBUTING documents describe the current behaviour; the Phase 3 history was removed from the README.
 - Rate limiting identifies clients by `req.ip`; `X-Forwarded-For`/`X-Real-IP` are only honoured when `TRUST_PROXY` is set.
   `/health` is exempt, the cleanup timer is unref'd and stoppable, `/metrics/rate-limit` shows salted hashes instead of addresses.
 - Default request body limit lowered from 50 MB to 1 MB.
