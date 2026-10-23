@@ -225,7 +225,7 @@ For high-traffic deployments:
 
 ### Configuration
 
-**Default:** 50 MB maximum request body size
+**Default:** 1 MB maximum request body size (`MAX_BODY_BYTES`); the upload route accepts 8 MB
 
 **Why It Matters:**
 - Prevents memory exhaustion attacks
@@ -249,7 +249,7 @@ curl -X POST http://localhost:3000/api/v1/validate-file \
 {
   "error": true,
   "code": "PAYLOAD_TOO_LARGE",
-  "message": "Request body exceeds maximum allowed size (50MB)"
+  "message": "Request body exceeds maximum allowed size (1MB)"
 }
 ```
 
