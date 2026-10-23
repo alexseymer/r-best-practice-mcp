@@ -49,7 +49,7 @@ Transport: standard input and output (`StdioServerTransport`).
 ### 3.2 REST API (`dist/web-server-entry.js`)
 
 Versioned routes live under `/api/v1/`. The same operations are also served under `/api/` without the
-version. Both are described in `/openapi.json` and the interactive docs at `/api-docs`.
+version. Both are supported indefinitely; see §9. Both are described in `/openapi.json` and the interactive docs at `/api-docs`.
 
 | Method and path | Purpose |
 | --- | --- |
@@ -230,7 +230,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 
 ## 9. Open decisions
 
-1. **Deprecation policy:** how long the unversioned `/api/*` routes stay, and how they are announced.
+1. **Deprecation policy (decided):** the unversioned `/api/*` routes are kept indefinitely, alongside `/api/v1/*`. Both are supported and neither is planned for removal.
 2. **Browser-side validation:** whether the server-side upload route is kept once the dashboard validates in the browser (currently: keep for API and MCP users).
 3. **Community rule code:** whether a sandboxed rule format is worth building, or contributions stay maintainer-only.
 4. **Publication:** when to publish the VS Code extension (issue #3), the npm package (issue #4) and the tutorials (issue #5).
