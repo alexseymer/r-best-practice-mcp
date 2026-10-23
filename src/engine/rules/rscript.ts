@@ -1,6 +1,5 @@
-import path from 'path';
+import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import fs from 'fs';
 import {
   DEFAULT_SKIPPED_DIRS,
   MAX_FILES,
@@ -28,23 +27,23 @@ const R_FILE = /\.[Rr]$/;
  * default-skipped directories), capped at MAX_FILES in total. Listing the levels explicitly keeps
  * the depth limit from being defeated by a file cap that deeper trees would use up.
  */
-async function listScripts(dirPath: string): Promise<string[]> {
-  const out = await findFiles(dirPath, R_FILE, { recursive: false });
-  let entries: fs.Dirent[] = [];
+async function listScripts(fsys: ProjectFs, dirPath: string): Promise<string[]> {
+  const out = await findFiles(fsys, dirPath, R_FILE, { recursive: false });
+  let entries: Awaited<ReturnType<typeof fsys.readdir>> = [];
   try {
-    entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    entries = await fsys.readdir(dirPath);
   } catch {
     return out;
   }
   const dirs = entries
     .filter(
-      (e) => e.isDirectory() && !e.name.startsWith('.') && !DEFAULT_SKIPPED_DIRS.includes(e.name)
+      (e) => e.isDirectory && !e.name.startsWith('.') && !DEFAULT_SKIPPED_DIRS.includes(e.name)
     )
     .map((e) => e.name)
     .sort(compareNames);
   for (const name of dirs) {
     if (out.length >= MAX_FILES) break;
-    out.push(...(await findFiles(path.join(dirPath, name), R_FILE, { recursive: false })));
+    out.push(...(await findFiles(fsys, fsys.join(dirPath, name), R_FILE, { recursive: false })));
   }
   return out.slice(0, MAX_FILES);
 }
@@ -131,14 +130,14 @@ export const rscriptRules: RuleDef[] = [
   {
     id: 'rscript-naming',
     workflows: ['r-script'],
-    async run({ dirPath }) {
-      const files = await listScripts(dirPath);
+    async run({ dirPath, fsys }) {
+      const files = await listScripts(fsys, dirPath);
       const bad = files.filter((f) => {
-        const base = path.basename(f);
+        const base = fsys.basename(f);
         return base !== '_targets.R' && !SNAKE_FILE.test(base);
       });
       if (bad.length === 0) return [];
-      const names = bad.slice(0, 5).map((f) => path.relative(dirPath, f));
+      const names = bad.slice(0, 5).map((f) => fsys.relative(dirPath, f));
       return [
         {
           id: 'rscript-naming',
@@ -148,7 +147,7 @@ export const rscriptRules: RuleDef[] = [
           file: bad[0],
           details: `Non-snake_case scripts: ${names.join(', ')}${bad.length > 5 ? ', ...' : ''}`,
           suggestions: [
-            `Rename ${path.basename(bad[0])} to a lowercase snake_case name such as data_cleaning.R`,
+            `Rename ${fsys.basename(bad[0])} to a lowercase snake_case name such as data_cleaning.R`,
             'Use only lowercase letters, digits and underscores (no spaces or hyphens)',
           ],
         },
@@ -158,9 +157,9 @@ export const rscriptRules: RuleDef[] = [
   {
     id: 'rscript-sections',
     workflows: ['r-script'],
-    async run({ dirPath }) {
-      for (const file of await listScripts(dirPath)) {
-        const content = await readText(file);
+    async run({ dirPath, fsys }) {
+      for (const file of await listScripts(fsys, dirPath)) {
+        const content = await readText(fsys, file);
         if (content === null) continue;
         const lines = toLines(content);
         if (lines.length <= 80) continue;
@@ -171,7 +170,7 @@ export const rscriptRules: RuleDef[] = [
             id: 'rscript-sections',
             severity: 'recommended',
             category: 'structure',
-            message: `Consider dividing ${path.basename(file)} (${lines.length} lines) into labelled sections`,
+            message: `Consider dividing ${fsys.basename(file)} (${lines.length} lines) into labelled sections`,
             file,
             suggestions: [
               'Add RStudio-style section headers such as "# Load data ----" and "# Clean data ----"',
@@ -186,9 +185,9 @@ export const rscriptRules: RuleDef[] = [
   {
     id: 'rscript-errors',
     workflows: ['r-script'],
-    async run({ dirPath }) {
-      for (const file of await listScripts(dirPath)) {
-        const content = await readText(file);
+    async run({ dirPath, fsys }) {
+      for (const file of await listScripts(fsys, dirPath)) {
+        const content = await readText(fsys, file);
         if (content === null) continue;
         const lines = toLines(content);
         if (lines.length <= 60) continue;
@@ -198,7 +197,7 @@ export const rscriptRules: RuleDef[] = [
             id: 'rscript-errors',
             severity: 'recommended',
             category: 'structure',
-            message: `Consider adding error handling to ${path.basename(file)} (${lines.length} lines, no tryCatch/stop/stopifnot)`,
+            message: `Consider adding error handling to ${fsys.basename(file)} (${lines.length} lines, no tryCatch/stop/stopifnot)`,
             file,
             suggestions: [
               'Wrap risky steps (file reads, downloads, database calls) in tryCatch() with a clear error message',
@@ -213,10 +212,10 @@ export const rscriptRules: RuleDef[] = [
   {
     id: 'rscript-cleanup',
     workflows: ['r-script'],
-    async run({ dirPath }) {
+    async run({ dirPath, fsys }) {
       const hits: (Unmatched & { file: string })[] = [];
-      for (const file of await listScripts(dirPath)) {
-        const content = await readText(file);
+      for (const file of await listScripts(fsys, dirPath)) {
+        const content = await readText(fsys, file);
         if (content === null) continue;
         const m = findUnmatched(content);
         if (m) hits.push({ ...m, file });
@@ -228,12 +227,12 @@ export const rscriptRules: RuleDef[] = [
           id: 'rscript-cleanup',
           severity: 'recommended',
           category: 'structure',
-          message: `Consider releasing resources: ${path.basename(first.file)} calls ${first.label} but never ${first.release}`,
+          message: `Consider releasing resources: ${fsys.basename(first.file)} calls ${first.label} but never ${first.release}`,
           file: first.file,
           line: first.line,
           details: hits
             .slice(0, 5)
-            .map((h) => `${path.relative(dirPath, h.file)}: ${h.label} without ${h.release}`)
+            .map((h) => `${fsys.relative(dirPath, h.file)}: ${h.label} without ${h.release}`)
             .join('; '),
           suggestions: [
             `Call ${first.release} when finished, ideally via on.exit() inside a function`,

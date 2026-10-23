@@ -22,8 +22,8 @@ export const rmarkdownRules: RuleDef[] = [
   {
     id: 'rmd-chunks',
     workflows: ['rmarkdown'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.Rmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.Rmd$/);
       const hits: { file: string; name: string; line: number }[] = [];
       for (const doc of docs) {
         for (const chunk of doc.chunks) {
@@ -48,8 +48,8 @@ export const rmarkdownRules: RuleDef[] = [
   {
     id: 'rmd-chunk-options',
     workflows: ['rmarkdown'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.Rmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.Rmd$/);
       const chunks = docs.flatMap((d) => d.chunks);
       if (chunks.length === 0) return [];
       for (const chunk of chunks) {
@@ -58,9 +58,9 @@ export const rmarkdownRules: RuleDef[] = [
         }
       }
       // opts_chunk$set() may live in a sourced setup script
-      const scripts = await findFiles(dirPath, /\.[Rr]$/);
+      const scripts = await findFiles(fsys, dirPath, /\.[Rr]$/);
       for (const script of scripts) {
-        const text = await readText(script);
+        const text = await readText(fsys, script);
         if (text !== null && /opts_chunk\$set\s*\(/.test(text)) return [];
       }
       return [

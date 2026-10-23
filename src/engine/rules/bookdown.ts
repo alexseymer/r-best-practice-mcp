@@ -1,4 +1,3 @@
-import path from 'path';
 import { RuleDef } from './types.js';
 import { anyExists, findFiles, readText } from './helpers.js';
 import { loadDocs, parseDoc, summarize } from './quarto.js';
@@ -9,11 +8,11 @@ export const bookdownRules: RuleDef[] = [
   {
     id: 'bookdown-chapter-naming',
     workflows: ['bookdown'],
-    async run({ dirPath }) {
-      const files = await findFiles(dirPath, /\.Rmd$/, { recursive: false });
+    async run({ dirPath, fsys }) {
+      const files = await findFiles(fsys, dirPath, /\.Rmd$/, { recursive: false });
       // bookdown ignores files starting with "_" and README.Rmd
       const bad = files
-        .map((f) => path.basename(f))
+        .map((f) => fsys.basename(f))
         .filter((n) => n !== 'index.Rmd' && n !== 'README.Rmd' && !n.startsWith('_'))
         .filter((n) => !CHAPTER_NAME.test(n));
       if (bad.length === 0) return [];
@@ -22,7 +21,7 @@ export const bookdownRules: RuleDef[] = [
           id: 'bookdown-chapter-naming',
           severity: 'recommended',
           category: 'naming',
-          file: path.join(dirPath, bad[0]),
+          file: fsys.join(dirPath, bad[0]),
           message: `${bad.length} chapter file(s) do not follow the NN-title.Rmd naming convention`,
           suggestions: [
             'Rename chapters to 01-introduction.Rmd, 02-methods.Rmd, ... (two digits, lowercase, hyphens)',
@@ -35,10 +34,10 @@ export const bookdownRules: RuleDef[] = [
   {
     id: 'bookdown-output-formats',
     workflows: ['bookdown'],
-    async run({ dirPath }) {
-      if (await anyExists(dirPath, ['_output.yml', '_output.yaml'])) return [];
-      const indexPath = path.join(dirPath, 'index.Rmd');
-      const text = await readText(indexPath);
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['_output.yml', '_output.yaml'])) return [];
+      const indexPath = fsys.join(dirPath, 'index.Rmd');
+      const text = await readText(fsys, indexPath);
       if (text === null) return [];
       const formats = new Set(
         parseDoc(text).frontMatter.match(/bookdown::(?!bookdown_site\b)[A-Za-z0-9_]+/g) ?? []
@@ -63,8 +62,8 @@ export const bookdownRules: RuleDef[] = [
   {
     id: 'bookdown-cross-references',
     workflows: ['bookdown'],
-    async run({ dirPath }) {
-      const docs = await loadDocs(dirPath, /\.Rmd$/);
+    async run({ dirPath, fsys }) {
+      const docs = await loadDocs(fsys, dirPath, /\.Rmd$/);
       const figureLike = /(^|[^A-Za-z0-9_.])(plot|ggplot|kable)\s*\(/;
       const withFloats: string[] = [];
       for (const doc of docs) {
@@ -78,7 +77,7 @@ export const bookdownRules: RuleDef[] = [
       }
       if (withFloats.length === 0) return [];
       for (const doc of docs) {
-        const text = await readText(doc.file);
+        const text = await readText(fsys, doc.file);
         if (text !== null && text.includes('\\@ref(')) return [];
       }
       return [
@@ -86,7 +85,7 @@ export const bookdownRules: RuleDef[] = [
           id: 'bookdown-cross-references',
           severity: 'recommended',
           category: 'documentation',
-          file: path.join(dirPath, withFloats[0]),
+          file: fsys.join(dirPath, withFloats[0]),
           message:
             'Consider cross-referencing figures and tables: chapters contain them but no \\@ref() was found',
           suggestions: [
