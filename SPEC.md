@@ -139,7 +139,7 @@ Only allow-listed extensions and names are accepted (for example `.R`, `.Rmd`, `
 `DESCRIPTION`, `NAMESPACE`). The uploaded files are written to a private temporary folder and deleted
 after the request, whatever the outcome. Upload validation is REST only and is not an MCP tool.
 
-**Planned (in review, PR #31 step 1):** the dashboard will validate uploads in the browser, so files
+**Planned (step 1 merged in PR #31; the browser bundle and dashboard switch are next):** the dashboard will validate uploads in the browser, so files
 do not leave the visitor's computer. The rules already read files through an interface
 (`src/engine/project-fs.ts`) that a browser implementation can satisfy. The API route stays for API and
 MCP users.
