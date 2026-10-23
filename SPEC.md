@@ -231,7 +231,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 ## 9. Open decisions
 
 1. **Deprecation policy (decided):** the unversioned `/api/*` routes are kept indefinitely, alongside `/api/v1/*`. Both are supported and neither is planned for removal.
-2. **Browser-side validation:** whether the server-side upload route is kept once the dashboard validates in the browser (currently: keep for API and MCP users).
+2. **Upload route (decided):** `POST /api/validate-upload` is kept once the dashboard validates in the browser. The dashboard stops using it for its default upload; API and MCP clients keep it.
 3. **Community rule code:** whether a sandboxed rule format is worth building, or contributions stay maintainer-only.
 4. **Publication:** when to publish the VS Code extension (issue #3), the npm package (issue #4) and the tutorials (issue #5).
 5. **Public metrics:** whether `METRICS_PUBLIC` should be documented as a production option at all.
