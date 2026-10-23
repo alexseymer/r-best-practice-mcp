@@ -202,7 +202,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 | `MAX_BODY_BYTES` | 1 MB | Global request body limit. |
 | `UPLOAD_TMP_DIR` | system temp | Where uploaded projects are written briefly. |
 | `METRICS_TOKEN` | — | Bearer token for `/metrics*`. |
-| `METRICS_PUBLIC` | off | Serve `/metrics*` without credentials. |
+| `METRICS_PUBLIC` | off | Serve `/metrics*` without credentials. Local or trusted-network use only; production should use `METRICS_TOKEN`. |
 | `GIT_SHA`, `BUILD_TIME` | — | Build identification, shown on `/health` and in the System panel. |
 
 **Deployment**
@@ -234,7 +234,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 2. **Upload route (decided):** `POST /api/validate-upload` is kept once the dashboard validates in the browser. The dashboard stops using it for its default upload; API and MCP clients keep it.
 3. **Rule code (decided):** contributors propose guidance practices only. Any new automated check (rule code) is written and merged by a maintainer. A sandboxed declarative rule format is not planned.
 4. **Publication (decided):** the VS Code extension (issue #3), the npm package (issue #4) and the tutorials (issue #5) are published after the browser-validation and spec work is merged and the live site has been re-tested.
-5. **Public metrics:** whether `METRICS_PUBLIC` should be documented as a production option at all.
+5. **Public metrics (decided):** `METRICS_PUBLIC` stays available but is documented as dev-only. Production deployments use `METRICS_TOKEN`.
 
 ## 10. Glossary
 
