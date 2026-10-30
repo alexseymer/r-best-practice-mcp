@@ -89,13 +89,20 @@ Confidence = (points collected / max possible) × 100
 
 ### 2. Validator Engine (`src/engine/validator.ts`)
 
-**Responsibility**: Check projects against 52+ best practices
+**Responsibility**: Check projects against the 70 best practices (59 automated, 11 guidance)
 
 **Key Methods**:
 ```typescript
 validateProject(path, workflow, options): Promise<ValidationResult>
 validateFile(path): Promise<Finding[]>
 ```
+
+**File access**: the validator and every rule read files through a `ProjectFs` interface
+(`src/engine/project-fs.ts`), never through Node's `fs` directly. `nodeProjectFs` serves the server's disk;
+`createMemoryProjectFs` serves files held in memory. The same findings must come from both, which
+`tests/unit/project-fs-parity.test.ts` checks for every workflow. The rules therefore do not depend on Node, so the
+engine can run in a browser (planned: the dashboard's upload validation). One difference is known: the analysis rule
+looks for `.git` in parent folders, which only the server can see.
 
 **Architecture**:
 ```
@@ -182,7 +189,7 @@ interface TemplateGeneratorOptions {
 
 ### 4. Knowledge Base (`src/data/knowledge-base.ts`)
 
-**Responsibility**: Store and query 52+ best practices
+**Responsibility**: Store and query the 70 best practices
 
 **Data Structure**:
 ```typescript
@@ -683,6 +690,15 @@ npm test -- --coverage      # With coverage report
 ```
 
 ---
+
+## Community Contributions
+
+Practices are data. A contribution PR changes only `src/data/practices/*.ts`, and
+`src/utils/practice-contribution.ts` parses it with the TypeScript parser, accepting only plain strings and lists:
+no code, no imports of values, no computed or template values. New practices must be `guidance`. The merge gate
+(`scripts/community-practice-gate.mjs`, run by `.github/workflows/community-practices.yml`) runs from `main`, reads the
+pull request only through the GitHub API, and merges when the rules in [CONTRIBUTING.md](../CONTRIBUTING.md) hold.
+It stays off until the repository variable `PRACTICE_AUTOMERGE` is `enabled`. Rule code is never merged by the gate.
 
 ## Future Enhancements
 
