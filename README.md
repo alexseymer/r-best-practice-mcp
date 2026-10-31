@@ -9,6 +9,8 @@
 
 An **MCP (Model Context Protocol) server** that enforces best practices across all standard R development workflows. Provides workflow detection, project validation, and template generation for R scripts, Quarto documents, Shiny applications, R packages, and more.
 
+> ⚠️ **AI-generated code, not fully tested yet.** Large parts of this project were written with the help of an AI assistant (Claude Code). Treat it as a work in progress: review the results before you rely on them, and please report anything that looks wrong in the issue tracker.
+
 ## Overview
 
 The R Best Practices MCP Server helps developers write better R code by:
