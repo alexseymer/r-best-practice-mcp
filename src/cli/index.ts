@@ -86,6 +86,8 @@ export async function run(): Promise<void> {
         break;
 
       case 'help':
+      case '--help':
+      case '-h':
         console.log(HELP_TEXT);
         break;
 
@@ -110,7 +112,7 @@ export async function run(): Promise<void> {
 async function handleValidateCommand(
   args: string[],
   options: CLIOptions,
-  watch: boolean = false,
+  watch: boolean = false
 ): Promise<void> {
   if (watch) {
     const { FileWatcher } = await import('./utils');
@@ -130,7 +132,9 @@ async function handleValidateCommand(
 
       try {
         if (!options.quiet) {
-          console.log(`\n${CLIFormatter.colorize(`[${new Date().toLocaleTimeString()}]`, 'gray')} File changed: ${filePath}`);
+          console.log(
+            `\n${CLIFormatter.colorize(`[${new Date().toLocaleTimeString()}]`, 'gray')} File changed: ${filePath}`
+          );
         }
         await validateCommand(args, options);
       } finally {
