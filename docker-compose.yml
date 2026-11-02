@@ -6,20 +6,20 @@ services:
       dockerfile: Dockerfile
     container_name: r-practices-api
     ports:
-      - "3000:3000"
+      # Loopback only: clients reach the API through nginx. Publishing it on all interfaces would let a
+      # client skip the proxy and spoof X-Forwarded-For.
+      - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
       - LOG_LEVEL=info
+      # nginx (below) sits in front of this service and sets X-Forwarded-For, so trust exactly one hop.
+      - TRUST_PROXY=1
       # Optional settings (defaults shown by `GET /api/config`); uncomment to change:
       # Directories the server may analyse (comma separated). Default in production: /projects
       # - ALLOWED_PROJECT_ROOTS=/projects
       # Bearer token that protects /metrics* (without it, /metrics* answer 404 in production)
       # - METRICS_TOKEN=change-me
-      # Reverse proxy hops to trust for X-Forwarded-For / X-Forwarded-Proto (1 behind one proxy,
-      # or e.g. `loopback`). Unset: forwarded headers are ignored and every client behind the proxy
-      # shares one rate-limit bucket, so set it when running behind nginx or another proxy.
-      # - TRUST_PROXY=1
       # Maximum JSON/form request body in bytes (default 1048576)
       # - MAX_BODY_BYTES=1048576
     volumes:
