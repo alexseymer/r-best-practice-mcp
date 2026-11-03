@@ -1,5 +1,8 @@
 # Phase 1 Review: R Best Practices MCP Server
 
+> **Historical snapshot.** This document records the project at the time it was written. Counts and statuses here are not current; see [SPEC.md](./SPEC.md) for the current specification.
+
+
 ## ✅ Completed Components
 
 ### 1. Type System (src/types/)
