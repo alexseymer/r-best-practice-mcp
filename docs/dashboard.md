@@ -58,9 +58,11 @@ computer can be checked on a hosted dashboard (where the server cannot see your 
   per-file limit. A summary such as "142 files, 1.2 MB (38 skipped)" is shown; if the supported files exceed the limits
   (`GET /api/config`, `upload`) the numbers are shown and nothing is sent.
 - **Run project audit** uses the workflow select and the Filters block of the Validate form and renders the result like a normal
-  audit (`POST /api/validate-upload`). On the Detect tab the same selection is sent with `detectOnly` and shows the detection card;
-  "Validate as ..." then audits the upload.
-- Your files are sent to the server for analysis and deleted immediately; nothing is stored.
+  audit. On the Detect tab the same selection is used with detection only, and shows the detection card; "Validate as ..." then
+  audits the upload.
+- The upload is analysed **in your browser**: the files are read into this page and checked by the same rules the server uses
+  (served from `/browser-engine/`, about 38 KB gzipped, loaded when you first run an upload). Nothing is uploaded. The server's
+  `POST /api/validate-upload` endpoint still exists for API and MCP clients.
 - When the server restricts paths (`ALLOWED_PROJECT_ROOTS`, or `NODE_ENV=production`), the help text reads "Server paths are limited
   to: ..." and the server-path forms are collapsed under "Advanced: analyse a folder on the server"; the upload section is then the
   primary option.

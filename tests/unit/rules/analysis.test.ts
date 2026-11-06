@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { findingsFor, idsFor } from '../../fixtures/rules';
 import { hasGitRepo } from '../../../src/engine/rules/analysis';
-import { nodeProjectFs } from '../../../src/engine/project-fs';
+import { nodeProjectFs } from '../../../src/engine/project-fs-node';
 
 /**
  * These fixtures live in the OS temp dir, not in the repository's own tests/.temp, so the walk up

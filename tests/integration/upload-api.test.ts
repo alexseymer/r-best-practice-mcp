@@ -11,6 +11,7 @@ import { WorkflowDetector } from '../../src/engine/detector';
 import { Validator } from '../../src/engine/validator';
 import { UPLOAD_LIMITS } from '../../src/config/runtime';
 import { createTempDir, cleanupTempDir, createFile } from '../fixtures/setup';
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 
 // Jest runs test files in parallel processes that share the system temp dir (and `process.env` inside Jest is a
 // copy, so TMPDIR cannot be redirected). UPLOAD_TMP_DIR gives each file its own upload directory, so the
@@ -252,9 +253,9 @@ describe('registerUploadRoutes on its own', () => {
   beforeAll(async () => {
     // No global body parser here: the route must bring its own (LARGE_BODY_ROUTES).
     const app = express();
-    const detector = new WorkflowDetector();
+    const detector = new WorkflowDetector(nodeProjectFs);
     let slow = false;
-    const validator = new Validator();
+    const validator = new Validator(nodeProjectFs);
     const original = validator.validateProject.bind(validator);
     validator.validateProject = (async (...args: Parameters<Validator['validateProject']>) => {
       if (slow) await new Promise((r) => setTimeout(r, 300));
@@ -321,11 +322,11 @@ describe('registerUploadRoutes on its own', () => {
   it('cleans up when validation throws and hides the error details', async () => {
     const before = tempDirs();
     const app = express();
-    const validator = new Validator();
+    const validator = new Validator(nodeProjectFs);
     validator.validateProject = (async () => {
       throw new Error('/secret/server/path exploded');
     }) as Validator['validateProject'];
-    registerUploadRoutes(app, { validator, detector: new WorkflowDetector() });
+    registerUploadRoutes(app, { validator, detector: new WorkflowDetector(nodeProjectFs) });
     const s = await new Promise<http.Server>((resolve) => {
       const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
     });

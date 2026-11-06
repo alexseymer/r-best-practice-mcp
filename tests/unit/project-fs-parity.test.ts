@@ -2,7 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Validator } from '../../src/engine/validator';
-import { createMemoryProjectFs, nodeProjectFs, ProjectFs } from '../../src/engine/project-fs';
+import { createMemoryProjectFs, ProjectFs } from '../../src/engine/project-fs';
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { Workflow } from '../../src/types/workflow';
 
 /**

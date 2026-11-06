@@ -24,6 +24,7 @@ import { metricsAccess } from './middleware/metrics-access.js';
 import { errorHandler } from './middleware/errors.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
 import { registerUploadRoutes } from './routes/upload.js';
+import { nodeProjectFs } from './engine/project-fs-node.js';
 
 if (typeof __dirname === 'undefined') {
   (global as any).__dirname = path.join(process.cwd(), 'src');
@@ -53,8 +54,8 @@ export class RPracticesWebServer {
     this.runtime = getRuntimeConfig(this.env);
     this.app = express();
     this.app.disable('x-powered-by');
-    this.detector = new WorkflowDetector();
-    this.validator = new Validator();
+    this.detector = new WorkflowDetector(nodeProjectFs);
+    this.validator = new Validator(nodeProjectFs);
     this.templateGenerator = new TemplateGenerator();
     // 100 requests per 60 seconds per client (req.ip)
     this.rateLimiter = new RateLimiter(
@@ -91,6 +92,14 @@ export class RPracticesWebServer {
     // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
     const publicPath = path.join(__dirname, '..', 'src', 'public');
     this.app.use(express.static(publicPath));
+    // The browser analyses uploads with the engine compiled to dist/browser-engine (scripts/build-browser-engine.mjs).
+    this.app.use(
+      '/browser-engine',
+      express.static(path.join(__dirname, '..', 'dist', 'browser-engine'), {
+        index: false,
+        maxAge: '1h',
+      })
+    );
 
     // Request logging middleware with performance tracking
     this.app.use((req: Request, res: Response, next: NextFunction) => {

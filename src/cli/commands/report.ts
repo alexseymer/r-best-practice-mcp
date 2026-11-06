@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../../engine/project-fs-node';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Validator } from '../../engine/validator.js';
@@ -20,8 +21,8 @@ export async function reportCommand(args: string[], options: CLIOptions): Promis
   }
 
   try {
-    const detector = new WorkflowDetector();
-    const validation = new Validator();
+    const detector = new WorkflowDetector(nodeProjectFs);
+    const validation = new Validator(nodeProjectFs);
 
     const detectionResult = await detector.detect(projectPath);
     const validationResult = await validation.validateProject(projectPath, detectionResult.workflow);

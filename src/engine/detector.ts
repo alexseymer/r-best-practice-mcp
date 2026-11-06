@@ -1,16 +1,16 @@
-import { FileUtils } from '../utils/file.js';
+import { isDirectoryAt, listFilesAt, type ProjectFs } from './project-fs.js';
+import { pathExists } from './rules/helpers.js';
 import { logger } from '../utils/logger.js';
 import { Workflow, DetectionResult, DetectionOptions } from '../types/workflow.js';
 
 export class WorkflowDetector {
-  async detect(
-    dirPath: string,
-    _options: DetectionOptions = {}
-  ): Promise<DetectionResult> {
+  constructor(private readonly fsys: ProjectFs) {}
+
+  async detect(dirPath: string, _options: DetectionOptions = {}): Promise<DetectionResult> {
     const startTime = Date.now();
     logger.info(`Detecting workflow for: ${dirPath}`);
 
-    const isDir = await FileUtils.isDirectory(dirPath);
+    const isDir = await isDirectoryAt(this.fsys, dirPath);
     if (!isDir) {
       return {
         workflow: 'unknown',
@@ -70,9 +70,9 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const appR = await FileUtils.exists(`${dirPath}/app.R`);
-    const uiR = await FileUtils.exists(`${dirPath}/ui.R`);
-    const serverR = await FileUtils.exists(`${dirPath}/server.R`);
+    const appR = await pathExists(this.fsys, `${dirPath}/app.R`);
+    const uiR = await pathExists(this.fsys, `${dirPath}/ui.R`);
+    const serverR = await pathExists(this.fsys, `${dirPath}/server.R`);
 
     if (appR) {
       scores['shiny'] += 100;
@@ -91,7 +91,7 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const qmdFiles = await FileUtils.listFiles(dirPath, /\.qmd$/, false);
+    const qmdFiles = await listFilesAt(this.fsys, dirPath, /\.qmd$/, false);
     if (qmdFiles.length > 0) {
       scores['quarto'] += 90;
       indicators.push(`.qmd files found (${qmdFiles.length})`);
@@ -104,7 +104,7 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const rmdFiles = await FileUtils.listFiles(dirPath, /\.Rmd$/, false);
+    const rmdFiles = await listFilesAt(this.fsys, dirPath, /\.Rmd$/, false);
     if (rmdFiles.length > 0) {
       scores['rmarkdown'] += 85;
       indicators.push(`.Rmd files found (${rmdFiles.length})`);
@@ -117,8 +117,8 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const description = await FileUtils.exists(`${dirPath}/DESCRIPTION`);
-    const rDir = await FileUtils.isDirectory(`${dirPath}/R`);
+    const description = await pathExists(this.fsys, `${dirPath}/DESCRIPTION`);
+    const rDir = await isDirectoryAt(this.fsys, `${dirPath}/R`);
 
     if (description && rDir) {
       scores['package'] += 100;
@@ -136,7 +136,7 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const renvLock = await FileUtils.exists(`${dirPath}/renv.lock`);
+    const renvLock = await pathExists(this.fsys, `${dirPath}/renv.lock`);
     if (renvLock) {
       scores['renv'] += 95;
       indicators.push('renv.lock found');
@@ -149,7 +149,7 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const targetsR = await FileUtils.exists(`${dirPath}/_targets.R`);
+    const targetsR = await pathExists(this.fsys, `${dirPath}/_targets.R`);
     if (targetsR) {
       scores['targets'] += 95;
       indicators.push('_targets.R found');
@@ -162,10 +162,10 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const rFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+    const rFiles = await listFilesAt(this.fsys, dirPath, /\.R$/, false);
 
     for (const file of rFiles) {
-      const content = await FileUtils.readFile(file);
+      const content = await this.fsys.readFile(file);
       if (/@get|@post|@put|@delete|@patch/.test(content)) {
         scores['plumber'] += 80;
         indicators.push('Plumber decorators found');
@@ -181,9 +181,9 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const hasDataDir = await FileUtils.isDirectory(`${dirPath}/data`);
-    const hasRDir = await FileUtils.isDirectory(`${dirPath}/R`);
-    const hasOutputDir = await FileUtils.isDirectory(`${dirPath}/output`);
+    const hasDataDir = await isDirectoryAt(this.fsys, `${dirPath}/data`);
+    const hasRDir = await isDirectoryAt(this.fsys, `${dirPath}/R`);
+    const hasOutputDir = await isDirectoryAt(this.fsys, `${dirPath}/output`);
 
     let count = 0;
     if (hasDataDir) count++;
@@ -203,10 +203,10 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const bookdownYml = await FileUtils.exists(`${dirPath}/_bookdown.yml`);
-    const bookdownYaml = await FileUtils.exists(`${dirPath}/_bookdown.yaml`);
-    const indexRmd = await FileUtils.exists(`${dirPath}/index.Rmd`);
-    const chaptersDir = await FileUtils.isDirectory(`${dirPath}/chapters`);
+    const bookdownYml = await pathExists(this.fsys, `${dirPath}/_bookdown.yml`);
+    const bookdownYaml = await pathExists(this.fsys, `${dirPath}/_bookdown.yaml`);
+    const indexRmd = await pathExists(this.fsys, `${dirPath}/index.Rmd`);
+    const chaptersDir = await isDirectoryAt(this.fsys, `${dirPath}/chapters`);
 
     if ((bookdownYml || bookdownYaml) && indexRmd) {
       scores['bookdown'] += 100;
@@ -229,10 +229,10 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const configToml = await FileUtils.exists(`${dirPath}/config.toml`);
-    const configYaml = await FileUtils.exists(`${dirPath}/config.yaml`);
-    const contentDir = await FileUtils.isDirectory(`${dirPath}/content`);
-    const themesDir = await FileUtils.isDirectory(`${dirPath}/themes`);
+    const configToml = await pathExists(this.fsys, `${dirPath}/config.toml`);
+    const configYaml = await pathExists(this.fsys, `${dirPath}/config.yaml`);
+    const contentDir = await isDirectoryAt(this.fsys, `${dirPath}/content`);
+    const themesDir = await isDirectoryAt(this.fsys, `${dirPath}/themes`);
 
     if ((configToml || configYaml) && contentDir) {
       scores['blogdown'] += 100;
@@ -255,14 +255,14 @@ export class WorkflowDetector {
     scores: Record<Workflow, number>,
     indicators: string[]
   ): Promise<Record<Workflow, number>> {
-    const shinytestDir = await FileUtils.isDirectory(`${dirPath}/tests/shinytest`);
-    const appR = await FileUtils.exists(`${dirPath}/app.R`);
-    const testFiles = await FileUtils.listFiles(dirPath, /\.R$/, false);
+    const shinytestDir = await isDirectoryAt(this.fsys, `${dirPath}/tests/shinytest`);
+    const appR = await pathExists(this.fsys, `${dirPath}/app.R`);
+    const testFiles = await listFilesAt(this.fsys, dirPath, /\.R$/, false);
 
     // Check for shinytest-specific patterns in test files
     let hasShinytest = false;
     for (const file of testFiles) {
-      const content = await FileUtils.readFile(file);
+      const content = await this.fsys.readFile(file);
       if (/shinytest|AppDriver/.test(content)) {
         hasShinytest = true;
         break;
@@ -287,9 +287,7 @@ export class WorkflowDetector {
     return scores;
   }
 
-  private determineWorkflow(
-    scores: Record<Workflow, number>
-  ): [Workflow, number] {
+  private determineWorkflow(scores: Record<Workflow, number>): [Workflow, number] {
     const entries = Object.entries(scores).filter(([_, score]) => score > 0);
 
     if (entries.length === 0) {

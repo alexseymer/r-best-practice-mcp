@@ -548,7 +548,7 @@
     updateFiltersBadge();
   }
 
-  /* upload (optional): { files, button } sends an uploaded project to /api/validate-upload; path is then its label. */
+  /* upload (optional): { files, button } analyses an uploaded project in this browser; path is then its label. */
   function runAudit(path, workflow, upload) {
     clearAlert();
     if (!path) {
@@ -564,7 +564,7 @@
     setBusy(btn, true, 'Auditing…');
     var body = Object.assign(upload ? { files: upload.files } : { path: path }, read.filters);
     if (workflow) body.workflow = workflow;
-    return api('POST', upload ? '/api/validate-upload' : '/api/validate-project', body).then(
+    return (upload ? validateUploadInBrowser(body) : api('POST', '/api/validate-project', body)).then(
       function (result) {
         if (!upload) rememberPath(path);
         state.audit = { kind: 'project', target: path, result: result, filters: read.filters };
@@ -1374,14 +1374,32 @@
     });
   }
 
-  /* ---------- upload a project from the browser (POST /api/validate-upload) ---------- */
+  /* ---------- upload a project from the browser (analysed in this browser, nothing is sent) ---------- */
+
+  var browserEnginePromise = null;
+  /**
+   * Runs the upload analysis from /browser-engine (the same code the server runs for /api/validate-upload).
+   * The files stay in this page: no request carries them.
+   */
+  function validateUploadInBrowser(body) {
+    if (!browserEnginePromise) {
+      browserEnginePromise = import('/browser-engine/engine/browser-upload.js').catch(function () {
+        browserEnginePromise = null;
+        throw new Error('The analysis engine could not be loaded. Reload the page and try again.');
+      });
+    }
+    return browserEnginePromise.then(function (engine) {
+      return engine.validateUploadBody(body);
+    });
+  }
+
 
   /* Directories that are build output or dependency caches; never read or sent. */
   var UPLOAD_SKIP_DIRS = ['node_modules', '.git', 'renv', '_book', '_site'];
   var UPLOAD_MAX_DEPTH = 20;
   var UPLOAD_WALK_LIMIT = 20000;
   var UPLOAD_READ_BATCH = 25;
-  var UPLOAD_PRIVACY_NOTE = 'Your files are sent to the server for analysis and deleted immediately; nothing is stored.';
+  var UPLOAD_PRIVACY_NOTE = 'Your files are analysed in this browser. They are not uploaded anywhere.';
 
   /* Shared by the Validate and Detect panels: { name, entries: [{ path, file }], bytes, skipped, error }. */
   var uploadSel = null;
@@ -1607,7 +1625,7 @@
     return readUploadFiles(sel.entries)
       .then(function (files) {
         setBusy(ui.runBtn, true, 'Detecting…');
-        return api('POST', '/api/validate-upload', { files: files, detectOnly: true });
+        return validateUploadInBrowser({ files: files, detectOnly: true });
       })
       .then(
         function (data) {

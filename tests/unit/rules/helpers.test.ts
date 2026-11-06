@@ -1,4 +1,4 @@
-import { nodeProjectFs } from '../../../src/engine/project-fs';
+import { nodeProjectFs } from '../../../src/engine/project-fs-node';
 import path from 'path';
 import { createTempDir, cleanupTempDir, createFile } from '../../fixtures/setup';
 import {

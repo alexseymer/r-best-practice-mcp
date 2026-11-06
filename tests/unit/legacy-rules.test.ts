@@ -4,6 +4,7 @@ import { Finding } from '../../src/types/finding';
 import { Workflow } from '../../src/types/workflow';
 import { cleanupTempDir, createDir, createFile, createTempDir } from '../fixtures/setup';
 import { findingsFor, idsFor } from '../fixtures/rules';
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 
 const FULL_DESC =
   'Package: pkg\nVersion: 0.1.0\nTitle: T\nDescription: D.\nLicense: GPL-3\nAuthors@R: person("A", "B")\n';
@@ -370,7 +371,7 @@ describe('legacy validator rules', () => {
 
     it('rscript-functions (file-level) matches its practice and has suggestions', async () => {
       const file = createFile(dir, 'a.R', '# h\n' + 'print(1)\n'.repeat(60));
-      const f = (await new Validator().validateFile(file)).find(
+      const f = (await new Validator(nodeProjectFs).validateFile(file)).find(
         (x) => x.id === 'rscript-functions'
       );
       const practice = ALL_PRACTICES.find((p) => p.id === 'rscript-functions');
@@ -388,7 +389,7 @@ describe('legacy validator rules', () => {
 
     it('validation-error findings carry suggestions', async () => {
       // A path that cannot be listed makes validateProject fall into the catch branch.
-      const result = await new Validator().validateProject(`${dir}/\0bad`, 'r-script');
+      const result = await new Validator(nodeProjectFs).validateProject(`${dir}/\0bad`, 'r-script');
       const f = result.findings.find((x) => x.id === 'validation-error');
       if (f) expect(f.suggestions?.length).toBeGreaterThan(0);
     });

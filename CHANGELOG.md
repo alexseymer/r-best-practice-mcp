@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- Uploaded projects are analysed in the browser (#34). The dashboard runs the same rules as the server from `/browser-engine/` (about 38 KB gzipped, loaded on first use), so the files are not sent. The server route `POST /api/validate-upload` stays for API and MCP clients. A parity test requires identical results on both sides, and the browser e2e checks that no upload request carries the file contents.
+- Browser-safe modules: the validator, detector and upload sanitising no longer import Node modules (`project-fs-node.ts` holds the disk implementation; `config/limits.ts`, `engine/upload-sanitize.ts` and `types/workflow.ts` hold the pure parts).
+- `build` also writes `dist/browser-engine` (`scripts/build-browser-engine.mjs`); the Dockerfile builds and checks it.
 - Validation reads project files through a `ProjectFs` interface (`src/engine/project-fs.ts`), so the same rules can run on
   the server's disk or on files held in memory. A parity test checks that both give the same findings. The dashboard still
   uploads files to the server; in-browser validation is the next step.

@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { WorkflowDetector } from '../../src/engine/detector';
 import {
   createTempDir,
@@ -19,7 +20,7 @@ describe('WorkflowDetector', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    detector = new WorkflowDetector();
+    detector = new WorkflowDetector(nodeProjectFs);
     tempDir = createTempDir();
   });
 
