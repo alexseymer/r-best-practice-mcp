@@ -21,7 +21,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && npm run build:css",
+    "build": "tsc && npm run build:css && node scripts/build-browser-engine.mjs",
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/dashboard.css -o src/public/dashboard.css --minify",
     "build:icons": "node scripts/build-icons.mjs",
     "watch": "tsc --watch",

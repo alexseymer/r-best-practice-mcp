@@ -1,20 +1,7 @@
 import path from 'path';
+import { VALID_WORKFLOWS } from '../types/workflow.js';
 
-/** Workflow types accepted by the API (excludes the internal 'unknown'). */
-export const VALID_WORKFLOWS = [
-  'r-script',
-  'quarto',
-  'shiny',
-  'package',
-  'rmarkdown',
-  'renv',
-  'targets',
-  'plumber',
-  'analysis',
-  'bookdown',
-  'blogdown',
-  'shinytest',
-] as const;
+export { VALID_WORKFLOWS } from '../types/workflow.js';
 
 export class SecurityUtils {
   /**

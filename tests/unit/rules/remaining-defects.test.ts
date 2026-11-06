@@ -5,6 +5,7 @@ import { findingsFor, idsFor } from '../../fixtures/rules';
 import { Validator } from '../../../src/engine/validator';
 import { Finding } from '../../../src/types/finding';
 import { Workflow } from '../../../src/types/workflow';
+import { nodeProjectFs } from '../../../src/engine/project-fs-node';
 
 const fm = (body: string): string => `---\ntitle: "B"\n${body}\n---\n\nText\n`;
 const filler = (n: number): string =>
@@ -88,7 +89,7 @@ describe('remaining rule defects', () => {
       'validate_file accepts %s',
       async (def) => {
         const file = createFile(dir, 'a.R', `# h\n${def}\n${filler(60)}\n`);
-        const found = await new Validator().validateFile(file);
+        const found = await new Validator(nodeProjectFs).validateFile(file);
         expect(found.map((x) => x.id)).not.toContain('rscript-functions');
       }
     );

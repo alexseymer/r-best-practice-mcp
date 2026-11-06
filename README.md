@@ -19,7 +19,7 @@ The R Best Practices MCP Server helps developers write better R code by:
 - **Validating** projects against best practices with detailed findings
 - **Generating** scaffold templates for new projects
 - **Providing** knowledge base access to 70 best practices (59 checked automatically, 11 guidance-only)
-- **Validating uploads** from the browser: a visitor can send a project folder to the server, or (planned) check it in the browser
+- **Validating uploads** in the browser: a visitor can check a project folder without it leaving their computer; API clients can still send one to the server
 - **Taking contributions** from the community: new practices are proposed by pull request, see [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 The product and its requirements are described in [SPEC.md](./SPEC.md).
@@ -391,9 +391,9 @@ curl -X POST http://localhost:3000/api/v1/generate-template \
   -d '{"workflow": "package", "projectName": "mypackage"}'
 ```
 
-#### Upload a project (REST only)
+#### Upload a project
 
-`POST /api/validate-upload` validates a project posted from a browser (the server never sees a path). It is REST only,
+The dashboard analyses an uploaded project in the browser: the files are checked by the same rules and nothing is sent. For API clients, `POST /api/validate-upload` validates a project posted as JSON (the server never sees a path). It is REST only,
 not an MCP tool, and is also listed in `/openapi.json`. The files are written to a private temporary directory, analysed and
 deleted immediately; nothing is stored.
 

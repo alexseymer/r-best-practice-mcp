@@ -2,6 +2,7 @@ import { applyFindingFilters, summarizeFindings } from '../../src/engine/finding
 import { Validator } from '../../src/engine/validator';
 import { Finding } from '../../src/types/finding';
 import { createTempDir, cleanupTempDir, createFile, createPackageFixture } from '../fixtures/setup';
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 
 const sample: Finding[] = [
   { id: 'a', severity: 'critical', category: 'security', message: 'a' },
@@ -70,7 +71,7 @@ describe('summarizeFindings', () => {
 });
 
 describe('Validator filters and summary', () => {
-  const validator = new Validator();
+  const validator = new Validator(nodeProjectFs);
   let tempDir: string;
 
   beforeEach(() => {

@@ -11,10 +11,11 @@ RUN npm ci
 
 # Copy source code
 COPY src ./src
+COPY scripts ./scripts
 COPY tsconfig.json tailwind.config.cjs ./
 
 # Build TypeScript and the precompiled Tailwind stylesheet (src/public/dashboard.css, not committed)
-RUN npm run build && test -s src/public/dashboard.css
+RUN npm run build && test -s src/public/dashboard.css && test -s dist/browser-engine/engine/browser-upload.js
 
 # Runtime stage
 FROM node:20-alpine

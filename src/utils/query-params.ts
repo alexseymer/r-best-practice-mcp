@@ -6,7 +6,7 @@
 import { CATEGORIES, SEVERITIES } from '../types/finding.js';
 import { ENFORCEMENTS, PracticeListOptions } from '../types/practice.js';
 import { FindingFilterOptions } from '../engine/finding-filters.js';
-import { VALID_WORKFLOWS } from './security.js';
+import { VALID_WORKFLOWS } from '../types/workflow.js';
 
 export const MAX_FINDINGS_LIMIT = 1000;
 export const PRACTICE_LIMIT_MAX = 200;

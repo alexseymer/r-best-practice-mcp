@@ -15,6 +15,7 @@ import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
 import { toMcpTools } from './tools/schemas.js';
 import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+import { nodeProjectFs } from './engine/project-fs-node.js';
 
 function invalidParameter(message: string): { error: true; code: string; message: string } {
   return { error: true, code: 'INVALID_PARAMETER', message };
@@ -35,8 +36,8 @@ export class RPracticesMCPServer {
       // Without this capability the SDK refuses to register the tools handlers.
       { capabilities: { tools: {} } }
     );
-    this.detector = new WorkflowDetector();
-    this.validator = new Validator();
+    this.detector = new WorkflowDetector(nodeProjectFs);
+    this.validator = new Validator(nodeProjectFs);
     this.templateGenerator = new TemplateGenerator();
     this.setupHandlers();
   }

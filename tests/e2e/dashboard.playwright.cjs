@@ -399,7 +399,7 @@ function check(name, ok, extra) {
       const f = document.querySelector('[data-form="audit"]');
       return !!(s.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_FOLLOWING);
     }));
-    check('privacy statement shown', /sent to the server for analysis and deleted immediately; nothing is stored/.test(await section.textContent()));
+    check('privacy statement shown', /analysed in this browser\. They are not uploaded anywhere/.test(await section.textContent()));
     check('choose-folder button labelled', (await page.textContent('[data-el="upload-choose-audit"]')).trim() === 'Choose a project folder');
     check('directory input has webkitdirectory', await page.locator('[data-upload-input="dir-audit"]').evaluate((e) => e.hasAttribute('webkitdirectory') && e.multiple));
     check('run button disabled before a selection', await page.locator('[data-el="upload-run-audit"]').isDisabled());
@@ -416,15 +416,28 @@ function check(name, ok, extra) {
     check('status is an aria-live region', (await page.getAttribute('[data-el="upload-status-audit"]', 'aria-live')) === 'polite');
     check('run button enabled after selection', await page.locator('[data-el="upload-run-audit"]').isEnabled());
 
+    // Records every request made while `action` runs: uploads are analysed in the browser, so none may
+    // carry the file contents to the server.
+    async function recordRequests(action) {
+      const seen = [];
+      const onRequest = (r) => seen.push({ method: r.method(), url: r.url(), body: r.postData() || '' });
+      page.on('request', onRequest);
+      try {
+        await action();
+      } finally {
+        page.off('request', onRequest);
+      }
+      return seen;
+    }
+
     await page.selectOption('[data-el="audit-workflow"]', '');
-    const [upReq] = await Promise.all([
-      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
-      page.click('[data-el="upload-run-audit"]'),
-    ]);
-    const sent = JSON.parse(upReq.postData());
-    check('upload sends relative paths without node_modules or binaries', JSON.stringify(sent.files.map((f) => f.path).sort()) === JSON.stringify(['DESCRIPTION', 'NAMESPACE', 'R/a.R']), JSON.stringify(sent.files.map((f) => f.path)));
-    check('upload sends file contents', sent.files.find((f) => f.path === 'R/a.R').content.includes('x+1'));
-    await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    const runSeen = await recordRequests(async () => {
+      await page.click('[data-el="upload-run-audit"]');
+      await page.waitForFunction(() => /uploadpkg/.test(document.querySelector('[data-el="findings-summary"]').textContent), null, { timeout: 8000 });
+    });
+    check('upload makes no request to the server', runSeen.every((r) => !r.url.includes('/api/validate-upload')), JSON.stringify(runSeen.map((r) => r.url)));
+    check('upload sends no file contents anywhere', runSeen.every((r) => !r.body.includes('x+1')));
+    check('upload analysis loads the engine from this origin', runSeen.some((r) => r.url.startsWith(BASE_URL + '/browser-engine/engine/browser-upload.js')));
     const upFindings = await page.locator('[data-el="findings"] article').count();
     check('uploaded project renders findings through the existing renderer', upFindings > 0, upFindings + ' findings');
     const upSummary = await page.textContent('[data-el="findings-summary"]');
@@ -436,11 +449,8 @@ function check(name, ok, extra) {
     // filters from the form are applied to the upload
     await page.locator('[data-el="audit-filters"] summary').click();
     await page.fill('#filter-max', '1');
-    const [capped] = await Promise.all([
-      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
-      page.click('[data-el="upload-run-audit"]'),
-    ]);
-    check('upload request carries the filter values', JSON.parse(capped.postData()).maxFindings === 1);
+    const capSeen = await recordRequests(() => page.click('[data-el="upload-run-audit"]'));
+    check('filtered upload is analysed in the browser', capSeen.every((r) => !r.url.includes('/api/validate-upload')));
     await page.waitForFunction(() => document.querySelectorAll('[data-el="findings"] article').length === 1, null, { timeout: 8000 }).then(() => check('maxFindings applied to upload', true), () => check('maxFindings applied to upload', false));
     await page.click('[data-action="reset-filters"]');
     await page.locator('[data-el="audit-filters"] summary').click();
@@ -460,26 +470,10 @@ function check(name, ok, extra) {
     check('too many files shows the numbers', manyErr.includes(String(cfg.upload.maxFiles + 1)) && manyErr.includes(String(cfg.upload.maxFiles)), manyErr);
     check('previous summary cleared on error', (await page.textContent('[data-el="upload-status-audit"]')) === '');
 
-    // server errors surface in the alert banner and nothing stays stuck
+    // Server errors (BUSY, body limits) apply to the API only: see tests/integration/upload-api.test.ts.
     await page.setInputFiles('[data-upload-input="dir-audit"]', UP);
     await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-audit"]').textContent));
-    await page.route('**/api/validate-upload', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: true, code: 'BUSY', message: 'The server is busy analysing other uploads. Try again shortly.' }) }));
-    await page.click('[data-el="upload-run-audit"]');
-    await page.waitForFunction(() => !document.querySelector('[data-el="alert"]').classList.contains('hidden'));
-    check('503 BUSY message shown', /busy/.test(await page.textContent('[data-el="alert-text"]')), await page.textContent('[data-el="alert-text"]'));
-    await page.unroute('**/api/validate-upload');
-    check('run button re-enabled after a failed upload', await page.locator('[data-el="upload-run-audit"]').isEnabled());
-    await page.click('[data-action="dismiss-alert"]');
-
-    // a dropped connection (no HTTP response) names the browser's error and the request size
-    await page.route('**/api/validate-upload', (r) => r.abort('connectionreset'));
-    await page.click('[data-el="upload-run-audit"]');
-    await page.waitForFunction(() => !document.querySelector('[data-el="alert"]').classList.contains('hidden'));
-    const netMsg = await page.textContent('[data-el="alert-text"]');
-    check('network failure message names the browser error and size', /Cannot reach the server \(.+ while sending \d+ KB\)/.test(netMsg), netMsg);
-    await page.unroute('**/api/validate-upload');
-    check('run button re-enabled after a dropped connection', await page.locator('[data-el="upload-run-audit"]').isEnabled());
-    await page.click('[data-action="dismiss-alert"]');
+    await page.waitForFunction(() => !document.querySelector('[data-el="upload-run-audit"]').disabled);
 
     // drag and drop (plain-files fallback; folder entries use the same selection code as the directory input)
     await page.evaluate(() => {
@@ -495,11 +489,8 @@ function check(name, ok, extra) {
     check('upload option in Detect panel', await page.locator('[data-upload="detect"]').isVisible());
     await page.setInputFiles('[data-upload-input="dir-detect"]', UP);
     await page.waitForFunction(() => /uploadpkg: 3 files/.test(document.querySelector('[data-el="upload-status-detect"]').textContent));
-    const [detReq] = await Promise.all([
-      page.waitForRequest((r) => r.url().endsWith('/api/validate-upload')),
-      page.click('[data-el="upload-run-detect"]'),
-    ]);
-    check('detect upload asks for detection only', JSON.parse(detReq.postData()).detectOnly === true);
+    const detSeen = await recordRequests(() => page.click('[data-el="upload-run-detect"]'));
+    check('detect upload is analysed in the browser', detSeen.every((r) => !r.url.includes('/api/validate-upload')));
     await page.waitForFunction(() => /\(uploaded\)/.test(document.querySelector('[data-el="detect-result"]').textContent), null, { timeout: 8000 });
     const upDetect = await page.textContent('[data-el="detect-result"]');
     check('detect upload shows the workflow and confidence', /R package/.test(upDetect) && /\d+%/.test(upDetect) && /uploadpkg \(uploaded\)/.test(upDetect), upDetect.replace(/\s+/g, ' ').slice(0, 120));

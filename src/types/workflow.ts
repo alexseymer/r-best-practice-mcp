@@ -25,3 +25,19 @@ export interface DetectionOptions {
   checkDepth?: number; // How deep to scan
   timeout?: number; // ms
 }
+
+/** Workflow types accepted by the API (excludes the internal 'unknown'). */
+export const VALID_WORKFLOWS = [
+  'r-script',
+  'quarto',
+  'shiny',
+  'package',
+  'rmarkdown',
+  'renv',
+  'targets',
+  'plumber',
+  'analysis',
+  'bookdown',
+  'blogdown',
+  'shinytest',
+] as const;

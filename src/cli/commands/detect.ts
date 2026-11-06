@@ -1,6 +1,7 @@
 import { WorkflowDetector } from '../../engine/detector.js';
 import { FileUtils } from '../../utils/file.js';
 import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
+import { nodeProjectFs } from '../../engine/project-fs-node.js';
 
 export async function detectCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);
@@ -16,7 +17,7 @@ export async function detectCommand(args: string[], options: CLIOptions): Promis
   }
 
   try {
-    const detector = new WorkflowDetector();
+    const detector = new WorkflowDetector(nodeProjectFs);
     const result = await detector.detect(projectPath);
 
     if (options.format === 'json') {
@@ -25,7 +26,9 @@ export async function detectCommand(args: string[], options: CLIOptions): Promis
       displayDetectionResult(result);
     }
   } catch (error) {
-    CLIFormatter.error(`Detection failed: ${error instanceof Error ? error.message : String(error)}`);
+    CLIFormatter.error(
+      `Detection failed: ${error instanceof Error ? error.message : String(error)}`
+    );
     process.exit(1);
   }
 }

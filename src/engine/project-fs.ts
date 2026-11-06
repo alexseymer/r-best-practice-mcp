@@ -1,8 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-
 /**
- * Read-only access to a project's files. The validator uses this instead of `fs` directly, so the
+ * Read-only access to a project's files. This module must stay free of Node imports: the browser loads it. The validator uses this instead of `fs` directly, so the
  * same rules can run on the server's disk (nodeProjectFs) or on files a browser already holds
  * (createMemoryProjectFs). Paths are strings in the implementation's own format.
  */
@@ -32,24 +29,6 @@ export interface ProjectFs {
   /** Absolute, normalised form of a path. */
   resolve(p: string): string;
 }
-
-/** The server's disk. */
-export const nodeProjectFs: ProjectFs = {
-  async readdir(dir) {
-    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    return entries.map((e) => ({ name: e.name, isDirectory: e.isDirectory(), isFile: e.isFile() }));
-  },
-  async stat(p) {
-    const s = await fs.promises.stat(p);
-    return { isFile: s.isFile(), isDirectory: s.isDirectory(), size: s.size };
-  },
-  readFile: (p) => fs.promises.readFile(p, 'utf-8'),
-  join: (...parts) => path.join(...parts),
-  basename: (p) => path.basename(p),
-  dirname: (p) => path.dirname(p),
-  relative: (from, to) => path.relative(from, to),
-  resolve: (p) => path.resolve(p),
-};
 
 /** POSIX-style path helpers for the in-memory file system (no Node 'path' module in the browser). */
 function normalizePosix(p: string): string {
@@ -155,4 +134,39 @@ export function createMemoryProjectFs(files: Record<string, string>): ProjectFs 
     relative: relativePosix,
     resolve: (p) => normalizePosix(p.startsWith('/') ? p : `/${p}`),
   };
+}
+
+/** True if the path is a directory. Missing paths and errors count as false. */
+export async function isDirectoryAt(fsys: ProjectFs, p: string): Promise<boolean> {
+  try {
+    return (await fsys.stat(p)).isDirectory;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Files under a directory whose names match `pattern`. Skips hidden entries and node_modules, and
+ * descends only when `recursive` is set. (The same contract as the former FileUtils.listFiles.)
+ */
+export async function listFilesAt(
+  fsys: ProjectFs,
+  dirPath: string,
+  pattern?: RegExp,
+  recursive = false
+): Promise<string[]> {
+  const files: string[] = [];
+  const traverse = async (dir: string): Promise<void> => {
+    for (const entry of await fsys.readdir(dir)) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const fullPath = fsys.join(dir, entry.name);
+      if (entry.isDirectory && recursive) {
+        await traverse(fullPath);
+      } else if (entry.isFile && (!pattern || pattern.test(entry.name))) {
+        files.push(fullPath);
+      }
+    }
+  };
+  await traverse(dirPath);
+  return files;
 }

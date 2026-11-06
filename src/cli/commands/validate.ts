@@ -3,6 +3,7 @@ import { FileUtils } from '../../utils/file.js';
 import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
 import { Finding } from '../../types/finding.js';
 import { Workflow } from '../../types/workflow.js';
+import { nodeProjectFs } from '../../engine/project-fs-node.js';
 
 export async function validateCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);
@@ -19,11 +20,15 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
   }
 
   try {
-    const validator = new Validator();
+    const validator = new Validator(nodeProjectFs);
     const result = await validator.validateProject(projectPath, workflow as Workflow, {
       minSeverity: options.severity as Finding['severity'],
       categories: options.category ? [options.category as string] : undefined,
-      maxFindings: options.limit ? (typeof options.limit === 'string' ? parseInt(options.limit) : options.limit) : undefined,
+      maxFindings: options.limit
+        ? typeof options.limit === 'string'
+          ? parseInt(options.limit)
+          : options.limit
+        : undefined,
     });
 
     if (options.format === 'json') {
@@ -36,7 +41,9 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
       process.exit(1);
     }
   } catch (error) {
-    CLIFormatter.error(`Validation failed: ${error instanceof Error ? error.message : String(error)}`);
+    CLIFormatter.error(
+      `Validation failed: ${error instanceof Error ? error.message : String(error)}`
+    );
     process.exit(1);
   }
 }
@@ -76,7 +83,6 @@ function displayValidationResult(result: any): void {
         });
       }
     });
-
 
     if (findingsForSeverity.length > 10) {
       CLIFormatter.info(`... and ${findingsForSeverity.length - 10} more`);

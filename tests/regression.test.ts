@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../src/engine/project-fs-node';
 import { WorkflowDetector } from '../src/engine/detector.js';
 import { Validator } from '../src/engine/validator.js';
 import { kb } from '../src/data/knowledge-base.js';
@@ -8,8 +9,8 @@ if (typeof __dirname === 'undefined') {
 }
 
 describe('Regression Tests', () => {
-  const detector = new WorkflowDetector();
-  const validator = new Validator();
+  const detector = new WorkflowDetector(nodeProjectFs);
+  const validator = new Validator(nodeProjectFs);
 
   /**
    * Regression tests for reported bugs and edge cases.

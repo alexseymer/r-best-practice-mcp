@@ -1,10 +1,11 @@
+import { nodeProjectFs } from '../src/engine/project-fs-node';
 import { WorkflowDetector } from '../src/engine/detector';
 import { Validator } from '../src/engine/validator';
 import path from 'path';
 
 describe('Example Projects Validation', () => {
-  const detector = new WorkflowDetector();
-  const validator = new Validator();
+  const detector = new WorkflowDetector(nodeProjectFs);
+  const validator = new Validator(nodeProjectFs);
   const baseDir = process.cwd();
 
   describe('Example Package', () => {

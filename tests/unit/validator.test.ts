@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { Validator } from '../../src/engine/validator';
 import {
   createTempDir,
@@ -17,7 +18,7 @@ describe('Validator', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    validator = new Validator();
+    validator = new Validator(nodeProjectFs);
     tempDir = createTempDir();
   });
 
@@ -130,11 +131,7 @@ describe('Validator', () => {
 
     it('should detect unlabeled code chunks', async () => {
       const filePath = `${tempDir}/test.qmd`;
-      createFile(
-        tempDir,
-        'test.qmd',
-        '---\ntitle: Test\n---\n\n```{r}\nprint("hello")\n```'
-      );
+      createFile(tempDir, 'test.qmd', '---\ntitle: Test\n---\n\n```{r}\nprint("hello")\n```');
       const findings = await validator.validateFile(filePath);
 
       const labelError = findings.find((f) => f.id === 'quarto-labels');

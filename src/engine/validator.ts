@@ -2,7 +2,7 @@ import { FileValidationResult, Finding, ValidationResult } from '../types/findin
 import { Workflow } from '../types/workflow.js';
 import { logger } from '../utils/logger.js';
 import { runRegisteredRules } from './rules/index.js';
-import { nodeProjectFs, ProjectFs } from './project-fs.js';
+import { isDirectoryAt, listFilesAt, type ProjectFs } from './project-fs.js';
 import {
   compareNames,
   findFiles,
@@ -36,37 +36,19 @@ export const UNKNOWN_WORKFLOW_WARNING =
   'No R project type was detected in this folder, so no workflow-specific checks ran. Choose a workflow type or check the path.';
 
 export class Validator {
-  /** Where project files are read from: the server's disk by default, or an in-memory copy. */
-  constructor(private readonly fsys: ProjectFs = nodeProjectFs) {}
+  /** Where project files are read from: the server's disk (project-fs-node) or an in-memory copy. */
+  constructor(private readonly fsys: ProjectFs) {}
 
   private exists(p: string): Promise<boolean> {
     return pathExists(this.fsys, p);
   }
 
-  private async isDirectory(p: string): Promise<boolean> {
-    try {
-      return (await this.fsys.stat(p)).isDirectory;
-    } catch {
-      return false;
-    }
+  private isDirectory(p: string): Promise<boolean> {
+    return isDirectoryAt(this.fsys, p);
   }
 
-  /** Same contract as the former FileUtils.listFiles: skips hidden entries and node_modules. */
-  private async listFiles(dirPath: string, pattern?: RegExp, recursive = false): Promise<string[]> {
-    const files: string[] = [];
-    const traverse = async (dir: string): Promise<void> => {
-      for (const entry of await this.fsys.readdir(dir)) {
-        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-        const fullPath = this.fsys.join(dir, entry.name);
-        if (entry.isDirectory && recursive) {
-          await traverse(fullPath);
-        } else if (entry.isFile && (!pattern || pattern.test(entry.name))) {
-          files.push(fullPath);
-        }
-      }
-    };
-    await traverse(dirPath);
-    return files;
+  private listFiles(dirPath: string, pattern?: RegExp, recursive = false): Promise<string[]> {
+    return listFilesAt(this.fsys, dirPath, pattern, recursive);
   }
 
   /** Same result as path.extname: '' for names without a dot or starting with one. */

@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { WorkflowDetector } from '../../src/engine/detector.js';
 import { Validator } from '../../src/engine/validator.js';
 import { TemplateGenerator } from '../../src/engine/template-generator.js';
@@ -9,8 +10,8 @@ if (typeof __dirname === 'undefined') {
 }
 
 describe('Performance and Load Tests', () => {
-  const detector = new WorkflowDetector();
-  const validator = new Validator();
+  const detector = new WorkflowDetector(nodeProjectFs);
+  const validator = new Validator(nodeProjectFs);
   const templateGenerator = new TemplateGenerator();
   const examplePackagePath = path.resolve(__dirname, '../../examples/example-package');
 

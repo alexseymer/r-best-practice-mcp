@@ -1,3 +1,4 @@
+import { nodeProjectFs } from '../src/engine/project-fs-node';
 import { WorkflowDetector } from '../src/engine/detector';
 import { Validator } from '../src/engine/validator';
 import { TemplateGenerator } from '../src/engine/template-generator';
@@ -24,8 +25,8 @@ describe('Performance Benchmarks', () => {
   let templateGenerator: TemplateGenerator;
 
   beforeEach(() => {
-    detector = new WorkflowDetector();
-    validator = new Validator();
+    detector = new WorkflowDetector(nodeProjectFs);
+    validator = new Validator(nodeProjectFs);
     templateGenerator = new TemplateGenerator();
     tempDir = createTempDir();
     metricsCollector.reset();

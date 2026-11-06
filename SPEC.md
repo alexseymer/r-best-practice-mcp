@@ -139,10 +139,10 @@ Only allow-listed extensions and names are accepted (for example `.R`, `.Rmd`, `
 `DESCRIPTION`, `NAMESPACE`). The uploaded files are written to a private temporary folder and deleted
 after the request, whatever the outcome. Upload validation is REST only and is not an MCP tool.
 
-**Planned (in review, PR #31 step 1):** the dashboard will validate uploads in the browser, so files
-do not leave the visitor's computer. The rules already read files through an interface
-(`src/engine/project-fs.ts`) that a browser implementation can satisfy. The API route stays for API and
-MCP users.
+**Browser analysis:** the dashboard analyses uploads in the visitor's browser, so the files do not leave their
+computer. The same analysis (`src/engine/browser-upload.ts`) runs on the server for the API route, and a parity test
+(`tests/unit/browser-upload-parity.test.ts`) requires identical results. The compiled engine is served from
+`/browser-engine/`. The API route stays for API and MCP users.
 
 ### 4.5 Template generation
 
@@ -230,7 +230,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 ## 9. Open decisions
 
 1. **Deprecation policy:** how long the unversioned `/api/*` routes stay, and how they are announced.
-2. **Browser-side validation:** whether the server-side upload route is kept once the dashboard validates in the browser (currently: keep for API and MCP users).
+2. **Browser-side validation (decided):** the server-side upload route is kept for API and MCP users; the dashboard analyses uploads in the browser.
 3. **Community rule code:** whether a sandboxed rule format is worth building, or contributions stay maintainer-only.
 4. **Publication:** when to publish the VS Code extension (issue #3), the npm package (issue #4) and the tutorials (issue #5).
 5. **Public metrics:** whether `METRICS_PUBLIC` should be documented as a production option at all.
