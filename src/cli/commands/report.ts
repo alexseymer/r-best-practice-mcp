@@ -1,4 +1,4 @@
-import { nodeProjectFs } from '../../engine/project-fs-node';
+import { nodeProjectFs } from '../../engine/project-fs-node.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Validator } from '../../engine/validator.js';
