@@ -208,7 +208,7 @@ npm test -- tests/performance.test.ts -t "Metrics Collection"
 ### Sample Benchmark Output (2026-09-26)
 
 ```
-Performance Benchmarks (22 tests, all passing)
+Performance Benchmarks
   Detection Performance
     ✓ should detect Shiny app within acceptable time (16ms)
     ✓ should detect package within acceptable time (3ms)

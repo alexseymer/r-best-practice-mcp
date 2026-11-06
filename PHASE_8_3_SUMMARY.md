@@ -1,5 +1,8 @@
 # Phase 8.3: Examples & Tutorials - Completion Summary
 
+> **Historical snapshot.** This document records the project at the time it was written. Counts and statuses here are not current; see [SPEC.md](./SPEC.md) for the current specification.
+
+
 **Issue:** #5 - Create Examples and Tutorial Documentation  
 **Status:** ✅ COMPLETE  
 **Date:** 2026-09-26  

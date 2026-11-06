@@ -424,7 +424,7 @@ r-practices validate . --watch
 
 ### Code Quality
 - ✅ TypeScript strict mode
-- ✅ 91 tests passing
+- ✅ Test suite passing (see CI)
 - ✅ ~90% coverage in tested components
 - ✅ Zero critical security issues
 - ✅ ESLint compliant

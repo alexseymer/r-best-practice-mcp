@@ -1,5 +1,8 @@
 # R Best Practices MCP Server - Project Status
 
+> **Historical snapshot.** This document records the project at the time it was written. Counts and statuses here are not current; see [SPEC.md](./SPEC.md) for the current specification.
+
+
 ## Project Completion Summary
 
 **Status**: ✅ **COMPLETE** — Phase 3 Delivered  

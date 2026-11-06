@@ -166,8 +166,7 @@ Anyone can propose a practice by pull request. The rules are in [CONTRIBUTING.md
 
 - **Correctness:** the same rules and fixtures on disk and in memory must give identical findings
   (`tests/unit/project-fs-parity.test.ts`).
-- **Tests:** unit, integration and rule tests run in CI on Node 18 and 20 (1,298 passing, 36 skipped at
-  the time of writing). Line coverage must stay at or above 80% (`.github/workflows/test.yml`).
+- **Tests:** unit, integration and rule tests run in CI on Node 18 and 20 (run `npm test` for the current count). Line coverage must stay at or above 80% (`.github/workflows/test.yml`).
 - **Static checks:** TypeScript strict mode, ESLint (zero errors), Prettier.
 - **Accessibility:** zero axe violations on each dashboard tab.
 - **Performance:** measured targets and baselines are in

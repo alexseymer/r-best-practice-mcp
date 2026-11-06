@@ -1,5 +1,8 @@
 # R Best Practices MCP Server - Project Summary
 
+> **Historical snapshot.** This document records the project at the time it was written. Counts and statuses here are not current; see [SPEC.md](./SPEC.md) for the current specification.
+
+
 ## What is This?
 
 An **MCP (Model Context Protocol) server** that helps R developers follow best practices across any R project type. Integrates with Claude to provide intelligent code analysis and guidance.

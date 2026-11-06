@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document explains the API versioning strategy for the R Best Practices MCP Server, including how versions are managed, how to migrate between versions, and the lifecycle of deprecated endpoints.
+This document explains the API versioning strategy for the R Best Practices MCP Server, including how versions are managed, how to migrate between versions, and the policy for any future removal of endpoints.
 
 ---
 
@@ -50,16 +50,11 @@ v1: GET  /api/v1/practice/:id
 - Security updates applied to both
 - Performance optimizations in v1
 
-### Phase 3: Maintenance (v0 deprecated - future)
-- v0 marked as deprecated (HTTP `Deprecation` header)
-- Clients get 6 months notice before removal
-- Migration guide provided
-- v1 becomes exclusive
-
-### Phase 4: Sunset (v0 removed - future)
-- v0 endpoints return 410 Gone
-- v1 only available
-- Clients must have migrated
+### Phase 3: Long-term support (decided)
+- The unversioned `/api/*` routes (called v0 in this document) are supported indefinitely, next to `/api/v1/*`.
+- They are not deprecated and carry no `Deprecation` or `Sunset` header.
+- v1 remains the recommended version for new code, and migration is optional.
+- See [SPEC.md](./SPEC.md) §9, decision 1.
 
 ---
 
@@ -332,28 +327,11 @@ GET  /api/practice/:id
 
 ## Deprecation Policy
 
-### How We Signal Deprecation
+No deprecation is planned for the unversioned `/api/*` routes. This is a decision recorded in SPEC.md §9.
 
-**1. HTTP Deprecation Header** (when applicable)
-```
-Deprecation: true
-Sunset: Sun, 27 Sep 2027 00:00:00 GMT
-```
-
-**2. Documentation Updates**
-- Version marked as deprecated in API docs
-- Migration guide provided
-- Recommended version clearly stated
-
-**3. Warning Messages**
-- Server logs warn when deprecated endpoints are used
-- Future versions may include warnings in responses
-
-### Timeline
-
-- **Month 1-6**: Maintain v0, actively develop v1
-- **Month 7**: Mark v0 as deprecated with 6-month notice
-- **Month 13**: Remove v0 endpoints (return 410 Gone)
+- Existing clients keep working. No `Deprecation` or `Sunset` header is sent.
+- A removal would need a new decision and a published notice of at least six months, with a migration guide.
+- Changes to v1 follow the normal rules for additive changes; breaking changes need a new version (`/api/v2/`).
 
 ---
 
@@ -515,7 +493,7 @@ No timeline for v2 yet. Current focus on v1 stability.
 
 ### Q: Will v0 be removed?
 
-**A:** Yes, but not until 6+ months after deprecation notice. You have time to migrate.
+**A:** Not planned. The unversioned routes are supported indefinitely. Migrating to v1 is optional.
 
 ### Q: Can I mix v0 and v1 in the same client?
 
@@ -535,7 +513,7 @@ No timeline for v2 yet. Current focus on v1 stability.
 
 ### Q: What if I'm using v0 and it stops working?
 
-**A:** Migrate to v1 immediately. If you need help, contact alexseymer@gmail.com.
+**A:** Check that the request still matches the documented format (see `/openapi.json`), and open an issue at https://github.com/alexseymer/r-best-practice-mcp/issues if it does not.
 
 ---
 

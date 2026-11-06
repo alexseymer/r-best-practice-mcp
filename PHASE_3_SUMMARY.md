@@ -1,5 +1,8 @@
 # Phase 3: Production Hardening - Complete Summary
 
+> **Historical snapshot.** This document records the project at the time it was written. Counts and statuses here are not current; see [SPEC.md](./SPEC.md) for the current specification.
+
+
 **Version:** 0.3.0  
 **Date:** 2026-09-27  
 **Status:** ✅ Complete and Production Ready

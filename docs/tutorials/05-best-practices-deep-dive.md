@@ -1,6 +1,6 @@
 # Best Practices Deep Dive by Workflow
 
-Comprehensive guide to the 52+ best practices organized by R workflow.
+Comprehensive guide to the 70 best practices organized by R workflow.
 
 ## R Scripts (7 Practices)
 
