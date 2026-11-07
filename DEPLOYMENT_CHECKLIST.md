@@ -544,6 +544,26 @@ k6 run load-test.js
 
 ---
 
+## Live Acceptance (after every deploy)
+
+Run the acceptance checks against the deployed URL. They take about a second and make about 25 requests, well under the
+per-IP limit of 100 per minute:
+
+```bash
+LIVE_BASE_URL=https://your-host.example npm run acceptance:live
+```
+
+The script reads `/api/config` and checks what the deployment reports: the dashboard's security headers, the browser upload
+engine, the paginated API, JSON error shapes, the upload path, path confinement and metrics protection. A `WARN` is a
+deployment choice worth a look (for example `build commit is reported` is `WARN` until `GIT_SHA` and `BUILD_TIME` are set,
+see issue #43). The command exits 1 if any check fails.
+
+Optionally, run the browser suite against the same URL. It makes more requests, so pace it or raise the limit for the run:
+
+```bash
+BASE_URL=https://your-host.example CHROMIUM_PATH=/path/to/chrome node tests/e2e/dashboard.playwright.cjs
+```
+
 ## Post-Deployment Verification
 
 ### Immediate After Deploy
