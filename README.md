@@ -112,6 +112,24 @@ merged pull requests in this repository. The gate is switched on by the reposito
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 
+### Use with an AI assistant (MCP)
+
+Once the package is published to npm, add it to your MCP client without installing anything:
+
+```json
+{
+  "mcpServers": {
+    "r-best-practices": {
+      "command": "npx",
+      "args": ["-y", "r-best-practices-mcp"]
+    }
+  }
+}
+```
+
+For Claude Code: `claude mcp add r-best-practices -- npx -y r-best-practices-mcp`.
+Until then, build from source (below) and point `command` at `node` with `dist/index.js`.
+
 ### From npm Registry (Recommended)
 
 ```bash
