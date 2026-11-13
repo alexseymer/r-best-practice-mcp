@@ -50,6 +50,7 @@ export class WorkflowDetector {
     scores = await this.checkBookdown(dirPath, scores, indicators);
     scores = await this.checkBlogdown(dirPath, scores, indicators);
     scores = await this.checkShinytest(dirPath, scores, indicators);
+    scores = await this.checkRScript(dirPath, scores, indicators);
 
     // Determine winner
     const [workflow, confidence] = this.determineWorkflow(scores);
@@ -282,6 +283,22 @@ export class WorkflowDetector {
     if (shinytestDir && appR) {
       scores['shinytest'] += 15;
       indicators.push('shinytest setup with Shiny app');
+    }
+
+    return scores;
+  }
+
+  // Low score on purpose: plain .R files only decide when nothing more specific matches.
+  private async checkRScript(
+    dirPath: string,
+    scores: Record<Workflow, number>,
+    indicators: string[]
+  ): Promise<Record<Workflow, number>> {
+    const rFiles = await listFilesAt(this.fsys, dirPath, /\.[Rr]$/, false);
+
+    if (rFiles.length > 0) {
+      scores['r-script'] += 40;
+      indicators.push(`R script files found (${rFiles.length})`);
     }
 
     return scores;

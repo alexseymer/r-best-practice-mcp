@@ -55,7 +55,6 @@
   "author": "alexseymer",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "commander": "^11.0.0",
     "compression": "1.8.2",

@@ -414,7 +414,7 @@ Uploaded files are written to a private temporary directory under `UPLOAD_TMP_DI
   the JSON body may be 8 MB. Only text project files are accepted (`.R .Rmd .qmd .md .yml .yaml .toml .json .lock .txt .dcf ...`
   and files such as `DESCRIPTION`, `NAMESPACE`, `.Rprofile`); other files are skipped and counted in `upload.skipped`.
 - Errors: `400 INVALID_PARAMETER` (not an array, empty, absolute path, `.`/`..`/empty segment, control characters, duplicate path,
-  wrong types, no supported files), `400 INVALID_WORKFLOW`, `413 PAYLOAD_TOO_LARGE` (file/total/count/body limits),
+  wrong types, no supported files), `400 INVALID_JSON` (the body is not valid JSON), `400 INVALID_WORKFLOW`, `413 PAYLOAD_TOO_LARGE` (file/total/count/body limits),
   `503 BUSY` with `Retry-After` (at most 2 uploads are analysed at the same time).
 
 #### API Documentation

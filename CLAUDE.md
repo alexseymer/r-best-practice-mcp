@@ -346,7 +346,7 @@ Phase N: Brief description
 - List new files/components
 - Mention test additions
 
-Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+Co-Authored-By: Name <email>   (only when someone else co-wrote the change)
 ```
 
 ## Troubleshooting
