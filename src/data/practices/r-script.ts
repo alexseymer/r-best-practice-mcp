@@ -203,4 +203,20 @@ dev.off()`,
       'https://withr.r-lib.org/reference/defer.html',
     ],
   },
+  {
+    id: 'rscript-paths',
+    title: 'Avoid setwd() and hard-coded absolute paths',
+    workflow: 'r-script',
+    category: 'structure',
+    severity: 'recommended',
+    enforcement: 'automated',
+    description: 'Scripts should run from any machine without editing paths',
+    details:
+      'A script that calls setwd() or reads from a path like "/Users/me/data.csv" or "C:/Users/me/data.csv" only works on one computer. This is a heuristic: it looks at the `.R` files in the project root and in first-level subdirectories, ignores comments and the text inside strings when looking for setwd(), and reports one finding for the first script that calls setwd() or contains a string literal that starts with a Unix home path (/Users/, /home/) or a Windows drive letter. Use project-relative paths with here::here() or an RStudio/Positron project instead.',
+    badExample: `setwd("/Users/me/project")
+raw <- read.csv("/Users/me/project/data/raw.csv")`,
+    goodExample: `raw <- read.csv(here::here("data", "raw.csv"))`,
+    tags: ['paths', 'reproducibility'],
+    references: ['https://here.r-lib.org/', 'https://r4ds.hadley.nz/workflow-scripts.html'],
+  },
 ];

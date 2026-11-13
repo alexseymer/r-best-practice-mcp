@@ -107,8 +107,8 @@ Practices are data. Each is one object in `src/data/practices/<workflow>.ts` wit
 workflow, category, severity, enforcement, description, details, good and bad examples, tags and
 references.
 
-- **Enforcement:** `automated` (a rule checks it) or `guidance` (advice only). Currently 70 practices:
-  59 automated, 11 guidance.
+- **Enforcement:** `automated` (a rule checks it) or `guidance` (advice only). Currently 71 practices:
+  60 automated, 11 guidance.
 - **Severity:** `critical`, `important`, `recommended`, `info`.
 - **Rules:** each automated practice has one rule with the same id, in `src/engine/rules/`. A test
   fails if a rule has no practice or an automated practice has no rule.
