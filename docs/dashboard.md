@@ -35,7 +35,7 @@ attributes; `dashboard.js` applies dynamic styles through the CSSOM (`element.st
 | **Validate** | Audit a project folder, optionally forcing the workflow, or validate one file | `POST /api/validate-project`, `POST /api/validate-file` |
 | **Detect** | Identify the workflow with a confidence score and the evidence; jump to validate or generate | `POST /api/detect-workflow` |
 | **Generate** | Create a project template, preview each file, download one file or everything as a ZIP (built in the browser) | `POST /api/generate-template` |
-| **Practices** | Browse the 71 practices; filter by workflow, category, minimum severity and check type; text search; examples and references | `GET /api/practices` |
+| **Practices** | Browse the 73 practices; filter by workflow, category, minimum severity and check type; text search; examples and references | `GET /api/practices` |
 | **System** | Server health, per-operation counts, endpoint reference, OpenAPI spec and CSV exports | `/health`, `/api/tools`, `/openapi.json`, `/metrics/*.csv` |
 
 ## Validate

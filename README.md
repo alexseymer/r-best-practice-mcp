@@ -18,7 +18,7 @@ The R Best Practices MCP Server helps developers write better R code by:
 - **Detecting** the R workflow type from a directory structure
 - **Validating** projects against best practices with detailed findings
 - **Generating** scaffold templates for new projects
-- **Providing** knowledge base access to 71 best practices (60 checked automatically, 11 guidance-only)
+- **Providing** knowledge base access to 73 best practices (62 checked automatically, 11 guidance-only)
 - **Validating uploads** in the browser: a visitor can check a project folder without it leaving their computer; API clients can still send one to the server
 - **Taking contributions** from the community: new practices are proposed by pull request, see [CONTRIBUTING.md](./CONTRIBUTING.md)
 
@@ -66,7 +66,7 @@ Generate complete project scaffolds:
 - Customizable project name and author info
 
 ### 📚 Knowledge Base
-Access to 71 best practices:
+Access to 73 best practices:
 - Organized by workflow type (12 workflows)
 - Categorized by topic (documentation, testing, security, etc.)
 - Every practice has details, a "bad" and a "good" example, and references
@@ -483,7 +483,7 @@ r-best-practice-mcp/
 │   │   ├── upload.ts              # Browser uploads: sanitising and temporary projects
 │   │   ├── template-generator.ts  # Starter projects per workflow
 │   │   └── rules/                 # One rule per automated practice, per workflow
-│   ├── data/practices/            # The 71 practices, one file per workflow (data only)
+│   ├── data/practices/            # The 73 practices, one file per workflow (data only)
 │   ├── utils/
 │   │   └── practice-contribution.ts  # Checks community practice contributions
 │   ├── cli/                       # The r-practices command line
@@ -566,7 +566,7 @@ findings for files on disk and in memory. CI requires at least 80% line coverage
 
 ## Best Practices Coverage
 
-The knowledge base includes 71 best practices. 60 are *automated* (a validator rule reports violations);
+The knowledge base includes 73 best practices. 62 are *automated* (a validator rule reports violations);
 11 are *guidance only* (they need R to run, runtime behaviour or judgement, so they never produce findings):
 
 **R Scripts** (7) — Headers, functions, naming, sections, error handling, cleanup  

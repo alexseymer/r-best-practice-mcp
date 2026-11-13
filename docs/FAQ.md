@@ -21,7 +21,7 @@
 
 The R Best Practices MCP Server is a tool that helps R developers follow best practices across different project types. It:
 - Detects your R project type (package, Shiny app, analysis, etc.)
-- Validates projects against 71 best practices
+- Validates projects against 73 best practices
 - Generates starter templates for new projects
 - Provides knowledge base access to practice documentation
 
@@ -163,7 +163,7 @@ Output shows: workflow type, confidence %, and detected indicators
 
 ### What does validation check?
 
-Validation checks your project against 71 best practices including:
+Validation checks your project against 73 best practices including:
 - **Structure** — Required directories and files
 - **Documentation** — README, DESCRIPTION, comments
 - **Testing** — Test files and coverage

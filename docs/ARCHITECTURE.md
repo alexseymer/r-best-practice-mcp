@@ -89,7 +89,7 @@ Confidence = (points collected / max possible) × 100
 
 ### 2. Validator Engine (`src/engine/validator.ts`)
 
-**Responsibility**: Check projects against the 71 best practices (60 automated, 11 guidance)
+**Responsibility**: Check projects against the 73 best practices (62 automated, 11 guidance)
 
 **Key Methods**:
 ```typescript
@@ -189,7 +189,7 @@ interface TemplateGeneratorOptions {
 
 ### 4. Knowledge Base (`src/data/knowledge-base.ts`)
 
-**Responsibility**: Store and query the 71 best practices
+**Responsibility**: Store and query the 73 best practices
 
 **Data Structure**:
 ```typescript

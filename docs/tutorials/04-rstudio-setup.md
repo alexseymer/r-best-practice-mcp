@@ -53,7 +53,7 @@ Once installed, find the addins in RStudio:
 
 ### 1. Validate Project
 
-**What it does:** Validates your current R project against 71 best practices.
+**What it does:** Validates your current R project against 73 best practices.
 
 **How to use:**
 1. Click Addins → Validate Project
