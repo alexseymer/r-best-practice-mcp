@@ -21,6 +21,16 @@ This document describes how to publish the R Best Practices MCP Server to npm an
    ```
 3. **Permissions** - You must be the package owner or have publishing rights
 
+### First release checklist
+
+1. Create an npm *automation* (or granular, publish-only) token at npmjs.com and store it as the
+   `NPM_TOKEN` secret in the GitHub repository (Settings, Secrets and variables, Actions).
+2. Check the tarball locally: `npm pack`, then `npm install ./r-best-practices-mcp-1.0.0.tgz` in an empty
+   folder; both `r-practices` and `r-best-practices-mcp` must start.
+3. Tag the release: `git tag v1.0.0 && git push origin v1.0.0`. The workflow refuses to publish when the
+   tag and the `package.json` version differ.
+4. Verify: `npm view r-best-practices-mcp version`, then `npx -y r-best-practices-mcp` in an MCP client.
+
 ### Manual Publishing
 
 To publish a new version manually:
