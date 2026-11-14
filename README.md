@@ -168,7 +168,7 @@ Run the server in a containerized environment with automatic dependency manageme
 docker pull alexseymer/r-best-practices-mcp:latest
 
 # Or use a specific version
-docker pull alexseymer/r-best-practices-mcp:1.0.0
+docker pull alexseymer/r-best-practices-mcp:0.8.5
 
 # Run the container
 docker run -d \
@@ -529,7 +529,7 @@ This project uses **GitHub Actions** for automated testing, building, and releas
   - Uses semantic versioning for tags
 
 **Publishing** is fully automated via GitHub Actions:
-1. Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+1. Push a version tag: `git tag v0.8.5 && git push origin v0.8.5`
 2. The workflow automatically publishes to npm and Docker registries
 3. GitHub Release is created with release notes
 
