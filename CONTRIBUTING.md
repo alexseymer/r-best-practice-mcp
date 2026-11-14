@@ -6,6 +6,13 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 Be respectful and constructive in all interactions. We welcome contributors from all backgrounds and experience levels.
 
+## How we work
+
+This project follows the Linux principle: small, focused programs that work together (results on stdout, status on
+stderr, text and JSON as the interface), and open, iterative development (small pull requests, release early and
+often, users as co-developers). Read [Core Principles](CLAUDE.md#core-principles-the-linux-principle) before a larger
+change.
+
 ## Getting Started
 
 ### Prerequisites
