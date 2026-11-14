@@ -270,9 +270,22 @@ export class WorkflowDetector {
       }
     }
 
+    // shinytest2 keeps its tests in tests/testthat/ and drives the app with AppDriver.
+    let shinytest2Tests = false;
+    for (const testsDir of ['tests/testthat', 'tests']) {
+      if (!(await isDirectoryAt(this.fsys, `${dirPath}/${testsDir}`))) continue;
+      for (const file of await listFilesAt(this.fsys, `${dirPath}/${testsDir}`, /\.[Rr]$/, false)) {
+        if (/AppDriver\$new|shinytest2/.test(await this.fsys.readFile(file)))
+          shinytest2Tests = true;
+      }
+    }
+
     if (shinytestDir) {
       scores['shinytest'] += 95;
       indicators.push('tests/shinytest/ directory found');
+    } else if (shinytest2Tests) {
+      scores['shinytest'] += 95;
+      indicators.push('shinytest2 tests found under tests/');
     }
 
     if (hasShinytest) {
@@ -280,7 +293,7 @@ export class WorkflowDetector {
       indicators.push('shinytest code patterns found');
     }
 
-    if (shinytestDir && appR) {
+    if ((shinytestDir || shinytest2Tests) && appR) {
       scores['shinytest'] += 15;
       indicators.push('shinytest setup with Shiny app');
     }

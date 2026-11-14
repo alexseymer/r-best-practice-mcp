@@ -189,13 +189,15 @@ format: html
 execute:
   echo: true
   warning: false
+  freeze: auto
 ---
 
 # Introduction
 
 ## Overview
 
-This is a Quarto document for ${projectName}.
+This is a Quarto document for ${projectName}. Replace this text with a short summary of the question
+the analysis answers and why it matters.
 
 ## Data
 
@@ -213,6 +215,8 @@ library(knitr)
 
 ## Analysis
 
+Describe your approach here: which variables you look at first and which methods you use.
+
 \`\`\`{r}
 #| label: exploratory-analysis
 
@@ -221,6 +225,8 @@ library(knitr)
 \`\`\`
 
 ## Results
+
+Explain what the figure below shows and what a reader should take from it.
 
 \`\`\`{r}
 #| label: create-figure
@@ -317,15 +323,16 @@ server <- function(input, output, session) {
   reactive_data <- reactiveVal(NULL)
 
   # Event handlers
-  observeEvent(input\\$go, {
+  observeEvent(input$go, {
     cat("Analysis started\\n")
     # Perform analysis
     reactive_data(data.frame(result = "Your results here"))
   })
 
   # Outputs
-  output\\$text_output <- renderText({
-    paste("Ready to analyze. Click 'Run Analysis' to start.")
+  output$text_output <- renderText({
+    validate(need(reactive_data(), "Ready to analyze. Click 'Run Analysis' to start."))
+    reactive_data()$result
   })
 
 }
@@ -547,7 +554,7 @@ output:
 ---
 
 \`\`\`{r setup, include=FALSE}
-knitr::opts_chunk\\$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 \`\`\`
 
@@ -704,8 +711,8 @@ create_data <- function() {
 
 analyze_data <- function(data) {
   list(
-    mean = mean(data\\$y),
-    sd = sd(data\\$y)
+    mean = mean(data$y),
+    sd = sd(data$y)
   )
 }
 
@@ -781,25 +788,29 @@ validate_input <- function(x) {
 #* @apiTitle ${projectName} API
 #* @apiDescription API for demonstrating Plumber functionality
 
+#* Greet a person by name
 #* @get /hello
 #* @param name:string Name to greet
 function(name = "World") {
   list(message = paste0("Hello, ", name, "!"))
 }
 
+#* Add two numbers
 #* @post /add
 #* @param a:numeric First number
 #* @param b:numeric Second number
-function(a, b) {
+function(a, b, res) {
   tryCatch({
     validate_input(a)
     validate_input(b)
     list(result = a + b)
   }, error = function(e) {
-    list(error = TRUE, message = e\\$message)
+    res$status <- 400
+    list(error = TRUE, message = e$message)
   })
 }
 
+#* Report whether the API is healthy
 #* @get /status
 function() {
   list(
@@ -817,7 +828,7 @@ function() {
 pr <- plumb_file("api.R")
 
 # Run the server
-pr\\$run(host = "127.0.0.1", port = 8000)
+pr$run(host = "127.0.0.1", port = 8000)
 `,
         },
         {
@@ -1027,7 +1038,7 @@ This is a sample introduction chapter. Each chapter in this book is a \`.Rmd\` f
           content: `# Chapter 1: Getting Started
 
 \`\`\`{r setup, include=FALSE}
-knitr::opts_chunk\\$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
 \`\`\`
 
 This is the first chapter.
@@ -1052,7 +1063,9 @@ This is the second chapter.
 
 ## Analysis Results
 
-\`\`\`{r}
+Figure \\@ref(fig:plot-xy) shows the data.
+
+\`\`\`{r plot-xy, fig.cap="A simple scatter plot"}
 # Your analysis code here
 x <- 1:10
 y <- rnorm(10)
@@ -1333,20 +1346,20 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
-  observeEvent(input\\$submit, {
+  observeEvent(input$submit, {
     # Process inputs
   })
 
-  output\\$greeting <- renderText({
-    if (nzchar(input\\$name)) {
-      paste("Hello,", input\\$name, "!")
+  output$greeting <- renderText({
+    if (nzchar(input$name)) {
+      paste("Hello,", input$name, "!")
     } else {
       "Please enter your name"
     }
   })
 
-  output\\$result <- renderText({
-    paste("You entered:", input\\$value)
+  output$result <- renderText({
+    paste("You entered:", input$value)
   })
 
 }
@@ -1360,57 +1373,50 @@ shinyApp(ui = ui, server = server)
         },
         {
           path: 'tests/testthat/setup-shinytest.R',
-          content: `# Setup for shinytest tests
-library(shinytest)
+          content: `# Setup for shinytest2 tests
+library(shinytest2)
 library(testthat)
-
-# Configure shinytest if needed
-`,
-        },
-        {
-          path: 'tests/shinytest/mytest.R',
-          content: `# Shinytest recording
-# This is a placeholder for shinytest recordings
-# Use shinytest::recordTest() to create test recordings
-
-app <- shinytest::ShinyDriver\\$new("../")
-
-# Example test steps (replace with your own):
-# app\\$setInputs(name = "Test User")
-# app\\$setInputs(value = 123)
-# app\\$setInputs(submit = 1)
-# expect_values(app)
-
-app\\$stop()
 `,
         },
         {
           path: 'tests/testthat/test-app.R',
-          content: `test_that("app starts", {
-  skip_on_ci()
+          content: `test_that("app starts and shows the default greeting", {
+  app <- AppDriver$new(app_dir = "../..", name = "start")
+  on.exit(app$stop(), add = TRUE)
 
-  # Basic test to verify app initializes
-  app <- shinytest::ShinyDriver\\$new("../../")
-
-  expect_true(app\\$isRunning())
-
-  app\\$stop()
+  app$expect_values()
 })
 
 test_that("greeting updates on input", {
-  skip_on_ci()
+  app <- AppDriver$new(app_dir = "../..", name = "greeting")
+  on.exit(app$stop(), add = TRUE)
 
-  app <- shinytest::ShinyDriver\\$new("../../")
+  app$set_inputs(name = "Test")
+  app$click("submit")
 
-  # Set input and check output
-  app\\$setInputs(name = "Test")
-  app\\$setInputs(submit = 1)
-
-  # Verify the app responds to input
-  expect_true(app\\$isRunning())
-
-  app\\$stop()
+  app$expect_values(output = "greeting")
 })
+`,
+        },
+        {
+          path: '.github/workflows/test-app.yaml',
+          content: `name: test-app
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::shiny, any::shinytest2, any::testthat
+      - name: Run tests
+        run: Rscript -e 'testthat::test_dir("tests/testthat")'
 `,
         },
         {
@@ -1433,36 +1439,36 @@ To run all tests:
 testthat::test_dir("tests/")
 \`\`\`
 
-Or run shinytest recordings:
+Or run the app tests only:
 
 \`\`\`r
-shinytest::testApp()
+shinytest2::test_app()
 \`\`\`
 
 ## Recording New Tests
 
-Create new test recordings:
+Record an interaction as a new test:
 
 \`\`\`r
-shinytest::recordTest()
+shinytest2::record_test()
 \`\`\`
 
 ## Project Structure
 
 - \`app.R\` - Main Shiny application
-- \`tests/shinytest/\` - Shinytest recordings
+- \`.github/workflows/test-app.yaml\` - Runs the tests on every push
 - \`tests/testthat/\` - Unit tests with testthat
 
 ## Requirements
 
 - R >= 4.0.0
 - shiny package
-- shinytest package
+- shinytest2 package
 - testthat package
 
 ## Testing Best Practices
 
-1. Record interactive tests with shinytest for UI workflows
+1. Record interactive tests with shinytest2 for UI workflows
 2. Write unit tests with testthat for business logic
 3. Test both happy paths and error cases
 4. Use meaningful test descriptions
@@ -1470,8 +1476,8 @@ shinytest::recordTest()
         },
         {
           path: '.gitignore',
-          content: `# Shinytest
-tests/shinytest/*.png
+          content: `# shinytest2 (keep tests/testthat/_snaps/, ignore local failures)
+tests/testthat/_snaps/**/*.new.*
 
 # R
 .Rhistory
@@ -1492,7 +1498,7 @@ Thumbs.db
 `,
         },
       ],
-      directories: ['tests/testthat', 'tests/shinytest'],
+      directories: ['tests/testthat', '.github/workflows'],
     };
   }
 }
