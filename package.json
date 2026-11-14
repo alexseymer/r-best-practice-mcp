@@ -1,10 +1,11 @@
 {
   "name": "r-best-practices-mcp",
-  "version": "1.0.0",
+  "version": "0.8.5",
   "description": "MCP server for R development best practices - enforces standards across R scripts, Quarto, Shiny, packages, and more",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
+    "r-best-practices-mcp": "dist/index.js",
     "r-practices": "dist/bin/cli.js"
   },
   "repository": {
@@ -55,7 +56,6 @@
   "author": "alexseymer",
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "commander": "^11.0.0",
     "compression": "1.8.2",
@@ -81,5 +81,8 @@
     "tailwindcss": "3.4.19",
     "ts-jest": "^29.4.14",
     "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

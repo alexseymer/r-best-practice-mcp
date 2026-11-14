@@ -18,7 +18,7 @@ The R Best Practices MCP Server helps developers write better R code by:
 - **Detecting** the R workflow type from a directory structure
 - **Validating** projects against best practices with detailed findings
 - **Generating** scaffold templates for new projects
-- **Providing** knowledge base access to 70 best practices (59 checked automatically, 11 guidance-only)
+- **Providing** knowledge base access to 73 best practices (62 checked automatically, 11 guidance-only)
 - **Validating uploads** in the browser: a visitor can check a project folder without it leaving their computer; API clients can still send one to the server
 - **Taking contributions** from the community: new practices are proposed by pull request, see [CONTRIBUTING.md](./CONTRIBUTING.md)
 
@@ -66,7 +66,7 @@ Generate complete project scaffolds:
 - Customizable project name and author info
 
 ### 📚 Knowledge Base
-Access to 70 best practices:
+Access to 73 best practices:
 - Organized by workflow type (12 workflows)
 - Categorized by topic (documentation, testing, security, etc.)
 - Every practice has details, a "bad" and a "good" example, and references
@@ -112,6 +112,24 @@ merged pull requests in this repository. The gate is switched on by the reposito
 - Node.js >= 18.0.0
 - npm >= 9.0.0
 
+### Use with an AI assistant (MCP)
+
+Once the package is published to npm, add it to your MCP client without installing anything:
+
+```json
+{
+  "mcpServers": {
+    "r-best-practices": {
+      "command": "npx",
+      "args": ["-y", "r-best-practices-mcp"]
+    }
+  }
+}
+```
+
+For Claude Code: `claude mcp add r-best-practices -- npx -y r-best-practices-mcp`.
+Until then, build from source (below) and point `command` at `node` with `dist/index.js`.
+
 ### From npm Registry (Recommended)
 
 ```bash
@@ -150,7 +168,7 @@ Run the server in a containerized environment with automatic dependency manageme
 docker pull alexseymer/r-best-practices-mcp:latest
 
 # Or use a specific version
-docker pull alexseymer/r-best-practices-mcp:1.0.0
+docker pull alexseymer/r-best-practices-mcp:0.8.5
 
 # Run the container
 docker run -d \
@@ -414,7 +432,7 @@ Uploaded files are written to a private temporary directory under `UPLOAD_TMP_DI
   the JSON body may be 8 MB. Only text project files are accepted (`.R .Rmd .qmd .md .yml .yaml .toml .json .lock .txt .dcf ...`
   and files such as `DESCRIPTION`, `NAMESPACE`, `.Rprofile`); other files are skipped and counted in `upload.skipped`.
 - Errors: `400 INVALID_PARAMETER` (not an array, empty, absolute path, `.`/`..`/empty segment, control characters, duplicate path,
-  wrong types, no supported files), `400 INVALID_WORKFLOW`, `413 PAYLOAD_TOO_LARGE` (file/total/count/body limits),
+  wrong types, no supported files), `400 INVALID_JSON` (the body is not valid JSON), `400 INVALID_WORKFLOW`, `413 PAYLOAD_TOO_LARGE` (file/total/count/body limits),
   `503 BUSY` with `Retry-After` (at most 2 uploads are analysed at the same time).
 
 #### API Documentation
@@ -465,7 +483,7 @@ r-best-practice-mcp/
 │   │   ├── upload.ts              # Browser uploads: sanitising and temporary projects
 │   │   ├── template-generator.ts  # Starter projects per workflow
 │   │   └── rules/                 # One rule per automated practice, per workflow
-│   ├── data/practices/            # The 70 practices, one file per workflow (data only)
+│   ├── data/practices/            # The 73 practices, one file per workflow (data only)
 │   ├── utils/
 │   │   └── practice-contribution.ts  # Checks community practice contributions
 │   ├── cli/                       # The r-practices command line
@@ -511,7 +529,7 @@ This project uses **GitHub Actions** for automated testing, building, and releas
   - Uses semantic versioning for tags
 
 **Publishing** is fully automated via GitHub Actions:
-1. Push a version tag: `git tag v1.0.0 && git push origin v1.0.0`
+1. Push a version tag: `git tag v0.8.5 && git push origin v0.8.5`
 2. The workflow automatically publishes to npm and Docker registries
 3. GitHub Release is created with release notes
 
@@ -548,7 +566,7 @@ findings for files on disk and in memory. CI requires at least 80% line coverage
 
 ## Best Practices Coverage
 
-The knowledge base includes 70 best practices. 59 are *automated* (a validator rule reports violations);
+The knowledge base includes 73 best practices. 62 are *automated* (a validator rule reports violations);
 11 are *guidance only* (they need R to run, runtime behaviour or judgement, so they never produce findings):
 
 **R Scripts** (7) — Headers, functions, naming, sections, error handling, cleanup  

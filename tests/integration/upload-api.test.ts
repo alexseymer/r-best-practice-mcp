@@ -294,10 +294,10 @@ describe('registerUploadRoutes on its own', () => {
     expect(res.json.code).toBe('PAYLOAD_TOO_LARGE');
   });
 
-  it('answers malformed JSON with 400 INVALID_PARAMETER', async () => {
+  it('answers malformed JSON with 400 INVALID_JSON', async () => {
     const bad = await post(base, '/api/validate-upload', null, '{not json');
     expect(bad.status).toBe(400);
-    expect(bad.json.code).toBe('INVALID_PARAMETER');
+    expect(bad.json.code).toBe('INVALID_JSON');
   });
 
   it('answers 503 BUSY with Retry-After when the gate is saturated', async () => {

@@ -306,4 +306,47 @@ usethis::use_coverage()`,
     tags: ['package', 'structure'],
     references: ['https://r-pkgs.org/structure.html'],
   },
+  {
+    id: 'pkg-library-calls',
+    title: 'Do not call library() or require() in package code',
+    workflow: 'package',
+    category: 'dependency',
+    severity: 'recommended',
+    enforcement: 'automated',
+    description: 'Declare dependencies in DESCRIPTION and NAMESPACE instead of attaching packages',
+    details:
+      "library() and require() attach a package to the user's search path as a side effect and hide the dependency from R CMD check. Declare it under Imports in DESCRIPTION and call it as pkg::fun() or with an @importFrom tag. This is a heuristic: it scans the files directly in R/, ignores comments and the text inside strings, and reports one finding for the first call to library() or require(). requireNamespace() is fine and is not flagged.",
+    badExample: `# R/plots.R
+library(ggplot2)
+plot_it <- function(df) ggplot(df, aes(x, y)) + geom_point()`,
+    goodExample: `# R/plots.R
+plot_it <- function(df) {
+  ggplot2::ggplot(df, ggplot2::aes(x, y)) + ggplot2::geom_point()
+}
+# DESCRIPTION: Imports: ggplot2`,
+    tags: ['dependencies', 'namespace'],
+    references: ['https://r-pkgs.org/dependencies-in-practice.html'],
+  },
+  {
+    id: 'pkg-rbuildignore',
+    title: 'Exclude development files with .Rbuildignore',
+    workflow: 'package',
+    category: 'structure',
+    severity: 'recommended',
+    enforcement: 'automated',
+    description: 'Files that are not part of the package must be listed in .Rbuildignore',
+    details:
+      'Files such as the .Rproj file, .github/, README.Rmd, cran-comments.md or _pkgdown.yml are not part of an installed package. Without .Rbuildignore, R CMD check reports them as non-standard files. The check runs once DESCRIPTION is present and reports when one of those files exists next to it but .Rbuildignore does not.',
+    badExample: `mypkg/
+  DESCRIPTION
+  mypkg.Rproj
+  .github/`,
+    goodExample: `mypkg/
+  DESCRIPTION
+  mypkg.Rproj
+  .github/
+  .Rbuildignore   # ^.*\\.Rproj$  and  ^\\.github$`,
+    tags: ['package', 'build'],
+    references: ['https://r-pkgs.org/structure.html#sec-rbuildignore'],
+  },
 ];

@@ -6,7 +6,7 @@ const args = process.argv.slice(2);
 
 if (args.length === 0) {
   console.log(`
-R Best Practices CLI Tool v1.0.0
+R Best Practices CLI Tool v0.8.5
 ═════════════════════════════════
 
 Usage: r-practices <command> [options]

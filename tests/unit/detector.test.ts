@@ -1,3 +1,5 @@
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { WorkflowDetector } from '../../src/engine/detector';
 import {
@@ -101,6 +103,22 @@ describe('WorkflowDetector', () => {
 
       expect(result.workflow).toBe('shinytest');
       expect(result.confidence).toBeGreaterThan(50);
+    });
+
+    it('should detect a folder with only R scripts as r-script', async () => {
+      writeFileSync(join(tempDir, 'analysis.R'), 'x <- 1\n');
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('r-script');
+      expect(result.confidence).toBe(40);
+    });
+
+    it('should not let plain R files outrank a more specific workflow', async () => {
+      createPackageFixture(tempDir);
+      writeFileSync(join(tempDir, 'helper.R'), 'x <- 1\n');
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('package');
     });
 
     it('should return unknown for non-existent directory', async () => {

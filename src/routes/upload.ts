@@ -51,7 +51,7 @@ function parseJsonBody(limitBytes: number) {
         );
       }
       if (e.type === 'entity.parse.failed' || e.status === 400) {
-        return sendError(res, 400, 'INVALID_PARAMETER', 'Request body is not valid JSON');
+        return sendError(res, 400, 'INVALID_JSON', 'Request body is not valid JSON');
       }
       return next(err);
     });
@@ -193,7 +193,9 @@ export function buildUploadOpenApiPaths(): Record<string, unknown> {
               'application/json': { schema: { $ref: '#/components/schemas/ValidationResult' } },
             },
           },
-          400: problem('Invalid files or parameters (code INVALID_PARAMETER, INVALID_WORKFLOW)'),
+          400: problem(
+            'Invalid files or parameters (code INVALID_PARAMETER, INVALID_JSON, INVALID_WORKFLOW)'
+          ),
           413: problem('Upload too large (code PAYLOAD_TOO_LARGE)'),
           503: problem('Server busy (code BUSY); see the Retry-After header'),
         },

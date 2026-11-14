@@ -5,7 +5,7 @@
 The **R Best Practices MCP Server** is a comprehensive tool for enforcing best practices across R development workflows. It integrates with Claude via the Model Context Protocol (MCP) to provide:
 
 1. **Workflow Detection** — Identify R project types automatically
-2. **Project Validation** — Check projects against 70 best practices
+2. **Project Validation** — Check projects against 73 best practices
 3. **Template Generation** — Create scaffold projects for any workflow
 4. **Knowledge Base** — Access comprehensive practice documentation
 
@@ -74,7 +74,7 @@ R developers often work across diverse project types (scripts, packages, Shiny a
 - Workflow generators: `generatePackage()`, `generateShiny()`, etc.
 
 #### 4. **KnowledgeBase** (`src/data/knowledge-base.ts`)
-- Contains 70 best practices across 12 workflows (59 automated, 11 guidance-only)
+- Contains 73 best practices across 12 workflows (62 automated, 11 guidance-only)
 - Dual indexing: by ID and by workflow
 - Supports filtering and searching
 - Returns `Practice[]` with detailed information
@@ -157,7 +157,7 @@ The server layer (`src/server.ts`) translates MCP tool calls to internal methods
 - Consistent error handling across all tools
 
 ### 4. **Knowledge Base as First-Class Data**
-The knowledge base is baked into the server (70 practices in `src/data/practices/<workflow>.ts`):
+The knowledge base is baked into the server (73 practices in `src/data/practices/<workflow>.ts`):
 - No external dependencies for best practices
 - Practices versioned with the code
 - Can be easily extended or customized
@@ -346,7 +346,7 @@ Phase N: Brief description
 - List new files/components
 - Mention test additions
 
-Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
+Co-Authored-By: Name <email>   (only when someone else co-wrote the change)
 ```
 
 ## Troubleshooting

@@ -242,4 +242,48 @@ export const rscriptRules: RuleDef[] = [
       ];
     },
   },
+  {
+    id: 'rscript-paths',
+    workflows: ['r-script'],
+    async run({ dirPath, fsys }) {
+      const hits: { file: string; line: number; what: string }[] = [];
+      for (const file of await listScripts(fsys, dirPath)) {
+        const content = await readText(fsys, file);
+        if (content === null) continue;
+        const masked = toLines(maskRSource(content, true));
+        const original = toLines(content);
+        for (let i = 0; i < masked.length; i++) {
+          if (/(?:^|[^\w.])setwd\(/.test(masked[i])) {
+            hits.push({ file, line: i + 1, what: 'setwd()' });
+            break;
+          }
+          const abs = /["'](?:\/Users\/|\/home\/|[A-Za-z]:[\\/])/.exec(original[i] ?? '');
+          if (abs && masked[i].includes(abs[0][0]) && !isComment(original[i].slice(0, abs.index))) {
+            hits.push({ file, line: i + 1, what: 'an absolute path' });
+            break;
+          }
+        }
+      }
+      if (hits.length === 0) return [];
+      const first = hits[0];
+      return [
+        {
+          id: 'rscript-paths',
+          severity: 'recommended',
+          category: 'structure',
+          message: `Consider project-relative paths: ${fsys.basename(first.file)} uses ${first.what}`,
+          file: first.file,
+          line: first.line,
+          details: hits
+            .slice(0, 5)
+            .map((h) => `${fsys.relative(dirPath, h.file)}:${h.line} ${h.what}`)
+            .join('; '),
+          suggestions: [
+            'Open the project as an RStudio/Positron project and use here::here("data", "file.csv")',
+            'Remove setwd(); it changes global state and breaks on other machines',
+          ],
+        },
+      ];
+    },
+  },
 ];

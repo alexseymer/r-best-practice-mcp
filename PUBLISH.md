@@ -21,6 +21,16 @@ This document describes how to publish the R Best Practices MCP Server to npm an
    ```
 3. **Permissions** - You must be the package owner or have publishing rights
 
+### First release checklist
+
+1. Create an npm *automation* (or granular, publish-only) token at npmjs.com and store it as the
+   `NPM_TOKEN` secret in the GitHub repository (Settings, Secrets and variables, Actions).
+2. Check the tarball locally: `npm pack`, then `npm install ./r-best-practices-mcp-0.8.5.tgz` in an empty
+   folder; both `r-practices` and `r-best-practices-mcp` must start.
+3. Tag the release: `git tag v0.8.5 && git push origin v0.8.5`. The workflow refuses to publish when the
+   tag and the `package.json` version differ.
+4. Verify: `npm view r-best-practices-mcp version`, then `npx -y r-best-practices-mcp` in an MCP client.
+
 ### Manual Publishing
 
 To publish a new version manually:
@@ -82,24 +92,24 @@ GitHub Packages uses your GitHub credentials automatically. No additional setup 
 
 ```bash
 # 1. Build the image
-docker build -t r-best-practices-mcp:1.0.0 .
+docker build -t r-best-practices-mcp:0.8.5 .
 
 # 2. Tag for Docker Hub
-docker tag r-best-practices-mcp:1.0.0 yourusername/r-best-practices-mcp:1.0.0
-docker tag r-best-practices-mcp:1.0.0 yourusername/r-best-practices-mcp:latest
+docker tag r-best-practices-mcp:0.8.5 yourusername/r-best-practices-mcp:0.8.5
+docker tag r-best-practices-mcp:0.8.5 yourusername/r-best-practices-mcp:latest
 
 # 3. Push to Docker Hub
 docker login
-docker push yourusername/r-best-practices-mcp:1.0.0
+docker push yourusername/r-best-practices-mcp:0.8.5
 docker push yourusername/r-best-practices-mcp:latest
 
 # 4. Tag for GitHub Packages
-docker tag r-best-practices-mcp:1.0.0 ghcr.io/yourusername/r-best-practices-mcp:1.0.0
-docker tag r-best-practices-mcp:1.0.0 ghcr.io/yourusername/r-best-practices-mcp:latest
+docker tag r-best-practices-mcp:0.8.5 ghcr.io/yourusername/r-best-practices-mcp:0.8.5
+docker tag r-best-practices-mcp:0.8.5 ghcr.io/yourusername/r-best-practices-mcp:latest
 
 # 5. Push to GitHub Packages
 docker login ghcr.io -u yourusername -p $GITHUB_TOKEN
-docker push ghcr.io/yourusername/r-best-practices-mcp:1.0.0
+docker push ghcr.io/yourusername/r-best-practices-mcp:0.8.5
 docker push ghcr.io/yourusername/r-best-practices-mcp:latest
 ```
 

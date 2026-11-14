@@ -1,6 +1,16 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { anyExists, findFiles, pathExists, readText, stripBom } from './helpers.js';
+import { anyExists, findFiles, maskRSource, pathExists, readText, stripBom } from './helpers.js';
+
+const ATTACH_CALL = /(?:^|[^\w.:$@])(library|require)\(/m;
+const DEV_FILES = [
+  '.github',
+  'README.Rmd',
+  'cran-comments.md',
+  '_pkgdown.yml',
+  '.lintr',
+  'codecov.yml',
+];
 
 const ROXYGEN_LINE = /^[ \t]*#'/m;
 
@@ -90,6 +100,61 @@ export const packageRules: RuleDef[] = [
           suggestions: [
             "Run usethis::use_vignette('getting-started') to add a vignette",
             'Show a typical workflow with the main functions in the vignette',
+          ],
+        },
+      ];
+    },
+  },
+  {
+    id: 'pkg-library-calls',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      for (const file of await rSourceFiles(fsys, dirPath)) {
+        const text = await readText(fsys, file);
+        if (text === null) continue;
+        const code = maskRSource(stripBom(text), true);
+        const m = ATTACH_CALL.exec(code);
+        if (!m) continue;
+        const line = code.slice(0, m.index + m[0].indexOf(m[1])).split('\n').length;
+        return [
+          {
+            id: 'pkg-library-calls',
+            severity: 'recommended',
+            category: 'dependency',
+            message: `Consider pkg::fun() instead of ${m[1]}(): ${fsys.basename(file)} attaches a package`,
+            file,
+            line,
+            suggestions: [
+              'Add the package to Imports in DESCRIPTION and call it as pkg::fun()',
+              "Or import single functions with #' @importFrom pkg fun",
+            ],
+          },
+        ];
+      }
+      return [];
+    },
+  },
+  {
+    id: 'pkg-rbuildignore',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, fsys.join(dirPath, 'DESCRIPTION')))) return [];
+      if (await pathExists(fsys, fsys.join(dirPath, '.Rbuildignore'))) return [];
+      const rproj = await findFiles(fsys, dirPath, /\.Rproj$/, { recursive: false });
+      const present: string[] = rproj.map((f) => fsys.basename(f));
+      for (const name of DEV_FILES) {
+        if (await pathExists(fsys, fsys.join(dirPath, name))) present.push(name);
+      }
+      if (present.length === 0) return [];
+      return [
+        {
+          id: 'pkg-rbuildignore',
+          severity: 'recommended',
+          category: 'structure',
+          message: `Package has no .Rbuildignore but contains development files (${present.slice(0, 3).join(', ')})`,
+          details: present.join(', '),
+          suggestions: [
+            'Run usethis::use_build_ignore() for each file, or create .Rbuildignore with one regex per line',
           ],
         },
       ];

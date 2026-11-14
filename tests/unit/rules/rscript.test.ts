@@ -197,4 +197,33 @@ describe('r-script rules', () => {
       expect(await idsFor(dir, 'r-script')).toContain('rscript-cleanup');
     });
   });
+
+  describe('rscript-paths', () => {
+    it.each([
+      ['setwd', 'setwd("data")\nx <- 1'],
+      ['unix home', 'x <- read.csv("/Users/me/data.csv")'],
+      ['linux home', "x <- read.csv('/home/me/data.csv')"],
+      ['windows drive', 'x <- read.csv("C:/data/x.csv")'],
+    ])('reports %s', async (_label, body) => {
+      createFile(dir, 'load_data.R', `# header\n${body}\n`);
+      const finding = await find('rscript-paths');
+      expect(finding).toBeDefined();
+      expect(finding!.severity).toBe('recommended');
+      expect(finding!.message).toMatch(/^Consider/);
+      expect(finding!.file).toContain('load_data.R');
+    });
+
+    it.each([
+      ['here', 'x <- read.csv(here::here("data", "x.csv"))'],
+      ['relative', 'x <- read.csv("data/x.csv")'],
+      ['comment', '# setwd("/Users/me")\nx <- 1'],
+      ['trailing comment', 'x <- 1 # was "/Users/me/x.csv"'],
+      ['string mention', 'msg <- "call setwd(dir) first"'],
+      ['similar name', 'my_setwd(1)'],
+      ['url', 'x <- "https://example.com/Users/me"'],
+    ])('does not report %s', async (_label, body) => {
+      createFile(dir, 'load_data.R', `# header\n${body}\n`);
+      expect(await idsFor(dir, 'r-script')).not.toContain('rscript-paths');
+    });
+  });
 });
