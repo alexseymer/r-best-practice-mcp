@@ -54,8 +54,11 @@ reason written down in the PR.
 4. Does it work on every supported OS and without extra installs?
 5. Is it covered by a test, and documented where a user will look for it?
 
-Known gaps against these principles (tracked as work, not as excuses): `validate` cannot read from stdin yet;
-`src/web-server.ts` (about 830 lines) is larger than one person can read at a sitting and should be split.
+Known gap against these principles (tracked as work, not as excuse): `validate` cannot read from stdin yet.
+
+The web server follows the same shape as the engine: `src/web-server.ts` wires middleware and dependencies, and each
+group of endpoints is one small module in `src/routes/` (`detect`, `validate`, `practices`, `templates`, `upload`,
+`ops`) that receives a shared `RouteContext`. The `/api` and `/api/v1` variants of an endpoint share one handler.
 
 ## Architecture
 
