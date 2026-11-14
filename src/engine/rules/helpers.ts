@@ -1,5 +1,7 @@
 import type { ProjectFs } from '../project-fs.js';
 
+export { isDirectoryAt, listFilesAt } from '../project-fs.js';
+
 export const MAX_FILES = 200;
 export const MAX_BYTES = 1_000_000;
 

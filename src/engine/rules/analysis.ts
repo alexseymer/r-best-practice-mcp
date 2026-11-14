@@ -1,6 +1,7 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { pathExists } from './helpers.js';
+import { anyExists, isDirectoryAt, pathExists } from './helpers.js';
+import { Finding } from '../../types/finding.js';
 
 /**
  * True if `dirPath` or any parent directory contains a `.git` entry.
@@ -23,6 +24,40 @@ export async function hasGitRepo(
 }
 
 export const analysisRules: RuleDef[] = [
+  {
+    id: 'analysis-readme',
+    workflows: ['analysis'],
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['README.md', 'README.Rmd', 'README'])) return [];
+      return [
+        {
+          id: 'analysis-readme',
+          severity: 'recommended',
+          category: 'documentation',
+          message: 'Add README.md to document the analysis',
+          suggestions: ['Create README.md describing the question, data sources and how to run it'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'analysis-structure',
+    workflows: ['analysis'],
+    async run({ dirPath, fsys }) {
+      const out: Finding[] = [];
+      for (const dir of ['data', 'R', 'output']) {
+        if (await isDirectoryAt(fsys, `${dirPath}/${dir}`)) continue;
+        out.push({
+          id: 'analysis-structure',
+          severity: 'recommended',
+          category: 'structure',
+          message: `Analysis project should have ${dir}/ directory`,
+          suggestions: [`Create a ${dir}/ directory`],
+        });
+      }
+      return out;
+    },
+  },
   {
     id: 'analysis-versioning',
     workflows: ['analysis'],

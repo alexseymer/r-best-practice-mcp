@@ -5,9 +5,12 @@ import {
   MAX_FILES,
   compareNames,
   findFiles,
+  listFilesAt,
   maskRSource,
   readText,
+  stripBom,
 } from './helpers.js';
+import { checkRFile, findTopLevelAssignments } from './file-checks.js';
 
 const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*\.[Rr]$/;
 const SECTION_START = /^#{4,}|^#\s*={4,}/;
@@ -126,7 +129,80 @@ function findUnmatched(content: string): Unmatched | null {
   return first;
 }
 
+const RSCRIPT_GLOBALS_THRESHOLD = 15;
+
+/** Root `.R`/`.r` files, sorted by name. */
+async function rootScripts(fsys: ProjectFs, dirPath: string): Promise<string[]> {
+  return (await findFiles(fsys, dirPath, /\.[Rr]$/, { recursive: false })).sort((x, y) =>
+    compareNames(fsys.basename(x), fsys.basename(y))
+  );
+}
+
 export const rscriptRules: RuleDef[] = [
+  {
+    id: 'rscript-header',
+    workflows: ['r-script'],
+    async run({ dirPath, fsys }) {
+      for (const file of await rootScripts(fsys, dirPath)) {
+        const text = await readText(fsys, file);
+        if (text === null) continue;
+        if (!stripBom(text).startsWith('#')) {
+          return [
+            {
+              id: 'rscript-header',
+              severity: 'recommended',
+              category: 'documentation',
+              file,
+              line: 1,
+              message: 'Script should start with header comment',
+              suggestions: ['# Purpose: [description]', '# Author: [name]', '# Date: [date]'],
+            },
+          ];
+        }
+      }
+      return [];
+    },
+  },
+  {
+    id: 'rscript-functions',
+    workflows: ['r-script'],
+    async run({ dirPath, fsys }) {
+      for (const file of await rootScripts(fsys, dirPath)) {
+        const text = await readText(fsys, file);
+        if (text === null) continue;
+        const found = checkRFile(file, stripBom(text).split('\n'));
+        if (found.length > 0) return found;
+      }
+      return [];
+    },
+  },
+  {
+    id: 'rscript-globals',
+    workflows: ['r-script'],
+    async run({ dirPath, fsys }) {
+      for (const file of await listFilesAt(fsys, dirPath, /\.R$/, false)) {
+        const globals = findTopLevelAssignments((await fsys.readFile(file)).split(/\r?\n/));
+        if (globals.length > RSCRIPT_GLOBALS_THRESHOLD) {
+          return [
+            {
+              id: 'rscript-globals',
+              severity: 'important',
+              category: 'structure',
+              file,
+              line: globals[0],
+              message: `Consider wrapping logic in functions: ${globals.length} top-level assignments create many global variables`,
+              suggestions: [
+                'Wrap logic in functions with parameters',
+                'Add a main() entry point and call it at the end of the script',
+                'Use local scope for intermediate variables',
+              ],
+            },
+          ];
+        }
+      }
+      return [];
+    },
+  },
   {
     id: 'rscript-naming',
     workflows: ['r-script'],

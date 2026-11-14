@@ -55,9 +55,8 @@ reason written down in the PR.
 5. Is it covered by a test, and documented where a user will look for it?
 
 Known gaps against these principles (tracked as work, not as excuses): `validate` cannot read from stdin yet;
-`src/engine/validator.ts`, `src/engine/template-generator.ts` and `src/web-server.ts` are larger than one
-person can read at a sitting and should be split; half of the rules still live inline in `validator.ts` instead of
-the rule registry.
+`src/engine/template-generator.ts` (about 1,500 lines) and `src/web-server.ts` (about 830 lines) are larger than
+one person can read at a sitting and should be split.
 
 ## Architecture
 
@@ -99,15 +98,14 @@ the rule registry.
 - Individual checkers: `checkPackage()`, `checkShiny()`, etc.
 
 #### 2. **Validator** (`src/engine/validator.ts`)
-- Runs workflow-specific validation rules
-- Validates individual files (R, Quarto, R Markdown)
+- Runs the rules registered for the workflow (`src/engine/rules/<workflow>.ts`, one rule per practice)
+- Validates individual files (R, Quarto, R Markdown) with the checks in `src/engine/rules/file-checks.ts`
 - Applies filtering (severity, category, limit)
 - Returns categorized `Finding[]` with severity and suggestions
 
 **Key Methods:**
 - `validateProject(path, workflow, options)` → `ValidationResult`
 - `validateFile(filePath)` → `Finding[]`
-- Workflow validators: `validatePackage()`, `validateShiny()`, etc.
 
 #### 3. **TemplateGenerator** (`src/engine/template-generator.ts`)
 - Generates complete project scaffolds
@@ -281,7 +279,8 @@ Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `deta
 4. `tests/unit/rule-consistency.test.ts` fails if a rule has no practice, an automated practice has no rule,
    or a guidance practice has one.
 
-The original inline rules still live in `src/engine/validator.ts` (`validatePackage()`, ...).
+All rules live in the registry; `src/engine/validator.ts` only runs them and applies the filters.
+Checks that look at a single file (used by both `validateFile` and the project rules) are in `src/engine/rules/file-checks.ts`.
 
 ### Adding a Template
 
