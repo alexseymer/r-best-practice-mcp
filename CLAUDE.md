@@ -55,8 +55,7 @@ reason written down in the PR.
 5. Is it covered by a test, and documented where a user will look for it?
 
 Known gaps against these principles (tracked as work, not as excuses): `validate` cannot read from stdin yet;
-`src/engine/template-generator.ts` (about 1,500 lines) and `src/web-server.ts` (about 830 lines) are larger than
-one person can read at a sitting and should be split.
+`src/web-server.ts` (about 830 lines) is larger than one person can read at a sitting and should be split.
 
 ## Architecture
 
@@ -107,7 +106,7 @@ one person can read at a sitting and should be split.
 - `validateProject(path, workflow, options)` → `ValidationResult`
 - `validateFile(filePath)` → `Finding[]`
 
-#### 3. **TemplateGenerator** (`src/engine/template-generator.ts`)
+#### 3. **TemplateGenerator** (`src/engine/template-generator.ts`, one file per workflow in `src/engine/templates/`)
 - Generates complete project scaffolds
 - Supports 12 workflow types
 - Creates files with realistic content and examples
@@ -115,7 +114,7 @@ one person can read at a sitting and should be split.
 
 **Key Methods:**
 - `generate(workflow, options)` → `GeneratedTemplate`
-- Workflow generators: `generatePackage()`, `generateShiny()`, etc.
+- Workflow generators: `generatePackage()` in `templates/package.ts`, `generateShiny()` in `templates/shiny.ts`, etc.
 
 #### 4. **KnowledgeBase** (`src/data/knowledge-base.ts`)
 - Contains 73 best practices across 12 workflows (62 automated, 11 guidance-only)
@@ -284,19 +283,26 @@ Checks that look at a single file (used by both `validateFile` and the project r
 
 ### Adding a Template
 
-In `src/engine/template-generator.ts`:
+Add `src/engine/templates/<workflow>.ts` exporting a generator function, and call it from the `switch` in
+`src/engine/template-generator.ts`:
 
 ```typescript
-private generateNewWorkflow(options: TemplateGeneratorOptions) {
+export function generateNewWorkflow(options: TemplateGeneratorOptions): {
+  files: TemplateFile[];
+  directories: string[];
+} {
   return {
     files: [
       { path: 'file1.txt', content: '...' },
       { path: 'file2.txt', content: '...' },
     ],
     directories: ['dir1', 'dir2'],
-  }
+  };
 }
 ```
+
+`tests/unit/template-consistency.test.ts` requires every template to be detected as its own workflow and to pass
+the project's own rules.
 
 ## Testing Strategy
 
