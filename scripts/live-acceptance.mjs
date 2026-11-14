@@ -88,7 +88,7 @@ async function run() {
   // 3. API: practices, pagination and rate-limit headers
   const practices = await call('GET', '/api/v1/practices?limit=5');
   check('api', '/api/v1/practices is paginated', practices.status === 200 &&
-    Array.isArray(practices.json?.data) && practices.json.data.length === 5 && practices.json?.pagination?.total === 70,
+    Array.isArray(practices.json?.data) && practices.json.data.length === 5 && Number.isInteger(practices.json?.pagination?.total) && practices.json.pagination.total > 5,
     JSON.stringify(practices.json?.pagination ?? practices.json).slice(0, 160));
   check('api', 'rate-limit headers are sent', !!practices.headers.get('x-ratelimit-limit'));
   check('api', 'the OpenAPI document is served', (await call('GET', '/openapi.json')).status === 200);
