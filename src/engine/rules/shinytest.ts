@@ -1,6 +1,13 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
+import {
+  anyExists,
+  findFiles,
+  isDirectoryAt,
+  maskRSource,
+  pathExists,
+  readText,
+} from './helpers.js';
 
 function stripComments(text: string): string {
   return maskRSource(text, false);
@@ -31,7 +38,78 @@ const RECORDING_PATTERN =
 const CI_PATTERN =
   /shinytest2?::|shinytest2?\.R|testthat::test_|devtools::test|rcmdcheck|check-r-package|R CMD check|\btest_dir\b|\btest_app\b|\btestApp\b/i;
 
+/** shinytest2 runs through testthat; legacy shinytest uses tests/shinytest/. */
+async function hasTestDir(fsys: ProjectFs, dirPath: string): Promise<boolean> {
+  return (
+    (await isDirectoryAt(fsys, `${dirPath}/tests/shinytest`)) ||
+    (await isDirectoryAt(fsys, `${dirPath}/tests/testthat`))
+  );
+}
+
 export const shinytestRules: RuleDef[] = [
+  {
+    id: 'shinytest-structure',
+    workflows: ['shinytest'],
+    async run({ dirPath, fsys }) {
+      if (await hasTestDir(fsys, dirPath)) return [];
+      return [
+        {
+          id: 'shinytest-structure',
+          severity: 'important',
+          category: 'structure',
+          message: 'Shinytest project should have tests/shinytest/ or tests/testthat/ directory',
+          suggestions: [
+            'Create tests/testthat/ for shinytest2 tests (shinytest2::use_shinytest2())',
+            'Or create tests/shinytest/ for legacy shinytest recordings',
+          ],
+        },
+      ];
+    },
+  },
+  {
+    id: 'shinytest-app',
+    workflows: ['shinytest'],
+    async run({ dirPath, fsys }) {
+      const appR = await pathExists(fsys, `${dirPath}/app.R`);
+      const uiServer =
+        (await pathExists(fsys, `${dirPath}/ui.R`)) &&
+        (await pathExists(fsys, `${dirPath}/server.R`));
+      if (appR || uiServer) return [];
+      return [
+        {
+          id: 'shinytest-app',
+          severity: 'important',
+          category: 'structure',
+          message: 'Shinytest requires Shiny app.R or ui.R/server.R',
+          suggestions: ['Create app.R containing the Shiny app', 'Or create ui.R and server.R'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'shinytest-setup',
+    workflows: ['shinytest'],
+    async run({ dirPath, fsys }) {
+      if (!(await hasTestDir(fsys, dirPath))) return [];
+      const setupFiles = [
+        'tests/testthat/setup-shinytest2.R',
+        'tests/testthat/setup-shinytest.R',
+        'tests/testthat/setup.R',
+        'tests/setup.R',
+        'tests/shinytest/setup.R',
+      ];
+      if (await anyExists(fsys, dirPath, setupFiles)) return [];
+      return [
+        {
+          id: 'shinytest-setup',
+          severity: 'recommended',
+          category: 'structure',
+          message: 'Shinytest project should have test setup configuration',
+          suggestions: ['Create tests/testthat/setup-shinytest2.R to configure the app under test'],
+        },
+      ];
+    },
+  },
   {
     id: 'shinytest-recordings',
     workflows: ['shinytest'],

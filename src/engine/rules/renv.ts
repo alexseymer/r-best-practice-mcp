@@ -3,6 +3,22 @@ import { pathExists } from './helpers.js';
 
 export const renvRules: RuleDef[] = [
   {
+    id: 'renv-lock',
+    workflows: ['renv'],
+    async run({ dirPath, fsys }) {
+      if (await pathExists(fsys, `${dirPath}/renv.lock`)) return [];
+      return [
+        {
+          id: 'renv-lock',
+          severity: 'critical',
+          category: 'structure',
+          message: 'renv project must have renv.lock file',
+          suggestions: ['Run renv::init() to create renv.lock'],
+        },
+      ];
+    },
+  },
+  {
     id: 'renv-init',
     workflows: ['renv'],
     async run({ dirPath, fsys }) {

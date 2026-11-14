@@ -1,4 +1,5 @@
 import { Validator } from '../../engine/validator.js';
+import { WorkflowDetector } from '../../engine/detector.js';
 import { FileUtils } from '../../utils/file.js';
 import { CLIFormatter, CLIOptions, getProjectPath } from '../utils.js';
 import { Finding } from '../../types/finding.js';
@@ -7,7 +8,7 @@ import { nodeProjectFs } from '../../engine/project-fs-node.js';
 
 export async function validateCommand(args: string[], options: CLIOptions): Promise<void> {
   const projectPath = getProjectPath(args[0]);
-  const workflow = args[1];
+  let workflow = args[1];
 
   if (!options.quiet) {
     CLIFormatter.info(`Validating project: ${projectPath}`);
@@ -20,6 +21,9 @@ export async function validateCommand(args: string[], options: CLIOptions): Prom
   }
 
   try {
+    if (!workflow) {
+      workflow = (await new WorkflowDetector(nodeProjectFs).detect(projectPath)).workflow;
+    }
     const validator = new Validator(nodeProjectFs);
     const result = await validator.validateProject(projectPath, workflow as Workflow, {
       minSeverity: options.severity as Finding['severity'],

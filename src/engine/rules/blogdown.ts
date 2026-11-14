@@ -1,6 +1,6 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { findFiles, readText, anyExists } from './helpers.js';
+import { anyExists, findFiles, isDirectoryAt, readText } from './helpers.js';
 
 // `content/` is the search root, so a root-level public/ (build output) is never reached; nested
 // sections such as content/docs/ are legitimate Hugo content and must be checked.
@@ -39,6 +39,67 @@ function hasFrontMatter(content: string): boolean {
 }
 
 export const blogdownRules: RuleDef[] = [
+  {
+    id: 'blogdown-config',
+    workflows: ['blogdown'],
+    async run({ dirPath, fsys }) {
+      // Hugo accepts several config names and a config directory
+      if (await isDirectoryAt(fsys, `${dirPath}/config/_default`)) return [];
+      const names = [
+        'config.toml',
+        'config.yaml',
+        'config.yml',
+        'hugo.toml',
+        'hugo.yaml',
+        'hugo.yml',
+        'config.json',
+        'hugo.json',
+      ];
+      if (await anyExists(fsys, dirPath, names)) return [];
+      return [
+        {
+          id: 'blogdown-config',
+          severity: 'critical',
+          category: 'structure',
+          message:
+            'Blogdown site must have a Hugo config (config.toml, hugo.toml, config.yaml, ... or config/_default/)',
+          suggestions: ['Create config.toml with site configuration'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'blogdown-content-structure',
+    workflows: ['blogdown'],
+    async run({ dirPath, fsys }) {
+      if (await isDirectoryAt(fsys, `${dirPath}/content`)) return [];
+      return [
+        {
+          id: 'blogdown-content-structure',
+          severity: 'important',
+          category: 'structure',
+          message: 'Blogdown site should have content/ directory',
+          suggestions: ['Create a content/ directory for posts and pages'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'blogdown-theme',
+    workflows: ['blogdown'],
+    async run({ dirPath, fsys }) {
+      if (await isDirectoryAt(fsys, `${dirPath}/themes`)) return [];
+      return [
+        {
+          id: 'blogdown-theme',
+          severity: 'recommended',
+          category: 'structure',
+          message: 'Blogdown site should have themes/ directory for custom theme',
+          suggestions: ['Install a Hugo theme, e.g. blogdown::install_theme()'],
+        },
+      ];
+    },
+  },
   {
     id: 'blogdown-metadata',
     workflows: ['blogdown'],

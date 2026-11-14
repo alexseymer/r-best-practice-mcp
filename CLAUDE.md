@@ -13,6 +13,51 @@ The **R Best Practices MCP Server** is a comprehensive tool for enforcing best p
 
 R developers often work across diverse project types (scripts, packages, Shiny apps, analyses, etc.) with different best practices for each. This MCP server provides a unified tool that Claude can use to help developers follow best practices regardless of their workflow.
 
+## Core Principles: the Linux principle
+
+Two ideas guide every design and development decision here: the **Unix philosophy** (how the software is built)
+and the **bazaar model** of Linux (how it is developed). When a change conflicts with these, the change needs a
+reason written down in the PR.
+
+> Small, focused, cooperating programs + open, collaborative and iterative development.
+
+### Design (Unix philosophy)
+
+| Principle | What it means in this project |
+|-----------|-------------------------------|
+| **Do one thing and do it well** | The engine checks the *structure and practice* of R projects. It does not run R, fix projects, replace `lintr`/`styler`, or store uploads (see SPEC §7). A new feature that is not detect, validate, generate or explain needs a strong case. |
+| **Programs work together** | Every surface (MCP, REST, CLI, dashboard, editors) is a thin adapter over the same engine, so all give the same answers. CLI commands compose: `validate` detects the workflow itself when none is given. |
+| **Text is the universal interface** | Results are JSON or plain text. Practices and rules are plain data and code in the repository, with no binary or database formats. |
+| **Every program is a filter** | Results go to **stdout**, status and errors to **stderr**, failure is a non-zero exit code. `r-practices validate . --format json \| jq` must always work. |
+| **Small is beautiful** | One rule is one small function in `src/engine/rules/<workflow>.ts`, one practice is one data object. Split files that grow past what one person can read at a sitting. |
+| **Prototype early** | Ship a heuristic rule with a clear "Consider ..." message and `recommended` severity first, then sharpen it from real findings. |
+| **Portability over efficiency** | Node >= 18, no native dependencies, any operating system, paths handled through `ProjectFs`. |
+| **No captive user interface** | No interactive prompts, no accounts, nothing that traps the user. All behaviour is reachable by flags or arguments. Browser uploads are analysed locally and are never stored. |
+| **Plain text storage** | Configuration and data are readable and diff-able text files. |
+
+### Process (bazaar model)
+
+- **Release early, release often.** Small pull requests, one concern each, merged as soon as CI is green; tagged
+  releases (`vX.Y.Z`) rather than big-bang versions.
+- **Many eyes.** Work happens in the open: issues, pull requests and reviews carry the decisions. Tests are the
+  contract that lets anyone change code safely; every rule has a triggering, a clean and a near-miss fixture.
+- **Users are co-developers.** Report a false positive or propose a practice through an issue or the
+  community-practices workflow; a good bug report with a fixture is worth more than a feature request.
+- **Open communication, clear maintainers.** Decisions and open questions are written in SPEC.md and the issues,
+  not in chat. The maintainer decides in the end; many people contribute to the subsystems.
+
+### Applying it: checklist for every change
+
+1. Does it do one thing, and is it inside the scope in SPEC §1 and §7?
+2. Can another tool consume its output (stdout, JSON, exit code) without parsing decoration?
+3. Is the smallest version that works shipped first, with the next step left as an issue?
+4. Does it work on every supported OS and without extra installs?
+5. Is it covered by a test, and documented where a user will look for it?
+
+Known gaps against these principles (tracked as work, not as excuses): `validate` cannot read from stdin yet;
+`src/engine/template-generator.ts` (about 1,500 lines) and `src/web-server.ts` (about 830 lines) are larger than
+one person can read at a sitting and should be split.
+
 ## Architecture
 
 ### Core Components
@@ -53,15 +98,14 @@ R developers often work across diverse project types (scripts, packages, Shiny a
 - Individual checkers: `checkPackage()`, `checkShiny()`, etc.
 
 #### 2. **Validator** (`src/engine/validator.ts`)
-- Runs workflow-specific validation rules
-- Validates individual files (R, Quarto, R Markdown)
+- Runs the rules registered for the workflow (`src/engine/rules/<workflow>.ts`, one rule per practice)
+- Validates individual files (R, Quarto, R Markdown) with the checks in `src/engine/rules/file-checks.ts`
 - Applies filtering (severity, category, limit)
 - Returns categorized `Finding[]` with severity and suggestions
 
 **Key Methods:**
 - `validateProject(path, workflow, options)` → `ValidationResult`
 - `validateFile(filePath)` → `Finding[]`
-- Workflow validators: `validatePackage()`, `validateShiny()`, etc.
 
 #### 3. **TemplateGenerator** (`src/engine/template-generator.ts`)
 - Generates complete project scaffolds
@@ -235,7 +279,8 @@ Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `deta
 4. `tests/unit/rule-consistency.test.ts` fails if a rule has no practice, an automated practice has no rule,
    or a guidance practice has one.
 
-The original inline rules still live in `src/engine/validator.ts` (`validatePackage()`, ...).
+All rules live in the registry; `src/engine/validator.ts` only runs them and applies the filters.
+Checks that look at a single file (used by both `validateFile` and the project rules) are in `src/engine/rules/file-checks.ts`.
 
 ### Adding a Template
 

@@ -1,6 +1,7 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, maskRSource, readText } from './helpers.js';
+import { Finding } from '../../types/finding.js';
 
 // plumber accepts both #* and #' annotations.
 const ENDPOINT = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b[ \t]*(\S*)/i;
@@ -77,7 +78,64 @@ function pathIssue(route: string): boolean {
   return VERB_PREFIX.test(first);
 }
 
+/** R files that define a plumber endpoint, with comments and string contents masked out. */
+async function endpointFiles(
+  fsys: ProjectFs,
+  dirPath: string
+): Promise<{ file: string; content: string }[]> {
+  const endpoint = /^\s*#[*']\s*@(get|post|put|delete|patch|head|options)\b/im;
+  const out: { file: string; content: string }[] = [];
+  for (const file of await findFiles(fsys, dirPath, /\.[Rr]$/)) {
+    const raw = await readText(fsys, file);
+    if (raw === null || !endpoint.test(raw)) continue;
+    out.push({ file, content: maskRSource(raw, true) });
+  }
+  return out;
+}
+
 export const plumberRules: RuleDef[] = [
+  {
+    id: 'plumber-validation',
+    workflows: ['plumber'],
+    async run({ dirPath, fsys }) {
+      const out: Finding[] = [];
+      for (const { file, content } of await endpointFiles(fsys, dirPath)) {
+        // A validation/check helper call, stopifnot(), req(), or a conditional
+        if (/\b(validate\w*|check\w*|stopifnot|req)\s*\(|\bif\s*\(/.test(content)) continue;
+        out.push({
+          id: 'plumber-validation',
+          severity: 'critical',
+          category: 'security',
+          file,
+          message: 'API should validate and sanitize all inputs',
+          suggestions: ['Add input validation for all parameters', 'Check data types and ranges'],
+        });
+      }
+      return out;
+    },
+  },
+  {
+    id: 'plumber-error',
+    workflows: ['plumber'],
+    async run({ dirPath, fsys }) {
+      const out: Finding[] = [];
+      for (const { file, content } of await endpointFiles(fsys, dirPath)) {
+        if (/\b(tryCatch|stop|warning)\s*\(/.test(content)) continue;
+        out.push({
+          id: 'plumber-error',
+          severity: 'important',
+          category: 'structure',
+          file,
+          message: 'Add error handling to API endpoints',
+          suggestions: [
+            'Wrap endpoint logic in tryCatch()',
+            'Return meaningful HTTP status codes with res$status',
+          ],
+        });
+      }
+      return out;
+    },
+  },
   {
     id: 'plumber-docs',
     workflows: ['plumber'],

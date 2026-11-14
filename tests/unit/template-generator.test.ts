@@ -137,9 +137,9 @@ describe('TemplateGenerator', () => {
 
       expect(result.workflow).toBe('shinytest');
       expect(result.files.some((f) => f.path === 'app.R')).toBe(true);
-      expect(result.files.some((f) => f.path.includes('tests/shinytest'))).toBe(true);
+      expect(result.files.some((f) => f.path.includes('.github/workflows'))).toBe(true);
       expect(result.files.some((f) => f.path.includes('tests/testthat'))).toBe(true);
-      expect(result.directories.includes('tests/shinytest')).toBe(true);
+      expect(result.directories.includes('.github/workflows')).toBe(true);
       expect(result.directories.includes('tests/testthat')).toBe(true);
     });
 

@@ -1,6 +1,14 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { anyExists, findFiles, maskRSource, pathExists, readText, stripBom } from './helpers.js';
+import {
+  anyExists,
+  findFiles,
+  isDirectoryAt,
+  maskRSource,
+  pathExists,
+  readText,
+  stripBom,
+} from './helpers.js';
 
 const ATTACH_CALL = /(?:^|[^\w.:$@])(library|require)\(/m;
 const DEV_FILES = [
@@ -19,6 +27,119 @@ async function rSourceFiles(fsys: ProjectFs, dirPath: string): Promise<string[]>
 }
 
 export const packageRules: RuleDef[] = [
+  {
+    id: 'pkg-description',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, `${dirPath}/DESCRIPTION`))) {
+        return [
+          {
+            id: 'pkg-description',
+            severity: 'critical',
+            category: 'structure',
+            message: 'Package must have DESCRIPTION file',
+            suggestions: ['Run usethis::use_description() to create DESCRIPTION'],
+          },
+        ];
+      }
+      const desc = await fsys.readFile(`${dirPath}/DESCRIPTION`);
+      // Required fields are matched at line start, not as substrings
+      const hasField = (field: string) =>
+        new RegExp(`^${field}:`, 'm').test(desc.replace(/\r/g, ''));
+      const missing = ['Package', 'Version', 'Title', 'Description', 'License'].filter(
+        (f) => !hasField(f)
+      );
+      if (!hasField('Authors@R') && !(hasField('Author') && hasField('Maintainer'))) {
+        missing.push('Authors@R (or both Author and Maintainer)');
+      }
+      if (missing.length === 0) return [];
+      return [
+        {
+          id: 'pkg-description',
+          severity: 'critical',
+          category: 'structure',
+          message: `DESCRIPTION missing required field(s): ${missing.join(', ')}`,
+          suggestions: [
+            'Add the missing fields to DESCRIPTION',
+            'Use usethis::use_description() to generate a complete DESCRIPTION',
+          ],
+        },
+      ];
+    },
+  },
+  {
+    id: 'pkg-structure',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, `${dirPath}/DESCRIPTION`))) return [];
+      if (await isDirectoryAt(fsys, `${dirPath}/R`)) return [];
+      return [
+        {
+          id: 'pkg-structure',
+          severity: 'important',
+          category: 'structure',
+          message: 'Package should have R/ directory for source files',
+          suggestions: ['Create an R/ directory and move source files into it'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'pkg-tests',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, `${dirPath}/DESCRIPTION`))) return [];
+      if (await isDirectoryAt(fsys, `${dirPath}/tests`)) return [];
+      return [
+        {
+          id: 'pkg-tests',
+          severity: 'important',
+          category: 'testing',
+          message: 'Add tests/ directory with testthat tests',
+          suggestions: ['Create tests/testthat/ directory', 'Add test_*.R files'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'pkg-license',
+    workflows: ['package'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, `${dirPath}/DESCRIPTION`))) return [];
+      const desc = await fsys.readFile(`${dirPath}/DESCRIPTION`);
+      const licenseMatch = /^License:[ \t]*(.*(?:\r?\n[ \t]+.*)*)/m.exec(desc);
+      if (!licenseMatch) {
+        return [
+          {
+            id: 'pkg-license',
+            severity: 'critical',
+            category: 'structure',
+            message: 'DESCRIPTION must declare a License field',
+            suggestions: [
+              'Add a License: field to DESCRIPTION',
+              'Run usethis::use_mit_license() or another usethis::use_*_license() helper',
+            ],
+          },
+        ];
+      }
+      if (!/file\s+LICEN[CS]E/.test(licenseMatch[1])) return [];
+      if (await anyExists(fsys, dirPath, ['LICENSE', 'LICENSE.md', 'LICENCE', 'LICENCE.md'])) {
+        return [];
+      }
+      return [
+        {
+          id: 'pkg-license',
+          severity: 'critical',
+          category: 'structure',
+          message: 'DESCRIPTION references "file LICENSE" but no LICENSE file exists',
+          suggestions: [
+            'Create the LICENSE file referenced by DESCRIPTION',
+            'Or use a standard license such as License: MIT + file LICENSE via usethis::use_mit_license()',
+          ],
+        },
+      ];
+    },
+  },
   {
     id: 'pkg-readme',
     workflows: ['package'],
