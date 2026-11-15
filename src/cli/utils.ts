@@ -198,7 +198,9 @@ export function parseArgs(args: string[]): {
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg.startsWith('--')) {
+    if (arg === '-') {
+      commandArgs.push(arg);
+    } else if (arg.startsWith('--')) {
       const [key, ...valueParts] = arg.slice(2).split('=');
       const value =
         valueParts.join('=') ||

@@ -140,6 +140,17 @@ r-best-practices validate <path> [workflow] [options]
 - `--category <category>` — Filter by category: `structure`, `naming`, `documentation`, `security`, `testing`, `performance`, etc.
 - `--limit <number>` — Limit results (default: all)
 - `--quiet` — Suppress non-essential output
+- `--stdin-filename <name>` — With `validate -`: the name of the piped file; its extension (`.R`, `.qmd`, `.Rmd`) picks the checks (default `stdin.R`)
+
+#### Validate one file from a pipe
+
+`validate -` reads a single file from stdin and prints one `file:line: [severity] message (id)` line per
+finding. The exit code is 1 when there are findings and 0 when there are none; `--format json` prints JSON only.
+
+```bash
+cat analysis.qmd | r-best-practices validate - --stdin-filename analysis.qmd
+git show HEAD:analysis.R | r-best-practices validate - --format json | jq '.findings[].id'
+```
 
 #### Examples
 

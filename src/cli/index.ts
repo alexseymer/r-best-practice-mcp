@@ -14,6 +14,7 @@ Usage: r-best-practices <command> [options] [args]
 Commands:
   detect <path>              Detect workflow type for a project
   validate <path> [workflow] Validate project against best practices
+  validate -                 Validate one file read from stdin (see --stdin-filename)
   template <workflow> [name] Generate a new project scaffold
   report <path>              Generate HTML validation report
   help                       Show this help message
@@ -26,6 +27,9 @@ Options:
   --verbose                  Show detailed output
   --quiet                    Suppress non-essential output
   --force                    Overwrite existing files
+  --severity <level>         validate: only findings at or above critical|important|recommended|info
+  --category <name>          validate: only findings of one category
+  --stdin-filename <name>    validate -: name of the piped file, picks the checks (.R, .qmd, .Rmd)
 
 Examples:
   # Detect workflow type
@@ -33,6 +37,9 @@ Examples:
 
   # Validate project
   r-best-practices validate /path/to/project package
+
+  # Validate a file from a pipe
+  cat analysis.qmd | r-best-practices validate - --stdin-filename analysis.qmd --format json | jq .findings
 
   # Generate template
   r-best-practices template shiny my-app --output ~/projects
@@ -70,7 +77,7 @@ export async function run(): Promise<void> {
         break;
 
       case 'validate':
-        await handleValidateCommand(cmdArgs, cliOptions, options.watch);
+        await handleValidateCommand(cmdArgs, { ...options, ...cliOptions }, options.watch);
         break;
 
       case 'template':

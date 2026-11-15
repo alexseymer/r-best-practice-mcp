@@ -107,26 +107,36 @@ export class Validator {
     };
   }
 
+  /** Validate file content that is not on disk (for example read from stdin). `filePath` picks the checks by extension. */
+  validateContent(
+    filePath: string,
+    content: string,
+    options: ValidatorOptions = {}
+  ): FileValidationResult {
+    const all = this.findingsForContent(filePath, content);
+    return {
+      path: filePath,
+      findings: applyFindingFilters(all, options),
+      summary: summarizeFindings(all),
+    };
+  }
+
   private async collectFileFindings(filePath: string): Promise<Finding[]> {
-    const findings: Finding[] = [];
-    const ext = this.getExtension(filePath);
-
     try {
-      const content = await this.fsys.readFile(filePath);
-      const lines = content.split('\n');
-
-      // Check file structure
-      if (ext === '.R') {
-        findings.push(...checkRFile(filePath, lines));
-      } else if (ext === '.qmd') {
-        findings.push(...checkQmdFile(filePath, lines));
-      } else if (ext === '.Rmd') {
-        findings.push(...checkRmdFile(filePath, lines));
-      }
+      return this.findingsForContent(filePath, await this.fsys.readFile(filePath));
     } catch (error) {
       logger.error(`Error validating file ${filePath}`, error);
+      return [];
     }
+  }
 
-    return findings;
+  private findingsForContent(filePath: string, content: string): Finding[] {
+    const ext = this.getExtension(filePath);
+    const lines = content.split('\n');
+
+    if (ext === '.R') return checkRFile(filePath, lines);
+    if (ext === '.qmd') return checkQmdFile(filePath, lines);
+    if (ext === '.Rmd') return checkRmdFile(filePath, lines);
+    return [];
   }
 }

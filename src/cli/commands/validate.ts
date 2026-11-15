@@ -6,7 +6,43 @@ import { Finding } from '../../types/finding.js';
 import { Workflow } from '../../types/workflow.js';
 import { nodeProjectFs } from '../../engine/project-fs-node.js';
 
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks).toString('utf-8');
+}
+
+/**
+ * `validate -` checks one file read from stdin, like a filter. `--stdin-filename name.qmd` says what
+ * kind of file it is (default stdin.R). Text output is one `file:line: [severity] message (id)` per finding.
+ */
+async function validateStdin(options: CLIOptions): Promise<void> {
+  if (process.stdin.isTTY) {
+    CLIFormatter.error('validate -: no input on stdin; pipe a file in, for example: cat a.R | ...');
+    process.exit(2);
+  }
+
+  const name =
+    typeof options['stdin-filename'] === 'string' ? options['stdin-filename'] : 'stdin.R';
+  const result = new Validator(nodeProjectFs).validateContent(name, await readStdin(), {
+    minSeverity: options.severity as Finding['severity'],
+    categories: options.category ? [options.category as string] : undefined,
+  });
+
+  if (options.format === 'json') {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    for (const f of result.findings) {
+      console.log(`${name}:${f.line ?? 1}: [${f.severity}] ${f.message} (${f.id})`);
+    }
+  }
+
+  if (result.findings.length > 0 && !options.quiet) process.exit(1);
+}
+
 export async function validateCommand(args: string[], options: CLIOptions): Promise<void> {
+  if (args[0] === '-') return validateStdin(options);
+
   const projectPath = getProjectPath(args[0]);
   let workflow = args[1];
 
