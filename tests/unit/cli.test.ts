@@ -1,5 +1,7 @@
 import { CLIFormatter, ConfigLoader, parseArgs, getProjectPath } from '../../src/cli/utils';
 import * as path from 'path';
+import { validateCommand } from '../../src/cli/commands/validate';
+import { createTempDir, cleanupTempDir, createFile } from '../fixtures/setup';
 
 describe('CLI Utils', () => {
   describe('parseArgs', () => {
@@ -86,6 +88,16 @@ describe('CLI Utils', () => {
       expect(typeof CLIFormatter.info).toBe('function');
     });
 
+    it('should write status messages to stderr and keep stdout for results', () => {
+      const out = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+      const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      CLIFormatter.info('Validating project: x');
+      expect(out).not.toHaveBeenCalled();
+      expect(err).toHaveBeenCalledTimes(1);
+      out.mockRestore();
+      err.mockRestore();
+    });
+
     it('should have header and section methods', () => {
       expect(typeof CLIFormatter.header).toBe('function');
       expect(typeof CLIFormatter.section).toBe('function');
@@ -121,9 +133,37 @@ describe('CLI Utils', () => {
   });
 
   describe('validateCommand', () => {
-    it('should accept path and optional workflow', async () => {
-      // Test in integration with actual command
-      expect(true).toBe(true);
+    let dir: string;
+    beforeEach(() => {
+      dir = createTempDir();
+    });
+    afterEach(() => cleanupTempDir(dir));
+
+    const run = async (args: string[]): Promise<string> => {
+      const out = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+      const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      try {
+        await validateCommand(args, { format: 'json' });
+        return out.mock.calls.map((c) => String(c[0])).join('\n');
+      } finally {
+        out.mockRestore();
+        err.mockRestore();
+        exit.mockRestore();
+      }
+    };
+
+    it('detects the workflow when none is given and prints only JSON to stdout', async () => {
+      createFile(dir, 'analysis.R', '# header\nx <- 1\n');
+      const result = JSON.parse(await run([dir]));
+      expect(result.workflow).toBe('r-script');
+      expect(result.warnings).toBeUndefined();
+    });
+
+    it('uses an explicit workflow when given', async () => {
+      createFile(dir, 'analysis.R', '# header\nx <- 1\n');
+      const result = JSON.parse(await run([dir, 'package']));
+      expect(result.workflow).toBe('package');
     });
   });
 

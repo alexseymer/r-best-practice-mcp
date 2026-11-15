@@ -1,10 +1,58 @@
 import { RuleDef } from './types.js';
-import { anyExists, findFiles, readText } from './helpers.js';
+import { anyExists, findFiles, pathExists, readText } from './helpers.js';
 import { loadDocs, parseDoc, summarize } from './quarto.js';
 
 const CHAPTER_NAME = /^\d{2}-[a-z0-9-]+\.Rmd$/;
 
 export const bookdownRules: RuleDef[] = [
+  {
+    id: 'bookdown-config',
+    workflows: ['bookdown'],
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['_bookdown.yml', '_bookdown.yaml'])) return [];
+      return [
+        {
+          id: 'bookdown-config',
+          severity: 'important',
+          category: 'structure',
+          message: 'Bookdown project should have _bookdown.yml',
+          suggestions: ['Create _bookdown.yml with book configuration'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'bookdown-index',
+    workflows: ['bookdown'],
+    async run({ dirPath, fsys }) {
+      if (await pathExists(fsys, `${dirPath}/index.Rmd`)) return [];
+      return [
+        {
+          id: 'bookdown-index',
+          severity: 'critical',
+          category: 'structure',
+          message: 'Bookdown book must have index.Rmd',
+          suggestions: ['Create index.Rmd with the book YAML header and introduction'],
+        },
+      ];
+    },
+  },
+  {
+    id: 'bookdown-readme',
+    workflows: ['bookdown'],
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['README.md', 'README.Rmd'])) return [];
+      return [
+        {
+          id: 'bookdown-readme',
+          severity: 'recommended',
+          category: 'documentation',
+          message: 'Add README.md (or README.Rmd) to document the book',
+          suggestions: ['Create README.md explaining how to build and contribute to the book'],
+        },
+      ];
+    },
+  },
   {
     id: 'bookdown-chapter-naming',
     workflows: ['bookdown'],

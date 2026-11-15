@@ -467,11 +467,9 @@ GET  /api/tools                       — List available tools
    }
    ```
 
-3. **Add validator** (src/engine/validator.ts)
+3. **Add a rule** (src/engine/rules/<workflow>.ts, see CLAUDE.md "Adding a Rule")
    ```typescript
-   private async validateNewWorkflow(path: string): Promise<Finding[]> {
-     // Run checks specific to workflow
-   }
+   { id: 'new-example', workflows: ['new-workflow'], async run({ dirPath, fsys }) { return [] } }
    ```
 
 4. **Add template** (src/engine/template-generator.ts)

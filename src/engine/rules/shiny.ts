@@ -1,6 +1,6 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
-import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
+import { anyExists, findFiles, maskRSource, pathExists, readText } from './helpers.js';
 
 const TOP_LEVEL_FILES = ['app.R', 'server.R', 'ui.R', 'global.R'];
 
@@ -56,6 +56,45 @@ const VALIDATION_PATTERNS = [
 ];
 
 export const shinyRules: RuleDef[] = [
+  {
+    id: 'shiny-structure',
+    workflows: ['shiny'],
+    async run({ dirPath, fsys }) {
+      const appR = await pathExists(fsys, `${dirPath}/app.R`);
+      const uiServer =
+        (await pathExists(fsys, `${dirPath}/ui.R`)) &&
+        (await pathExists(fsys, `${dirPath}/server.R`));
+      if (appR || uiServer) return [];
+      return [
+        {
+          id: 'shiny-structure',
+          severity: 'important',
+          category: 'structure',
+          message: 'Shiny app should have either app.R or ui.R/server.R',
+          suggestions: [
+            'Create app.R with ui and server functions',
+            'Or create separate ui.R and server.R files',
+          ],
+        },
+      ];
+    },
+  },
+  {
+    id: 'shiny-readme',
+    workflows: ['shiny'],
+    async run({ dirPath, fsys }) {
+      if (await anyExists(fsys, dirPath, ['README.md', 'README.Rmd'])) return [];
+      return [
+        {
+          id: 'shiny-readme',
+          severity: 'recommended',
+          category: 'documentation',
+          message: 'Add README.md with Shiny app documentation',
+          suggestions: ['Create README.md describing the app, how to run it and its deployment'],
+        },
+      ];
+    },
+  },
   {
     id: 'shiny-validation',
     workflows: ['shiny'],

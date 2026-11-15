@@ -1,5 +1,5 @@
 import { RuleDef } from './types.js';
-import { findFiles, maskRSource, readText } from './helpers.js';
+import { findFiles, maskRSource, pathExists, readText } from './helpers.js';
 
 const SNAKE = /^[a-z][a-z0-9_]*$/;
 const TARGET_CALL = /(?:^|[^\w.])tar_target\(\s*(?:name\s*=\s*)?([A-Za-z._][A-Za-z0-9._]*)\s*[,)]/g;
@@ -14,6 +14,37 @@ function suggest(name: string): string {
 }
 
 export const targetsRules: RuleDef[] = [
+  {
+    id: 'targets-structure',
+    workflows: ['targets'],
+    async run({ dirPath, fsys }) {
+      if (!(await pathExists(fsys, `${dirPath}/_targets.R`))) {
+        return [
+          {
+            id: 'targets-structure',
+            severity: 'recommended',
+            category: 'structure',
+            message: 'targets project must have _targets.R file',
+            suggestions: ['Run targets::use_targets() to create _targets.R'],
+          },
+        ];
+      }
+      const content = await fsys.readFile(`${dirPath}/_targets.R`);
+      // A target list is list() or tarchetypes::tar_plan(); comments do not count
+      if (/(^|[^A-Za-z0-9_.])(list|tar_plan)\s*\(/.test(maskRSource(content, true))) return [];
+      return [
+        {
+          id: 'targets-structure',
+          severity: 'recommended',
+          category: 'structure',
+          message: '_targets.R should define targets using list() or tar_plan()',
+          suggestions: [
+            'End _targets.R with list(tar_target(name, command), ...) or use tarchetypes::tar_plan(...)',
+          ],
+        },
+      ];
+    },
+  },
   {
     id: 'targets-naming',
     workflows: ['targets'],

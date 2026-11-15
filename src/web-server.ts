@@ -5,25 +5,23 @@ import type { Server } from 'http';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
 import { TemplateGenerator } from './engine/template-generator.js';
-import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { getRuntimeConfig, RuntimeConfig } from './config/runtime.js';
-import { FileUtils } from './utils/file.js';
 import { metricsCollector } from './utils/metrics.js';
-import { SecurityUtils } from './utils/security.js';
 import { RateLimiter } from './utils/rate-limiter.js';
-import { OpenAPIGenerator } from './utils/openapi.js';
-import { PaginationUtils } from './utils/pagination.js';
-import { toRestToolsPayload } from './tools/schemas.js';
 import { parseTrustProxy, proxyMisconfigurationWarning } from './middleware/trust-proxy.js';
-import { pathGuard, getConfinedPath } from './middleware/path-guard.js';
 import { securityHeaders, noStore } from './middleware/security-headers.js';
 import { isStaticAssetPath } from './middleware/static-assets.js';
 import { bodyParsers, getMaxBodyBytes } from './middleware/body-limits.js';
-import { metricsAccess } from './middleware/metrics-access.js';
 import { errorHandler } from './middleware/errors.js';
-import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+import { pathGuard } from './middleware/path-guard.js';
 import { registerUploadRoutes } from './routes/upload.js';
+import type { RouteContext } from './routes/context.js';
+import { registerDetectRoutes } from './routes/detect.js';
+import { registerOpsRoutes } from './routes/ops.js';
+import { registerPracticeRoutes } from './routes/practices.js';
+import { registerTemplateRoutes } from './routes/templates.js';
+import { registerValidateRoutes } from './routes/validate.js';
 import { nodeProjectFs } from './engine/project-fs-node.js';
 
 if (typeof __dirname === 'undefined') {
@@ -90,12 +88,12 @@ export class RPracticesWebServer {
 
     // Serve static files from public directory
     // When running from dist/web-server.js, __dirname = dist, so we go up to root/src/public
-    const publicPath = path.join(__dirname, '..', 'src', 'public');
-    this.app.use(express.static(publicPath));
+    const { publicDir, browserEngineDir } = this.routeContext().paths;
+    this.app.use(express.static(publicDir));
     // The browser analyses uploads with the engine compiled to dist/browser-engine (scripts/build-browser-engine.mjs).
     this.app.use(
       '/browser-engine',
-      express.static(path.join(__dirname, '..', 'dist', 'browser-engine'), {
+      express.static(browserEngineDir, {
         index: false,
         maxAge: '1h',
       })
@@ -125,103 +123,29 @@ export class RPracticesWebServer {
       next();
     });
 
-    // Health check with metrics
-    this.app.get('/health', (req: Request, res: Response) => {
-      const metrics = metricsCollector.getSnapshot();
+    registerOpsRoutes(this.app, this.routeContext());
+  }
 
-      res.json({
-        status: 'ok',
-        service: 'r-best-practices-mcp',
-        version: this.runtime.version,
-        build: this.runtime.build,
-        timestamp: new Date().toISOString(),
-        metrics: {
-          uptime: metrics.uptime,
-          averageRequestDuration: `${metrics.averageRequestDuration.toFixed(2)}ms`,
-          totalRequests: metrics.requests.length,
-          operationCounts: metrics.operationCounts,
-          errorCounts: metrics.errorCounts,
-        },
-      });
-    });
-
-    // Deployment-dependent settings the dashboard adapts to
-    this.app.get('/api/config', (req: Request, res: Response) => {
-      res.json({ error: false, data: this.runtime, timestamp: Date.now() });
-    });
-
-    // /metrics*: public, bearer-token protected or disabled (404), see getRuntimeConfig().metrics
-    this.app.use('/metrics', metricsAccess(this.runtime.metrics, this.env.METRICS_TOKEN));
-
-    // Metrics endpoint
-    this.app.get('/metrics', (req: Request, res: Response) => {
-      const metrics = metricsCollector.getSnapshot();
-      res.json(metrics);
-    });
-
-    // Rate limit stats endpoint
-    this.app.get('/metrics/rate-limit', (req: Request, res: Response) => {
-      const stats = this.rateLimiter.getStats();
-      res.json({
-        status: 'ok',
-        rateLimit: {
-          window: '60 seconds',
-          maxRequests: 100,
-          ...stats,
-        },
-      });
-    });
-
-    // OpenAPI spec endpoint
-    this.app.get('/openapi.json', (req: Request, res: Response) => {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const spec = OpenAPIGenerator.generateSpec(this.runtime.version, baseUrl);
-      res.json(spec);
-    });
-
-    // OpenAPI UI: Swagger UI served from the pinned swagger-ui-dist package, no CDN
-    // (only the two files the page needs are exposed, not the whole package directory)
-    const swaggerDist = path.join(__dirname, '..', 'node_modules', 'swagger-ui-dist');
-    for (const asset of ['swagger-ui.css', 'swagger-ui-bundle.js']) {
-      this.app.get(`/api-docs/assets/${asset}`, (req: Request, res: Response) => {
-        res.sendFile(path.join(swaggerDist, asset));
-      });
-    }
-    this.app.get('/api-docs', (req: Request, res: Response) => {
-      res.sendFile(path.join(__dirname, '..', 'src', 'public', 'api-docs.html'));
-    });
-
-    // Metrics export endpoints
-    this.app.get('/metrics/requests.csv', (req: Request, res: Response) => {
-      const csv = metricsCollector.exportRequestsCSV();
-      res.type('text/csv');
-      res.send(csv);
-    });
-
-    this.app.get('/metrics/operations.csv', (req: Request, res: Response) => {
-      const csv = metricsCollector.exportOperationsCSV();
-      res.type('text/csv');
-      res.send(csv);
-    });
-
-    // Dashboard route
-    this.app.get('/dashboard', (req: Request, res: Response) => {
-      const dashboardPath = path.join(__dirname, '..', 'src', 'public', 'dashboard.html');
-      res.sendFile(dashboardPath);
-    });
-
-    // Browsers request /favicon.ico regardless of <link rel=icon>; avoid the JSON 404
-    this.app.get('/favicon.ico', (req: Request, res: Response) => {
-      res.redirect(301, '/favicon.svg');
-    });
-
-    // Index route redirects to dashboard
-    this.app.get('/', (req: Request, res: Response) => {
-      res.redirect('/dashboard');
-    });
+  private routeContext(): RouteContext {
+    const rootDir = path.join(__dirname, '..');
+    return {
+      runtime: this.runtime,
+      env: this.env,
+      detector: this.detector,
+      validator: this.validator,
+      templateGenerator: this.templateGenerator,
+      rateLimiter: this.rateLimiter,
+      paths: {
+        publicDir: path.join(rootDir, 'src', 'public'),
+        browserEngineDir: path.join(rootDir, 'dist', 'browser-engine'),
+        swaggerDistDir: path.join(rootDir, 'node_modules', 'swagger-ui-dist'),
+      },
+    };
   }
 
   private setupRoutes(): void {
+    const ctx = this.routeContext();
+
     // Confine client-supplied paths to the allowed roots (no-op in unrestricted mode)
     this.app.post(
       [
@@ -232,559 +156,15 @@ export class RPracticesWebServer {
         '/api/validate-file',
         '/api/v1/validate-file',
       ],
-      pathGuard(this.runtime.serverPaths)
+      pathGuard(ctx.runtime.serverPaths)
     );
 
-    // Detect workflow
-    this.app.post('/api/detect-workflow', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        const result = await this.detector.detect(getConfinedPath(res, inputPath));
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('detection', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'detection',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in detect-workflow', error);
-        res.status(500).json({
-          error: true,
-          code: 'DETECTION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Validate project and file (v0 + v1 share one implementation)
-    for (const prefix of ['/api', '/api/v1']) {
-      this.app.post(`${prefix}/validate-project`, (req: Request, res: Response) =>
-        this.handleValidateProject(req, res)
-      );
-      this.app.post(`${prefix}/validate-file`, (req: Request, res: Response) =>
-        this.handleValidateFile(req, res)
-      );
-    }
-
+    registerDetectRoutes(this.app, ctx);
+    registerValidateRoutes(this.app, ctx);
     // Browser uploads (own JSON parser, see LARGE_BODY_ROUTES)
     registerUploadRoutes(this.app, { validator: this.validator, detector: this.detector });
-
-    // Get practice
-    this.app.get('/api/practice/:id', (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { id } = req.params;
-        const practice = kb.getPractice(id);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('practice-lookup', duration, !!practice);
-
-        if (!practice) {
-          return res.status(404).json({
-            error: true,
-            code: 'NOT_FOUND',
-            message: `Practice not found: ${id}`,
-          });
-        }
-
-        res.json({
-          error: false,
-          data: practice,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'practice-lookup',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in get-practice', error);
-        res.status(500).json({
-          error: true,
-          code: 'PRACTICE_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // List practices (v0 - backward compatible)
-    this.app.get('/api/practices', (req: Request, res: Response) => {
-      this.handleListPractices(req, res, false);
-    });
-
-    // List practices (v1 - with pagination)
-    this.app.get('/api/v1/practices', (req: Request, res: Response) => {
-      this.handleListPractices(req, res, true);
-    });
-
-    // Generate template
-    this.app.post('/api/generate-template', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { workflow, projectName, authorName, authorEmail } = req.body;
-
-        if (!workflow) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'workflow parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidWorkflow(workflow)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_WORKFLOW',
-            message: `Invalid workflow type: ${workflow}`,
-          });
-        }
-
-        // Sanitize optional string inputs
-        const sanitizedProjectName = projectName
-          ? SecurityUtils.sanitizeInput(projectName)
-          : undefined;
-        const sanitizedAuthorName = authorName
-          ? SecurityUtils.sanitizeInput(authorName)
-          : undefined;
-        const sanitizedAuthorEmail = authorEmail
-          ? SecurityUtils.sanitizeInput(authorEmail)
-          : undefined;
-
-        const result = await this.templateGenerator.generate(workflow as any, {
-          projectName: sanitizedProjectName,
-          authorName: sanitizedAuthorName,
-          authorEmail: sanitizedAuthorEmail,
-        });
-
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('template-generation', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'template-generation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in generate-template', error);
-        res.status(500).json({
-          error: true,
-          code: 'TEMPLATE_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // === API v1 Routes (with versioning) ===
-    // Detect workflow (v1)
-    this.app.post('/api/v1/detect-workflow', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { path: inputPath } = req.body;
-        if (!inputPath) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'path parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidFilePath(inputPath)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_PATH',
-            message: 'Invalid path format',
-          });
-        }
-
-        const result = await this.detector.detect(getConfinedPath(res, inputPath));
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('detection', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'detection',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in detect-workflow', error);
-        res.status(500).json({
-          error: true,
-          code: 'DETECTION_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Get practice (v1)
-    this.app.get('/api/v1/practice/:id', (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { id } = req.params;
-        const practice = kb.getPractice(id);
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('practice-lookup', duration, !!practice);
-
-        if (!practice) {
-          return res.status(404).json({
-            error: true,
-            code: 'NOT_FOUND',
-            message: `Practice not found: ${id}`,
-          });
-        }
-
-        res.json({
-          error: false,
-          data: practice,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'practice-lookup',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in get-practice', error);
-        res.status(500).json({
-          error: true,
-          code: 'PRACTICE_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // Generate template (v1)
-    this.app.post('/api/v1/generate-template', async (req: Request, res: Response) => {
-      const startTime = process.hrtime();
-      try {
-        const { workflow, projectName, authorName, authorEmail } = req.body;
-
-        if (!workflow) {
-          return res.status(400).json({
-            error: true,
-            code: 'MISSING_PARAMETER',
-            message: 'workflow parameter is required',
-          });
-        }
-
-        if (!SecurityUtils.isValidWorkflow(workflow)) {
-          return res.status(400).json({
-            error: true,
-            code: 'INVALID_WORKFLOW',
-            message: `Invalid workflow type: ${workflow}`,
-          });
-        }
-
-        const sanitizedProjectName = projectName
-          ? SecurityUtils.sanitizeInput(projectName)
-          : undefined;
-        const sanitizedAuthorName = authorName
-          ? SecurityUtils.sanitizeInput(authorName)
-          : undefined;
-        const sanitizedAuthorEmail = authorEmail
-          ? SecurityUtils.sanitizeInput(authorEmail)
-          : undefined;
-
-        const result = await this.templateGenerator.generate(workflow as any, {
-          projectName: sanitizedProjectName,
-          authorName: sanitizedAuthorName,
-          authorEmail: sanitizedAuthorEmail,
-        });
-
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation('template-generation', duration, true);
-
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      } catch (error) {
-        const hrTime = process.hrtime(startTime);
-        const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-        metricsCollector.recordOperation(
-          'template-generation',
-          duration,
-          false,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-
-        logger.error('Error in generate-template', error);
-        res.status(500).json({
-          error: true,
-          code: 'TEMPLATE_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    });
-
-    // List all tools (for introspection); derived from tools/schemas.ts like the MCP tool list
-    this.app.get('/api/tools', (req: Request, res: Response) => {
-      res.json({
-        error: false,
-        data: toRestToolsPayload(),
-        timestamp: Date.now(),
-      });
-    });
-  }
-
-  private sendInvalidParameter(res: Response, code: string, message: string): Response {
-    return res.status(400).json({ error: true, code, message });
-  }
-
-  private async handleValidateProject(req: Request, res: Response): Promise<void> {
-    const startTime = process.hrtime();
-    try {
-      const body = req.body ?? {};
-      const { path: inputPath, workflow } = body;
-      if (!inputPath) {
-        this.sendInvalidParameter(res, 'MISSING_PARAMETER', 'path parameter is required');
-        return;
-      }
-
-      if (!SecurityUtils.isValidFilePath(inputPath)) {
-        this.sendInvalidParameter(res, 'INVALID_PATH', 'Invalid path format');
-        return;
-      }
-
-      if (workflow && !SecurityUtils.isValidWorkflow(workflow)) {
-        this.sendInvalidParameter(res, 'INVALID_WORKFLOW', `Invalid workflow type: ${workflow}`);
-        return;
-      }
-
-      const filters = parseFindingFilters(body);
-      if (!filters.ok) {
-        this.sendInvalidParameter(res, filters.code, filters.message);
-        return;
-      }
-
-      const targetPath = getConfinedPath(res, inputPath);
-      const exists = await FileUtils.isDirectory(targetPath);
-      if (!exists) {
-        res.status(404).json({
-          error: true,
-          code: 'PATH_NOT_FOUND',
-          message: `Directory not found: ${inputPath}`,
-        });
-        return;
-      }
-
-      // Auto-detect workflow if not specified
-      let detectedWorkflow = workflow || 'unknown';
-      if (!workflow) {
-        const detection = await this.detector.detect(targetPath);
-        detectedWorkflow = detection.workflow;
-      }
-
-      const result = await this.validator.validateProject(
-        targetPath,
-        detectedWorkflow as any,
-        filters.value
-      );
-      const hrTime = process.hrtime(startTime);
-      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-      metricsCollector.recordOperation('validation', duration, true);
-
-      res.json({
-        error: false,
-        data: result,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      this.sendValidationFailure(res, startTime, error, 'validate-project');
-    }
-  }
-
-  private async handleValidateFile(req: Request, res: Response): Promise<void> {
-    const startTime = process.hrtime();
-    try {
-      const body = req.body ?? {};
-      const { path: inputPath } = body;
-      if (!inputPath) {
-        this.sendInvalidParameter(res, 'MISSING_PARAMETER', 'path parameter is required');
-        return;
-      }
-
-      if (!SecurityUtils.isValidFilePath(inputPath)) {
-        this.sendInvalidParameter(res, 'INVALID_PATH', 'Invalid path format');
-        return;
-      }
-
-      const filters = parseFindingFilters(body);
-      if (!filters.ok) {
-        this.sendInvalidParameter(res, filters.code, filters.message);
-        return;
-      }
-
-      const targetPath = getConfinedPath(res, inputPath);
-      const exists = await FileUtils.exists(targetPath);
-      if (!exists) {
-        res.status(404).json({
-          error: true,
-          code: 'FILE_NOT_FOUND',
-          message: `File not found: ${inputPath}`,
-        });
-        return;
-      }
-
-      const data = await this.validator.validateFileWithSummary(targetPath, filters.value);
-      const hrTime = process.hrtime(startTime);
-      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-      metricsCollector.recordOperation('validation', duration, true);
-
-      res.json({
-        error: false,
-        data,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      this.sendValidationFailure(res, startTime, error, 'validate-file');
-    }
-  }
-
-  private sendValidationFailure(
-    res: Response,
-    startTime: [number, number],
-    error: unknown,
-    route: string
-  ): void {
-    const hrTime = process.hrtime(startTime);
-    const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-    metricsCollector.recordOperation(
-      'validation',
-      duration,
-      false,
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-
-    logger.error(`Error in ${route}`, error);
-    res.status(500).json({
-      error: true,
-      code: 'VALIDATION_ERROR',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-
-  private handleListPractices(req: Request, res: Response, withPagination: boolean): any {
-    const startTime = process.hrtime();
-    try {
-      const options = parsePracticeFilters(req.query as Record<string, unknown>);
-      if (!options.ok) {
-        return this.sendInvalidParameter(res, options.code, options.message);
-      }
-
-      // On v1 `limit` is the page size (handled by pagination below), so the filter limit is
-      // only applied to the unpaginated v0 response.
-      const filterOptions = { ...options.value };
-      if (withPagination) delete filterOptions.limit;
-      const result = kb.listPractices(filterOptions);
-
-      const hrTime = process.hrtime(startTime);
-      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-      metricsCollector.recordOperation('practice-lookup', duration, true);
-
-      if (withPagination) {
-        const paginationParams = PaginationUtils.parsePaginationParams(req.query);
-        const paginatedData = PaginationUtils.paginate(
-          result.practices,
-          paginationParams.limit,
-          paginationParams.offset
-        );
-        const paginatedResponse = PaginationUtils.createResponse(
-          paginatedData,
-          result.practices.length,
-          paginationParams.limit,
-          paginationParams.offset
-        );
-
-        res.json({
-          error: false,
-          data: paginatedResponse.data,
-          pagination: paginatedResponse.pagination,
-          timestamp: Date.now(),
-        });
-      } else {
-        res.json({
-          error: false,
-          data: result,
-          timestamp: Date.now(),
-        });
-      }
-    } catch (error) {
-      const hrTime = process.hrtime(startTime);
-      const duration = hrTime[0] * 1000 + hrTime[1] / 1000000;
-      metricsCollector.recordOperation(
-        'practice-lookup',
-        duration,
-        false,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-
-      logger.error('Error in list-practices', error);
-      res.status(500).json({
-        error: true,
-        code: 'PRACTICES_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    registerPracticeRoutes(this.app);
+    registerTemplateRoutes(this.app, ctx);
   }
 
   private setupErrorHandling(): void {

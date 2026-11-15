@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { nodeProjectFs } from '../../src/engine/project-fs-node';
 import { WorkflowDetector } from '../../src/engine/detector';
@@ -119,6 +119,27 @@ describe('WorkflowDetector', () => {
       const result = await detector.detect(tempDir);
 
       expect(result.workflow).toBe('package');
+    });
+
+    it('should detect shinytest2 tests in tests/testthat as shinytest', async () => {
+      writeFileSync(join(tempDir, 'app.R'), 'shiny::shinyApp(ui, server)\n');
+      mkdirSync(join(tempDir, 'tests', 'testthat'), { recursive: true });
+      writeFileSync(
+        join(tempDir, 'tests', 'testthat', 'test-app.R'),
+        'app <- AppDriver$new(app_dir = "../..")\n'
+      );
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('shinytest');
+    });
+
+    it('should keep a Shiny app without app tests as shiny', async () => {
+      writeFileSync(join(tempDir, 'app.R'), 'shiny::shinyApp(ui, server)\n');
+      mkdirSync(join(tempDir, 'tests', 'testthat'), { recursive: true });
+      writeFileSync(join(tempDir, 'tests', 'testthat', 'test-x.R'), 'expect_true(TRUE)\n');
+      const result = await detector.detect(tempDir);
+
+      expect(result.workflow).toBe('shiny');
     });
 
     it('should return unknown for non-existent directory', async () => {

@@ -46,8 +46,9 @@ export class CLIFormatter {
     console.warn(this.colorize('⚠', 'yellow'), message);
   }
 
+  /** Status messages go to stderr so stdout carries only the result (`--format json | jq`). */
   static info(message: string): void {
-    console.log(this.colorize('ℹ', 'blue'), message);
+    console.error(this.colorize('ℹ', 'blue'), message);
   }
 
   static header(text: string): void {
@@ -67,10 +68,7 @@ export class CLIFormatter {
 
     const widths: Record<string, number> = {};
     columns.forEach((col) => {
-      widths[col] = Math.max(
-        col.length,
-        ...data.map((row) => String(row[col] || '').length),
-      );
+      widths[col] = Math.max(col.length, ...data.map((row) => String(row[col] || '').length));
     });
 
     const printRow = (values: string[]): void => {
@@ -78,11 +76,7 @@ export class CLIFormatter {
     };
 
     printRow(columns);
-    console.log(
-      columns
-        .map((col) => '─'.repeat(widths[col]))
-        .join('─┼─'),
-    );
+    console.log(columns.map((col) => '─'.repeat(widths[col])).join('─┼─'));
 
     data.forEach((row) => {
       printRow(columns.map((col) => String(row[col] || '')));
@@ -192,7 +186,11 @@ export class FileWatcher {
   }
 }
 
-export function parseArgs(args: string[]): { command: string; args: string[]; options: Record<string, any> } {
+export function parseArgs(args: string[]): {
+  command: string;
+  args: string[];
+  options: Record<string, any>;
+} {
   const command = args[0] || '';
   const commandArgs: string[] = [];
   const options: Record<string, any> = {};
@@ -202,7 +200,9 @@ export function parseArgs(args: string[]): { command: string; args: string[]; op
 
     if (arg.startsWith('--')) {
       const [key, ...valueParts] = arg.slice(2).split('=');
-      const value = valueParts.join('=') || (i + 1 < args.length && !args[i + 1].startsWith('-') ? args[++i] : true);
+      const value =
+        valueParts.join('=') ||
+        (i + 1 < args.length && !args[i + 1].startsWith('-') ? args[++i] : true);
       options[key] = value;
     } else if (arg.startsWith('-')) {
       const key = arg.slice(1);

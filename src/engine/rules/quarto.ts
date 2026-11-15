@@ -1,6 +1,7 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
 import { findFiles, readText } from './helpers.js';
+import { checkQmdFile, checkRootFiles } from './file-checks.js';
 
 export interface Chunk {
   /** 1-based line of the opening fence. */
@@ -196,6 +197,18 @@ function isHidden(chunk: Chunk): boolean {
 }
 
 export const quartoRules: RuleDef[] = [
+  {
+    id: 'quarto-yaml',
+    workflows: ['quarto'],
+    run: ({ dirPath, fsys }) =>
+      checkRootFiles(fsys, dirPath, /\.qmd$/, checkQmdFile, 'quarto-yaml'),
+  },
+  {
+    id: 'quarto-labels',
+    workflows: ['quarto'],
+    run: ({ dirPath, fsys }) =>
+      checkRootFiles(fsys, dirPath, /\.qmd$/, checkQmdFile, 'quarto-labels'),
+  },
   {
     id: 'quarto-options',
     workflows: ['quarto'],

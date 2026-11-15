@@ -1,5 +1,6 @@
 import { RuleDef } from './types.js';
 import { findFiles, readText } from './helpers.js';
+import { checkRmdFile, checkRootFiles } from './file-checks.js';
 import {
   Chunk,
   callsOptsChunkSet,
@@ -19,6 +20,11 @@ function isLabeled(chunk: Chunk): boolean {
 }
 
 export const rmarkdownRules: RuleDef[] = [
+  {
+    id: 'rmd-yaml',
+    workflows: ['rmarkdown'],
+    run: ({ dirPath, fsys }) => checkRootFiles(fsys, dirPath, /\.Rmd$/, checkRmdFile, 'rmd-yaml'),
+  },
   {
     id: 'rmd-chunks',
     workflows: ['rmarkdown'],

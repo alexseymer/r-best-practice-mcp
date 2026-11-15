@@ -20,6 +20,9 @@ tool, and editor integrations. The core is one set of rules, so every surface gi
 
 **Out of scope:** running R code, fixing projects automatically, storing user projects, and accounts.
 
+The product is built and developed by the Linux principle: small, focused, cooperating programs, and open, iterative
+development. The rules are in [CLAUDE.md](CLAUDE.md#core-principles-the-linux-principle).
+
 ## 2. Users
 
 | User | Needs |
