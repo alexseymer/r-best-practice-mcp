@@ -54,7 +54,7 @@ reason written down in the PR.
 4. Does it work on every supported OS and without extra installs?
 5. Is it covered by a test, and documented where a user will look for it?
 
-Known gap against these principles (tracked as work, not as excuse): `validate` cannot read from stdin yet.
+`validate -` reads one file from stdin, so the CLI works as a filter in a pipe (`cat a.qmd | r-practices validate - --stdin-filename a.qmd`).
 
 The web server follows the same shape as the engine: `src/web-server.ts` wires middleware and dependencies, and each
 group of endpoints is one small module in `src/routes/` (`detect`, `validate`, `practices`, `templates`, `upload`,
