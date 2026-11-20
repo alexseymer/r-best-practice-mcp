@@ -22,27 +22,18 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && npm run build:css && node scripts/build-browser-engine.mjs",
-    "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/dashboard.css -o src/public/dashboard.css --minify",
-    "build:icons": "node scripts/build-icons.mjs",
+    "build": "tsc",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
-    "start:web": "node dist/web-server-entry.js",
     "dev": "npm run build && npm start",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "test:unit": "jest tests/unit --coverage",
-    "test:integration": "jest tests/integration --runInBand",
-    "test:e2e": "jest tests/e2e --runInBand --testTimeout=120000",
-    "test:load": "jest tests/performance --runInBand --testTimeout=60000",
-    "test:examples": "jest tests/examples.test.ts",
-    "test:regression": "jest tests/regression.test.ts",
-    "test:all": "npm run test:unit && npm run test:examples && npm run test:regression && npm run test:load",
+    "test:all": "npm run test:unit",
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "prepublishOnly": "npm run build && npm run test && npm run lint",
-    "version": "npm run format && git add -A",
-    "acceptance:live": "node scripts/live-acceptance.mjs"
+    "version": "npm run format && git add -A"
   },
   "keywords": [
     "mcp",
@@ -57,28 +48,16 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "commander": "^11.0.0",
-    "compression": "1.8.2",
-    "express": "^4.18.2",
-    "swagger-ui-dist": "5.33.1"
+    "commander": "^11.0.0"
   },
   "devDependencies": {
-    "@fontsource/geist": "5.3.0",
-    "@fontsource/jetbrains-mono": "5.3.0",
-    "@material-design-icons/svg": "0.14.15",
-    "@tailwindcss/container-queries": "0.1.1",
-    "@tailwindcss/forms": "0.5.11",
-    "@types/compression": "1.8.1",
-    "@types/express": "^4.17.17",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "axe-core": "4.9.1",
     "eslint": "^8.0.0",
     "jest": "^29.7.0",
     "prettier": "^3.0.0",
-    "tailwindcss": "3.4.19",
     "ts-jest": "^29.4.14",
     "typescript": "^5.0.0"
   },
