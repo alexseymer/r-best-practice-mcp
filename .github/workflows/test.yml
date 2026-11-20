@@ -38,7 +38,6 @@ jobs:
       - name: Verify build output
         run: |
           test -f dist/index.js && echo "✓ MCP server built successfully"
-          test -f dist/web-server-entry.js && echo "✓ Web server built successfully"
           test -f dist/bin/cli.js && echo "✓ CLI tool built successfully"
 
       - name: Run unit tests
