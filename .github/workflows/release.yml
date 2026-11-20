@@ -234,18 +234,10 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm \
-            --name test-release \
-            -d \
-            -p 3000:3000 \
-            r-best-practices-mcp:${{ steps.version.outputs.version }}
-
-          sleep 5
-
-          curl -f http://localhost:3000/health || exit 1
+          REQ='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+          echo "$REQ" | docker run -i --rm r-best-practices-mcp:${{ steps.version.outputs.version }} \
+            | grep -q '"detect_workflow"' || exit 1
           echo "✓ Docker image test passed"
-
-          docker stop test-release || true
 
       - name: Display Docker image info
         run: |
