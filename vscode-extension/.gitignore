@@ -1,6 +1,0 @@
-node_modules/
-dist/
-*.vsix
-.DS_Store
-*.log
-npm-debug.log*

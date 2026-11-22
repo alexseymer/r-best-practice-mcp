@@ -5,8 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "r-best-practices-mcp": "dist/index.js",
-    "r-practices": "dist/bin/cli.js"
+    "r-best-practices-mcp": "dist/index.js"
   },
   "repository": {
     "type": "git",
@@ -47,8 +46,7 @@
   "author": "alexseymer",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "commander": "^11.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
