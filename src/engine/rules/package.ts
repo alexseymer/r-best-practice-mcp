@@ -1,5 +1,6 @@
 import type { ProjectFs } from '../project-fs.js';
 import { RuleDef } from './types.js';
+import type { Finding } from '../../types/finding.js';
 import {
   anyExists,
   findFiles,
@@ -24,6 +25,53 @@ const ROXYGEN_LINE = /^[ \t]*#'/m;
 
 async function rSourceFiles(fsys: ProjectFs, dirPath: string): Promise<string[]> {
   return findFiles(fsys, fsys.join(dirPath, 'R'), /\.[Rr]$/, { recursive: false });
+}
+
+/** Full value of a DESCRIPTION field, including its indented continuation lines. */
+function fieldValue(desc: string, field: string): string | undefined {
+  const match = new RegExp(`^${field}:[ \\t]*(.*(?:\\r?\\n[ \\t]+.*)*)`, 'm').exec(desc.replace(/\r/g, ''));
+  return match ? match[1].replace(/\s*\n\s*/g, ' ').trim() : undefined;
+}
+
+const TITLE_MAX_LENGTH = 65;
+
+/**
+ * Content checks from R Packages (description.html): the Title is a short plain title without a full
+ * stop, and the Description ends as a sentence. Title case is not checked. Reported under the same id
+ * at recommended severity, because a missing or wrong wording does not break the package.
+ */
+function descriptionStyleFindings(desc: string): Finding[] {
+  const out: Finding[] = [];
+  const title = fieldValue(desc, 'Title') ?? '';
+  const description = fieldValue(desc, 'Description') ?? '';
+  const add = (message: string, suggestion: string) =>
+    out.push({
+      id: 'pkg-description',
+      severity: 'recommended',
+      category: 'structure',
+      message,
+      suggestions: [suggestion],
+    });
+
+  if (title === '') {
+    add('Consider filling in the Title field', 'Write a short title in plain text, for example "Tools for Tidy Data"');
+  } else {
+    if (title.endsWith('.')) add('Consider removing the full stop at the end of Title', 'Titles have no trailing full stop');
+    if (title.length > TITLE_MAX_LENGTH) {
+      add(
+        `Consider shortening Title to ${TITLE_MAX_LENGTH} characters or fewer (${title.length} now)`,
+        'Listings such as CRAN truncate longer titles',
+      );
+    }
+    if (/^(a|an|the|this)\s+package\b/i.test(title)) {
+      add('Consider a Title that says what the package does, not "A package for ..."', 'Start the title with the subject, as in "Tools for Tidy Data"');
+    }
+  }
+
+  if (description !== '' && !/[.!?]$/.test(description)) {
+    add('Consider ending Description with a full stop', 'Write the Description as complete sentences in one paragraph');
+  }
+  return out;
 }
 
 export const packageRules: RuleDef[] = [
@@ -52,19 +100,21 @@ export const packageRules: RuleDef[] = [
       if (!hasField('Authors@R') && !(hasField('Author') && hasField('Maintainer'))) {
         missing.push('Authors@R (or both Author and Maintainer)');
       }
-      if (missing.length === 0) return [];
-      return [
-        {
-          id: 'pkg-description',
-          severity: 'critical',
-          category: 'structure',
-          message: `DESCRIPTION missing required field(s): ${missing.join(', ')}`,
-          suggestions: [
-            'Add the missing fields to DESCRIPTION',
-            'Use usethis::use_description() to generate a complete DESCRIPTION',
-          ],
-        },
-      ];
+      if (missing.length > 0) {
+        return [
+          {
+            id: 'pkg-description',
+            severity: 'critical',
+            category: 'structure',
+            message: `DESCRIPTION missing required field(s): ${missing.join(', ')}`,
+            suggestions: [
+              'Add the missing fields to DESCRIPTION',
+              'Use usethis::use_description() to generate a complete DESCRIPTION',
+            ],
+          },
+        ];
+      }
+      return descriptionStyleFindings(desc);
     },
   },
   {

@@ -45,7 +45,7 @@ se <- function(x, na.rm = FALSE) {
     enforcement: 'automated',
     description: 'Keep Package, Version, Title, Description, Authors@R and License current',
     details:
-      'DESCRIPTION holds the metadata that R, CRAN and users rely on: name, version, title, authors, license and dependencies. Keep the Title in title case without a trailing period, write a full-sentence Description, and declare every package you use under Imports or Suggests. The automated check reports a missing DESCRIPTION file, and any of the fields Package, Version, Title, Description and License that is absent. It also requires either Authors@R or both Author and Maintainer. Field names are matched at the start of a line (a word inside another field does not count); the values are not validated.',
+      'DESCRIPTION holds the metadata that R, CRAN and users rely on: name, version, title, authors, license and dependencies. Keep the Title in title case without a trailing period, write a full-sentence Description, and declare every package you use under Imports or Suggests. The automated check reports a missing DESCRIPTION file, and any of the fields Package, Version, Title, Description and License that is absent. It also requires either Authors@R or both Author and Maintainer. Field names are matched at the start of a line (a word inside another field does not count). The values get light content checks, reported under the same id at recommended severity: no full stop at the end of Title, Title of at most 65 characters, no Title starting with "A package" or "This package", and a Description that ends with a full stop. Title case is not checked.',
     badExample: `Package: mypkg
 Version: 1.0
 Title: a package that does stuff.
