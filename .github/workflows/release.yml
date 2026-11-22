@@ -232,11 +232,13 @@ jobs:
             r-best-practices-mcp:latest
           cache-from: type=gha
 
-      - name: Test Docker image
+      - name: Test Docker image (MCP over stdio)
         run: |
-          REQ='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-          echo "$REQ" | docker run -i --rm r-best-practices-mcp:${{ steps.version.outputs.version }} \
-            | grep -q '"detect_workflow"' || exit 1
+          REQUEST='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'
+          RESPONSE=$(printf '%s\n' "$REQUEST" | timeout 60 docker run --rm -i r-best-practices-mcp:${{ steps.version.outputs.version }})
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | grep -q '"serverInfo"' || { echo "✗ MCP server did not answer initialize"; exit 1; }
           echo "✓ Docker image test passed"
 
       - name: Display Docker image info

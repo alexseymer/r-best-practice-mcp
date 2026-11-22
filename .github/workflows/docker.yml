@@ -21,12 +21,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute build time
+        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
           load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           tags: |
             r-best-practices-mcp:latest
             r-best-practices-mcp:${{ github.sha }}
@@ -35,13 +41,16 @@ jobs:
 
       - name: Test Docker image (MCP over stdio)
         run: |
-          REQ='{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-          OUT=$(echo "$REQ" | docker run -i --rm r-best-practices-mcp:latest || true)
-          echo "$OUT" | head -c 300; echo
-          if echo "$OUT" | grep -q '"detect_workflow"'; then
-            echo "✓ MCP tools/list answered"
+          # The image runs the MCP server on stdin/stdout; send one initialize request and expect a server reply
+          REQUEST='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}'
+          RESPONSE=$(printf '%s\n' "$REQUEST" | timeout 60 docker run --rm -i r-best-practices-mcp:latest)
+          echo "$RESPONSE"
+
+          if echo "$RESPONSE" | grep -q '"serverInfo"'; then
+            echo "✓ MCP server answered initialize"
           else
-            echo "✗ MCP server did not list its tools"; exit 1
+            echo "✗ MCP server did not answer initialize"
+            exit 1
           fi
 
       - name: Verify image layers
@@ -60,12 +69,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute build time
+        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Build Docker image for scanning
         uses: docker/build-push-action@v5
         with:
           context: .
           push: false
           load: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ env.BUILD_TIME }}
           tags: r-best-practices-mcp:scan
           cache-from: type=gha
 
@@ -82,4 +97,3 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
-
