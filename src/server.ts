@@ -2,8 +2,12 @@ import { getRuntimeConfig } from './config/runtime.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
-  ListToolsRequestSchema,
   CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
   TextContent,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -13,12 +17,20 @@ import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
 import { FileUtils } from './utils/file.js';
-import { toMcpTools } from './tools/schemas.js';
-import { parseFindingFilters, parsePracticeFilters } from './utils/query-params.js';
+import { VALID_WORKFLOWS } from './utils/security.js';
+import { parseFindingFilters } from './utils/query-params.js';
 import { nodeProjectFs } from './engine/project-fs-node.js';
+import { TOOLS, PROJECT_TYPES } from './tools/schemas.js';
+import { PROMPTS, getPrompt } from './prompts.js';
+import { listResources, readResource } from './resources.js';
+import { createProject, PROJECT_QUESTIONS, type ProjectAnswers, type ProjectType } from './create-project.js';
 
 function invalidParameter(message: string): { error: true; code: string; message: string } {
   return { error: true, code: 'INVALID_PARAMETER', message };
+}
+
+function stringArg(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
 export class RPracticesMCPServer {
@@ -33,8 +45,8 @@ export class RPracticesMCPServer {
         name: 'r-best-practices-mcp',
         version: getRuntimeConfig().version,
       },
-      // Without this capability the SDK refuses to register the tools handlers.
-      { capabilities: { tools: {} } }
+      // Without these capabilities the SDK refuses to register the matching handlers.
+      { capabilities: { tools: {}, prompts: {}, resources: {} } }
     );
     this.detector = new WorkflowDetector(nodeProjectFs);
     this.validator = new Validator(nodeProjectFs);
@@ -48,11 +60,30 @@ export class RPracticesMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) =>
       this.handleCallTool(request)
     );
+
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => ({ prompts: PROMPTS }));
+
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const prompt = getPrompt(request.params.name, request.params.arguments ?? {});
+      if (!prompt) throw new Error(`Unknown prompt: ${request.params.name}`);
+      return prompt;
+    });
+
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: listResources(),
+    }));
+
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const text = readResource(request.params.uri);
+      if (text === undefined) throw new Error(`Unknown resource: ${request.params.uri}`);
+      return {
+        contents: [{ uri: request.params.uri, mimeType: 'text/markdown', text }],
+      };
+    });
   }
 
   private handleListTools(): { tools: Tool[] } {
-    // Tool names, descriptions and parameters come from tools/schemas.ts (shared with REST).
-    return { tools: toMcpTools() as Tool[] };
+    return { tools: TOOLS };
   }
 
   private async handleCallTool(request: {
@@ -66,23 +97,14 @@ export class RPracticesMCPServer {
       let result: unknown;
 
       switch (name) {
-        case 'detect_workflow':
-          result = await this.detectWorkflow(args);
-          break;
-        case 'validate_project':
-          result = await this.validateProject(args);
-          break;
-        case 'validate_file':
-          result = await this.validateFile(args);
+        case 'check_project':
+          result = await this.checkProject(args);
           break;
         case 'get_practice':
           result = this.getPractice(args);
           break;
-        case 'list_practices':
-          result = this.listPractices(args);
-          break;
-        case 'generate_template':
-          result = await this.generateTemplate(args);
+        case 'create_project':
+          result = await this.createProject(args);
           break;
         default:
           result = {
@@ -117,25 +139,19 @@ export class RPracticesMCPServer {
     }
   }
 
-  private async detectWorkflow(args: Record<string, unknown>): Promise<unknown> {
-    const path = args.path as string;
-    const result = await this.detector.detect(path);
-    return {
-      error: false,
-      data: result,
-      timestamp: Date.now(),
-    };
-  }
-
-  private async validateProject(args: Record<string, unknown>): Promise<unknown> {
-    const path = args.path as string;
-    const specifiedWorkflow = args.workflow as string | undefined;
+  private async checkProject(args: Record<string, unknown>): Promise<unknown> {
+    const path = stringArg(args.path);
+    if (!path) return invalidParameter('path is required');
 
     const filters = parseFindingFilters(args);
     if (!filters.ok) return invalidParameter(filters.message);
 
-    const exists = await FileUtils.isDirectory(path);
-    if (!exists) {
+    const workflowArg = stringArg(args.workflow);
+    if (workflowArg && !(VALID_WORKFLOWS as readonly string[]).includes(workflowArg)) {
+      return invalidParameter(`Unknown project type: ${workflowArg}`);
+    }
+
+    if (!(await FileUtils.isDirectory(path))) {
       return {
         error: true,
         code: 'PATH_NOT_FOUND',
@@ -143,57 +159,33 @@ export class RPracticesMCPServer {
       };
     }
 
-    // Auto-detect workflow if not specified
-    let workflow = specifiedWorkflow || 'unknown';
-    if (!specifiedWorkflow) {
-      const detection = await this.detector.detect(path);
-      workflow = detection.workflow;
-    }
-
-    // Validate project
-    const result = await this.validator.validateProject(path, workflow as any, filters.value);
+    const detection = await this.detector.detect(path);
+    const workflow = (workflowArg ?? detection.workflow) as Parameters<Validator['validateProject']>[1];
+    const validation = await this.validator.validateProject(path, workflow, filters.value);
 
     return {
       error: false,
-      data: result,
-      timestamp: Date.now(),
-    };
-  }
-
-  private async validateFile(args: Record<string, unknown>): Promise<unknown> {
-    const path = args.path as string;
-
-    const filters = parseFindingFilters(args);
-    if (!filters.ok) return invalidParameter(filters.message);
-
-    const exists = await FileUtils.exists(path);
-    if (!exists) {
-      return {
-        error: true,
-        code: 'FILE_NOT_FOUND',
-        message: `File not found: ${path}`,
-      };
-    }
-
-    // Validate file
-    const data = await this.validator.validateFileWithSummary(path, filters.value);
-
-    return {
-      error: false,
-      data,
+      data: {
+        detection: {
+          workflow,
+          confidence: detection.confidence,
+          indicators: detection.indicators,
+        },
+        ...validation,
+      },
       timestamp: Date.now(),
     };
   }
 
   private getPractice(args: Record<string, unknown>): unknown {
-    const id = args.id as string;
-    const practice = kb.getPractice(id);
+    const id = stringArg(args.id);
+    const practice = id ? kb.getPractice(id) : undefined;
 
     if (!practice) {
       return {
         error: true,
         code: 'NOT_FOUND',
-        message: `Practice not found: ${id}`,
+        message: `Practice not found: ${id ?? ''}`,
       };
     }
 
@@ -204,53 +196,64 @@ export class RPracticesMCPServer {
     };
   }
 
-  private listPractices(args: Record<string, unknown>): unknown {
-    const options = parsePracticeFilters(args);
-    if (!options.ok) {
-      return { error: true, code: options.code, message: options.message };
+  private async createProject(args: Record<string, unknown>): Promise<unknown> {
+    const type = stringArg(args.type);
+    if (!type || !(PROJECT_TYPES as readonly string[]).includes(type)) {
+      return invalidParameter(`type must be one of: ${PROJECT_TYPES.join(', ')}`);
     }
 
+    let answers: ProjectAnswers = {
+      projectName: stringArg(args.projectName),
+      authorName: stringArg(args.authorName),
+      authorEmail: stringArg(args.authorEmail),
+    };
+
+    // Ask the user directly when the client supports elicitation; otherwise the response below
+    // lists the questions and the assistant asks them in the chat.
+    if (!answers.projectName && this.clientSupportsElicitation()) {
+      const response = await this.server.elicitInput({
+        message: 'Which project should I create?',
+        requestedSchema: {
+          type: 'object',
+          properties: Object.fromEntries(
+            PROJECT_QUESTIONS.map(({ key, question }) => [key, { type: 'string', title: question }])
+          ),
+          required: ['projectName'],
+        },
+      });
+      if (response.action !== 'accept') {
+        return { error: true, code: 'CANCELLED', message: 'The user did not provide the project details.' };
+      }
+      answers = { ...answers, ...(response.content as ProjectAnswers) };
+    }
+
+    const result = await createProject(type as ProjectType, answers, this.templateGenerator);
+    if (!result.ok) {
+      return {
+        error: true,
+        code: result.code,
+        message: result.message,
+        ...(result.questions ? { questions: result.questions } : {}),
+      };
+    }
+
+    const { template } = result;
     return {
       error: false,
-      data: kb.listPractices(options.value),
+      data: {
+        type,
+        workflow: template.workflow,
+        projectName: answers.projectName,
+        files: template.files,
+        directories: template.directories,
+        nextSteps: 'Create the directories, then write each file relative to the target folder.',
+      },
       timestamp: Date.now(),
     };
   }
 
-  private async generateTemplate(args: Record<string, unknown>): Promise<unknown> {
-    const workflow = args.workflow as string;
-    const projectName = args.projectName as string | undefined;
-    const authorName = args.authorName as string | undefined;
-    const authorEmail = args.authorEmail as string | undefined;
-
-    if (!workflow) {
-      return {
-        error: true,
-        code: 'MISSING_WORKFLOW',
-        message: 'workflow parameter is required',
-      };
-    }
-
-    try {
-      const result = await this.templateGenerator.generate(workflow as any, {
-        projectName,
-        authorName,
-        authorEmail,
-      });
-
-      return {
-        error: false,
-        data: result,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      logger.error(`Error generating template for ${workflow}`, error);
-      return {
-        error: true,
-        code: 'TEMPLATE_GENERATION_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+  private clientSupportsElicitation(): boolean {
+    return this.server.getClientCapabilities()?.elicitation !== undefined;
   }
 
   async start(): Promise<void> {
