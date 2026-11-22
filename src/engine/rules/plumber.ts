@@ -104,10 +104,10 @@ export const plumberRules: RuleDef[] = [
         if (/\b(validate\w*|check\w*|stopifnot|req)\s*\(|\bif\s*\(/.test(content)) continue;
         out.push({
           id: 'plumber-validation',
-          severity: 'critical',
+          severity: 'recommended',
           category: 'security',
           file,
-          message: 'API should validate and sanitize all inputs',
+          message: 'Consider validating and sanitizing all inputs',
           suggestions: ['Add input validation for all parameters', 'Check data types and ranges'],
         });
       }
@@ -123,10 +123,10 @@ export const plumberRules: RuleDef[] = [
         if (/\b(tryCatch|stop|warning)\s*\(/.test(content)) continue;
         out.push({
           id: 'plumber-error',
-          severity: 'important',
+          severity: 'recommended',
           category: 'structure',
           file,
-          message: 'Add error handling to API endpoints',
+          message: 'Consider adding error handling to API endpoints',
           suggestions: [
             'Wrap endpoint logic in tryCatch()',
             'Return meaningful HTTP status codes with res$status',

@@ -99,7 +99,7 @@ describe('remaining rule defects', () => {
       const all = (await findingsFor(dir, 'r-script')).filter((x) => x.id === 'rscript-functions');
       expect(all).toHaveLength(1);
       expect(path.basename(all[0].file ?? '')).toBe('a.R');
-      expect(all[0].severity).toBe('important');
+      expect(all[0].severity).toBe('recommended');
       expect(all[0].category).toBe('structure');
       expect(all[0].suggestions?.length).toBeGreaterThan(0);
     });

@@ -12,7 +12,8 @@ import {
 } from './helpers.js';
 import { checkRFile, findTopLevelAssignments } from './file-checks.js';
 
-const SNAKE_FILE = /^[a-z0-9]+(_[a-z0-9]+)*\.[Rr]$/;
+// Lowercase words joined by _ or -, as the tidyverse style guide allows ("Delimit words with - or _").
+const SNAKE_FILE = /^[a-z0-9]+([_-][a-z0-9]+)*\.[Rr]$/;
 const SECTION_START = /^#{4,}|^#\s*={4,}/;
 
 /** `# Title ----`, `#### Title`, `# ====` ... Uses endsWith instead of `.*` regexes (quadratic). */
@@ -186,7 +187,7 @@ export const rscriptRules: RuleDef[] = [
           return [
             {
               id: 'rscript-globals',
-              severity: 'important',
+              severity: 'recommended',
               category: 'structure',
               file,
               line: globals[0],
@@ -219,12 +220,12 @@ export const rscriptRules: RuleDef[] = [
           id: 'rscript-naming',
           severity: 'recommended',
           category: 'naming',
-          message: `${bad.length} script filename(s) are not snake_case`,
+          message: `${bad.length} script filename(s) are not lowercase words joined by _ or -`,
           file: bad[0],
-          details: `Non-snake_case scripts: ${names.join(', ')}${bad.length > 5 ? ', ...' : ''}`,
+          details: `Non-matching scripts: ${names.join(', ')}${bad.length > 5 ? ', ...' : ''}`,
           suggestions: [
-            `Rename ${fsys.basename(bad[0])} to a lowercase snake_case name such as data_cleaning.R`,
-            'Use only lowercase letters, digits and underscores (no spaces or hyphens)',
+            `Rename ${fsys.basename(bad[0])} to a lowercase name such as data_cleaning.R or data-cleaning.R`,
+            'Use only lowercase letters, digits, underscores and hyphens (no spaces or capitals)',
           ],
         },
       ];

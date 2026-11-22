@@ -42,6 +42,9 @@ jobs:
       - name: Run unit tests
         run: npm test -- --coverage --testPathPattern="unit"
 
+      - name: Run end-to-end tests (stdio)
+        run: npm test -- --testPathPattern="e2e"
+
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         continue-on-error: true

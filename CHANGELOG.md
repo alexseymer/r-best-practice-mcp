@@ -12,6 +12,11 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
 - `create_project` returns the file list for a standard project (package, shiny, quarto, rmarkdown, analysis). The client
   writes the files. Missing details are asked through MCP elicitation or listed for the assistant to ask.
 - The package template's DESCRIPTION title is `Tools for <name>` instead of a placeholder.
+- Heuristic checks (content-based, not a fact about the project) are at most `recommended` and say "Consider ...":
+  `rscript-functions`, `rscript-errors`, `rscript-cleanup`, `rscript-globals`, `quarto-text`, `shiny-separation`,
+  `shiny-validation`, `plumber-status`, `plumber-validation` and `plumber-error` were `important` or `critical`.
+- `rscript-naming` accepts lowercase words joined by `_` or `-`, as the tidyverse style guide does (`data-cleaning.R` is
+  no longer reported).
 
 ### Added
 - Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and

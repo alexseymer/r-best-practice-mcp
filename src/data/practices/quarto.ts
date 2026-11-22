@@ -159,7 +159,7 @@ model <- lm(delay ~ ., data = big_flights)
     title: 'Include narrative text between code chunks',
     workflow: 'quarto',
     category: 'documentation',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Explain analysis steps, findings, and conclusions',
     details:

@@ -11,7 +11,7 @@ export const rScriptPractices: Practice[] = [
     description:
       'Begin each script with a comment block saying what it does (purpose, author, date)',
     details:
-      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check is deliberately minimal: it looks at the `.R` and `.r` files in the project root (subdirectories are not examined), in alphabetical order, and reports one finding for the first script whose first line (after an optional byte order mark) does not start with `#`. A shebang line or any comment passes; the purpose, author and date suggested in the advice are not verified. Keep the header to a few lines and update it when the purpose changes.',
+      'A short header comment tells readers what the script does, who wrote it and when, before they read any code. The check is deliberately minimal: it looks at the `.R` and `.r` files in the project root (subdirectories are not examined), in alphabetical order, and reports one finding for the first script whose first line (after an optional byte order mark) does not start with `#`. A shebang line or any comment passes; the purpose, author and date suggested in the advice are not verified. Keep the header to a few lines and update it when the purpose changes. R for Data Science starts scripts with the packages they need and does not prescribe a header, so this header check is house guidance, not a rule from that book or from the tidyverse style guide.',
     badExample: `library(dplyr)
 data <- read.csv("data/sales.csv")
 summary(data)`,
@@ -30,14 +30,14 @@ summary(sales)`,
   },
   {
     id: 'rscript-naming',
-    title: 'Use snake_case for script filenames',
+    title: 'Use lowercase names with _ or - for script filenames',
     workflow: 'r-script',
     category: 'naming',
     severity: 'recommended',
     enforcement: 'automated',
-    description: 'Script filenames should use snake_case (e.g., data_cleaning.R)',
+    description: 'Script filenames should be lowercase, with words separated by _ or - (e.g., data_cleaning.R or 01-load-data.R)',
     details:
-      'Meaningful, lowercase file names sort predictably and work on case-sensitive and case-insensitive file systems; spaces and hyphens complicate shell use. The check inspects `.R` and `.r` files in the project root and in each first-level subdirectory (hidden directories and renv, node_modules, _book, _site, public and docs are skipped; at most 200 files are scanned) and reports names that do not match lowercase snake_case, such as MyScript.R, my-script.R or Analysis 1.R (`_targets.R` is exempt). Numeric prefixes like 01_clean.R are fine for ordering.',
+      'The tidyverse style guide asks for file names that are machine readable: lowercase, words delimited by - or _, no spaces or special characters, and the .R extension. R for Data Science adds that numbered prefixes (01-load-data.R) keep files in order. Lowercase names work on case-sensitive and case-insensitive file systems, and spaces complicate shell use. The check inspects `.R` and `.r` files in the project root and in each first-level subdirectory (hidden directories and renv, node_modules, _book, _site, public and docs are skipped; at most 200 files are scanned) and reports names that are not lowercase words joined by _ or -, such as MyScript.R, cleanData.R or Analysis 1.R (`_targets.R` is exempt). Numeric prefixes like 01_clean.R or 01-clean.R are fine for ordering.',
     badExample: `MyScript.R
 my-script.R
 Analysis 1.R
@@ -57,7 +57,7 @@ data_cleaning.R
     title: 'Extract reusable logic into functions',
     workflow: 'r-script',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Avoid code duplication; extract repeated logic into functions',
     details:
@@ -121,7 +121,7 @@ write.csv(clean, "output/clean.csv")`,
     title: 'Wrap script logic in functions instead of piling up globals',
     workflow: 'r-script',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description:
       'Avoid long runs of top-level assignments; use functions with parameters and a main() entry point',
@@ -152,7 +152,7 @@ main()`,
     title: 'Handle errors gracefully with tryCatch',
     workflow: 'r-script',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Use tryCatch for error handling in production scripts',
     details:
@@ -181,7 +181,7 @@ write.csv(df, "output/scored.csv")`,
     title: 'Clean up connections and files',
     workflow: 'r-script',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Close database connections and file handles at script end',
     details:

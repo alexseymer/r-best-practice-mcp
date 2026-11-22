@@ -17,7 +17,7 @@ describe('r-script rules', () => {
     (await findingsFor(dir, 'r-script')).find((f) => f.id === id);
 
   describe('rscript-naming', () => {
-    it.each(['MyScript.R', 'my-script.R', 'Analysis 1.R'])('reports %s', async (name) => {
+    it.each(['MyScript.R', 'cleanData.R', 'Analysis 1.R'])('reports %s', async (name) => {
       createFile(dir, name, '# x\n');
       const finding = await find('rscript-naming');
       expect(finding).toBeDefined();
@@ -26,6 +26,11 @@ describe('r-script rules', () => {
       expect(finding!.message.length).toBeGreaterThan(0);
       expect(finding!.suggestions!.length).toBeGreaterThan(0);
       expect(finding!.details).toContain(name);
+    });
+
+    it.each(['data_cleaning.R', 'data-cleaning.R', '01-load-data.R'])('accepts %s', async (name) => {
+      createFile(dir, name, '# x\n');
+      expect(await idsFor(dir, 'r-script')).not.toContain('rscript-naming');
     });
 
     it('checks one level of subdirectories', async () => {

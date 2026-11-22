@@ -38,7 +38,7 @@ myapp/
     title: 'Create test recordings with record_test()',
     workflow: 'shinytest',
     category: 'testing',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Use shinytest2::record_test() to record interactive user workflows',
     details:
