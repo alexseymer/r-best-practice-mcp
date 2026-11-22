@@ -1,3 +1,4 @@
+import { isAbsolute } from 'path';
 import { getRuntimeConfig } from './config/runtime.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -151,7 +152,19 @@ export class RPracticesMCPServer {
       return invalidParameter(`Unknown project type: ${workflowArg}`);
     }
 
+    // The server runs in the client's own process, so a relative path would resolve against an unknown folder.
+    if (!isAbsolute(path)) {
+      return invalidParameter(`path must be an absolute path, got: ${path}`);
+    }
+
     if (!(await FileUtils.isDirectory(path))) {
+      if (await FileUtils.exists(path)) {
+        return {
+          error: true,
+          code: 'NOT_A_FOLDER',
+          message: `Expected a project folder, but this is a file: ${path}. Pass the folder that contains it.`,
+        };
+      }
       return {
         error: true,
         code: 'PATH_NOT_FOUND',

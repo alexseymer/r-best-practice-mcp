@@ -89,14 +89,14 @@ export const packageRules: RuleDef[] = [
     workflows: ['package'],
     async run({ dirPath, fsys }) {
       if (!(await pathExists(fsys, `${dirPath}/DESCRIPTION`))) return [];
-      if (await isDirectoryAt(fsys, `${dirPath}/tests`)) return [];
+      if (await isDirectoryAt(fsys, `${dirPath}/tests/testthat`)) return [];
       return [
         {
           id: 'pkg-tests',
           severity: 'important',
           category: 'testing',
-          message: 'Add tests/ directory with testthat tests',
-          suggestions: ['Create tests/testthat/ directory', 'Add test_*.R files'],
+          message: 'Add tests/testthat/ with testthat tests',
+          suggestions: ['Create tests/testthat/ directory (usethis::use_testthat(3))', 'Add test_*.R files'],
         },
       ];
     },

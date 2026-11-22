@@ -73,7 +73,7 @@ Encoding: UTF-8`,
     enforcement: 'automated',
     description: 'Use testthat package in tests/testthat/ directory',
     details:
-      'Automated tests let you change code with confidence and catch regressions before users do. Use testthat with the third edition, keep one test file per source file in tests/testthat/, and cover both normal behavior and edge cases. The automated check only verifies that a tests/ directory exists next to DESCRIPTION; it does not look for tests/testthat/, run the tests or measure how thorough they are.',
+      'Automated tests let you change code with confidence and catch regressions before users do. Use testthat with the third edition, keep one test file per source file in tests/testthat/, and cover both normal behavior and edge cases. The automated check verifies that a tests/testthat/ directory exists next to DESCRIPTION; it does not run the tests or measure how thorough they are.',
     badExample: `mypkg/
   DESCRIPTION
   NAMESPACE
