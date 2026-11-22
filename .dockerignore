@@ -13,9 +13,7 @@ coverage
 *.log
 *.md
 docs
-examples
 tests
-.vscode
 .idea
 *.swp
 *.swo

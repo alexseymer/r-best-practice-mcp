@@ -27,7 +27,7 @@ const WORKFLOWS: Workflow[] = [
   'shinytest',
 ];
 
-const EXAMPLES = path.resolve(__dirname, '../../examples');
+const EXAMPLES = path.resolve(__dirname, '../fixtures/examples');
 const ROOT = '/project';
 
 /** Every file under a directory as relative POSIX path -> text, skipping node_modules. */

@@ -47,7 +47,7 @@ describe('Regression Tests', () => {
     it('should handle directories with only README', async () => {
       // Bug: Directories with minimal files might detect incorrectly
       // Expected: Should still try to detect workflow type
-      const packagePath = path.resolve(__dirname, '../examples/example-package');
+      const packagePath = path.resolve(__dirname, './fixtures/examples/example-package');
       const result = await detector.detect(packagePath);
 
       expect(result.workflow).toBeDefined();
@@ -57,7 +57,7 @@ describe('Regression Tests', () => {
     it('should handle mixed R and Python projects', async () => {
       // Bug: Mixed language projects cause confusion
       // Expected: Should prefer detected R workflow
-      const packagePath = path.resolve(__dirname, '../examples/example-package');
+      const packagePath = path.resolve(__dirname, './fixtures/examples/example-package');
       const result = await detector.detect(packagePath);
 
       // Should not detect as Python or other non-R workflow
@@ -69,7 +69,7 @@ describe('Regression Tests', () => {
     it('should handle files with BOM characters', async () => {
       // Bug: BOM characters in file encoding cause validation to fail
       // Expected: Should gracefully handle and validate file
-      const filePath = path.resolve(__dirname, '../examples/example-package/R/statistics.R');
+      const filePath = path.resolve(__dirname, './fixtures/examples/example-package/R/statistics.R');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
@@ -78,7 +78,7 @@ describe('Regression Tests', () => {
     it('should handle very long lines in R files', async () => {
       // Bug: Very long lines might cause regex issues
       // Expected: Should still validate without errors
-      const filePath = path.resolve(__dirname, '../examples/example-package/R/statistics.R');
+      const filePath = path.resolve(__dirname, './fixtures/examples/example-package/R/statistics.R');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
@@ -92,7 +92,7 @@ describe('Regression Tests', () => {
     it('should handle files with special characters in names', async () => {
       // Bug: Files with special chars in names cause issues
       // Expected: Should validate without errors
-      const filePath = path.resolve(__dirname, '../examples/example-package/R/statistics.R');
+      const filePath = path.resolve(__dirname, './fixtures/examples/example-package/R/statistics.R');
       const findings = await validator.validateFile(filePath);
 
       expect(Array.isArray(findings)).toBe(true);
@@ -101,7 +101,7 @@ describe('Regression Tests', () => {
     it('should handle deeply nested project structures', async () => {
       // Bug: Deep nesting causes performance issues
       // Expected: Should validate within reasonable time
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
       const startTime = performance.now();
 
       const result = await validator.validateProject(projectPath, 'package');
@@ -155,7 +155,7 @@ describe('Regression Tests', () => {
     it('should handle concurrent validations of same project', async () => {
       // Bug: Race conditions in concurrent validations
       // Expected: All should complete successfully
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
 
       const results = await Promise.all([
         validator.validateProject(projectPath, 'package'),
@@ -173,7 +173,7 @@ describe('Regression Tests', () => {
     it('should handle rapid successive API calls', async () => {
       // Bug: Rapid calls might cause resource exhaustion
       // Expected: Should handle gracefully
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
 
       const results = [];
       for (let i = 0; i < 10; i++) {
@@ -190,7 +190,7 @@ describe('Regression Tests', () => {
     it('should handle symlinks gracefully', async () => {
       // Bug: Symlinks might cause infinite loops or errors
       // Expected: Should detect and validate without hanging
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
       const result = await detector.detect(projectPath);
 
       // Should complete without hanging
@@ -202,7 +202,7 @@ describe('Regression Tests', () => {
       // Expected: Should handle gracefully or report error
       // Note: This test is complex and might need skip() in some environments
 
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
       const result = await detector.detect(projectPath);
 
       // At minimum, should not crash
@@ -212,7 +212,7 @@ describe('Regression Tests', () => {
     it('should handle files disappearing during validation', async () => {
       // Bug: Files deleted during validation cause crashes
       // Expected: Should handle gracefully
-      const filePath = path.resolve(__dirname, '../examples/example-package/R/statistics.R');
+      const filePath = path.resolve(__dirname, './fixtures/examples/example-package/R/statistics.R');
 
       // File should exist for this test
       const findings = await validator.validateFile(filePath);
@@ -269,7 +269,7 @@ describe('Regression Tests', () => {
     it('all findings should have suggestions when applicable', async () => {
       // Bug: Missing suggestions for important findings
       // Expected: Important/critical findings should have suggestions
-      const projectPath = path.resolve(__dirname, '../examples/example-package');
+      const projectPath = path.resolve(__dirname, './fixtures/examples/example-package');
       const result = await validator.validateProject(projectPath, 'package');
 
       result.findings.forEach(finding => {
