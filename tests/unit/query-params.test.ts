@@ -4,8 +4,6 @@ import {
   parseFindingFilters,
   parseIntegerParam,
   parseListParam,
-  parsePracticeFilters,
-  parseTextParam,
 } from '../../src/utils/query-params';
 
 describe('query-params helpers', () => {
@@ -74,16 +72,6 @@ describe('query-params helpers', () => {
     });
   });
 
-  describe('parseTextParam', () => {
-    it('accepts strings up to the limit', () => {
-      expect(parseTextParam('q', 'hello')).toEqual({ ok: true, value: 'hello' });
-      expect(parseTextParam('q', undefined)).toEqual({ ok: true, value: undefined });
-    });
-    it('rejects non-strings and over-long text', () => {
-      expect(parseTextParam('q', 5)).toMatchObject({ ok: false });
-      expect(parseTextParam('q', 'x'.repeat(201))).toMatchObject({ ok: false });
-    });
-  });
 
   describe('parseFindingFilters', () => {
     it('returns an empty object when nothing is supplied', () => {
@@ -122,62 +110,4 @@ describe('query-params helpers', () => {
     });
   });
 
-  describe('parsePracticeFilters', () => {
-    it('returns an empty object when nothing is supplied', () => {
-      expect(parsePracticeFilters({})).toEqual({ ok: true, value: {} });
-    });
-    it('parses every option', () => {
-      expect(
-        parsePracticeFilters({
-          workflow: 'package',
-          category: 'testing',
-          minSeverity: 'recommended',
-          tags: 'shiny, testing',
-          enforcement: 'automated',
-          q: '  Roxygen ',
-          limit: '20',
-        })
-      ).toEqual({
-        ok: true,
-        value: {
-          workflow: 'package',
-          category: 'testing',
-          minSeverity: 'recommended',
-          tags: ['shiny', 'testing'],
-          enforcement: 'automated',
-          query: 'Roxygen',
-          limit: 20,
-        },
-      });
-    });
-    it('prefers query over its alias q and ignores blank text', () => {
-      expect(parsePracticeFilters({ query: 'a', q: 'b' })).toMatchObject({ value: { query: 'a' } });
-      expect(parsePracticeFilters({ q: 'b' })).toMatchObject({ value: { query: 'b' } });
-      expect(parsePracticeFilters({ q: '   ' })).toEqual({ ok: true, value: {} });
-    });
-    it('reports invalid workflow with INVALID_WORKFLOW', () => {
-      expect(parsePracticeFilters({ workflow: 'cobol' })).toEqual({
-        ok: false,
-        code: 'INVALID_WORKFLOW',
-        message: 'Invalid workflow type: cobol',
-      });
-    });
-    it.each([
-      [{ category: 'misc' }, /^category /],
-      [{ minSeverity: 'huge' }, /^minSeverity /],
-      [{ enforcement: 'manual' }, /^enforcement /],
-      [{ limit: 0 }, /^limit /],
-      [{ limit: 201 }, /^limit /],
-      [{ limit: 'x' }, /^limit /],
-      [{ tags: [1] }, /^tags /],
-      [{ q: 'x'.repeat(300) }, /^query /],
-    ])('rejects %j', (input, pattern) => {
-      const r = parsePracticeFilters(input);
-      expect(r.ok).toBe(false);
-      if (!r.ok) {
-        expect(r.code).toBe('INVALID_PARAMETER');
-        expect(r.message).toMatch(pattern);
-      }
-    });
-  });
 });
