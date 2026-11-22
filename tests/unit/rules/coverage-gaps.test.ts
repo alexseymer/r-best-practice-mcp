@@ -185,6 +185,11 @@ describe('rules without a named test: violation and clean project', () => {
     expect(found[0].suggestions?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it('pkg-tests needs tests/testthat, not only some tests/ folder', async () => {
+    write({ DESCRIPTION: DESCRIPTION_OK, 'R/demo.R': 'f <- function() 1\n', 'tests/manual/check.R': '1\n' });
+    expect(await idsFor(dir, 'package')).toContain('pkg-tests');
+  });
+
   it.each(cases)('$id is silent on a clean project', async ({ id, workflow, clean }) => {
     write(clean);
     expect(await idsFor(dir, workflow)).not.toContain(id);

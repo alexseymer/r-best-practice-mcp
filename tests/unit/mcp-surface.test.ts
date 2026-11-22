@@ -64,6 +64,17 @@ describe('MCP surface: tools, prompts, resources', () => {
       expect(res.code).toBe('INVALID_PARAMETER');
     });
 
+    it('requires an absolute path', async () => {
+      const res = await callTool('check_project', { path: 'relative/folder' });
+      expect(res.code).toBe('INVALID_PARAMETER');
+      expect(res.message).toContain('absolute');
+    });
+
+    it('explains when the path is a file, not a folder', async () => {
+      const res = await callTool('check_project', { path: path.join(EXAMPLE_PACKAGE, 'DESCRIPTION') });
+      expect(res.code).toBe('NOT_A_FOLDER');
+    });
+
     it('reports a missing folder', async () => {
       const res = await callTool('check_project', { path: '/definitely/not/here' });
       expect(res.code).toBe('PATH_NOT_FOUND');

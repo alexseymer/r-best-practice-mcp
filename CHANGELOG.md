@@ -15,6 +15,9 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
 - Heuristic checks (content-based, not a fact about the project) are at most `recommended` and say "Consider ...":
   `rscript-functions`, `rscript-errors`, `rscript-cleanup`, `rscript-globals`, `quarto-text`, `shiny-separation`,
   `shiny-validation`, `plumber-status`, `plumber-validation` and `plumber-error` were `important` or `critical`.
+- `check_project` requires an absolute `path` (`INVALID_PARAMETER`) and reports a file given in place of a folder as
+  `NOT_A_FOLDER`.
+- `pkg-tests` looks for `tests/testthat/` (the R Packages layout), not just any `tests/` folder.
 - `rscript-naming` accepts lowercase words joined by `_` or `-`, as the tidyverse style guide does (`data-cleaning.R` is
   no longer reported).
 
