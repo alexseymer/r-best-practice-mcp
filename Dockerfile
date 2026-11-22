@@ -1,21 +1,18 @@
+# The image runs the MCP server over stdio. It has no port and no web interface.
+# Use it with `docker run -i --rm <image>`; the MCP client writes requests to stdin.
+
 # Build stage
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci
 
-# Copy source code
 COPY src ./src
-COPY scripts ./scripts
-COPY tsconfig.json tailwind.config.cjs ./
+COPY tsconfig.json ./
 
-# Build TypeScript and the precompiled Tailwind stylesheet (src/public/dashboard.css, not committed)
-RUN npm run build && test -s src/public/dashboard.css && test -s dist/browser-engine/engine/browser-upload.js
+RUN npm run build && test -s dist/index.js
 
 # Runtime stage
 FROM node:20-alpine
@@ -25,24 +22,11 @@ WORKDIR /app
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Copy package files
 COPY package*.json ./
-
-# Install production dependencies only
 RUN npm ci --omit=dev && \
     npm cache clean --force
 
-# Copy built application from builder
 COPY --from=builder /app/dist ./dist
-
-# Web dashboard static assets (served from ./src/public at runtime)
-COPY --from=builder /app/src/public ./src/public
-
-# Build information shown by /health and /api/config (pass with --build-arg)
-ARG GIT_SHA=""
-ARG BUILD_TIME=""
-ENV GIT_SHA=$GIT_SHA \
-    BUILD_TIME=$BUILD_TIME
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -50,15 +34,9 @@ RUN addgroup -g 1001 -S nodejs && \
 
 USER nodejs
 
-# Expose port
-EXPOSE 3000
+ENV NODE_ENV=production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start web server
-CMD ["node", "dist/web-server-entry.js"]
+# Start the MCP server on stdin/stdout
+CMD ["node", "dist/index.js"]
