@@ -2,74 +2,25 @@
 
 ## Unreleased
 
+The server is now an MCP server only. The web interface, the REST API, the command-line tool and the editor add-ins
+are removed. The last version with them is tagged `v0.8.5-legacy`.
+
+### Changed (breaking)
+- Three tools instead of six: `check_project` (detection and validation in one call), `get_practice` and
+  `create_project`. `detect_workflow`, `validate_project`, `validate_file`, `list_practices` and `generate_template` are
+  removed.
+- `create_project` returns the file list for a standard project (package, shiny, quarto, rmarkdown, analysis). The client
+  writes the files. Missing details are asked through MCP elicitation or listed for the assistant to ask.
+- The package template's DESCRIPTION title is `Tools for <name>` instead of a placeholder.
+
 ### Added
-- Uploaded projects are analysed in the browser (#34). The dashboard runs the same rules as the server from `/browser-engine/` (about 38 KB gzipped, loaded on first use), so the files are not sent. The server route `POST /api/validate-upload` stays for API and MCP clients. A parity test requires identical results on both sides, and the browser e2e checks that no upload request carries the file contents.
-- Browser-safe modules: the validator, detector and upload sanitising no longer import Node modules (`project-fs-node.ts` holds the disk implementation; `config/limits.ts`, `engine/upload-sanitize.ts` and `types/workflow.ts` hold the pure parts).
-- `build` also writes `dist/browser-engine` (`scripts/build-browser-engine.mjs`); the Dockerfile builds and checks it.
-- Validation reads project files through a `ProjectFs` interface (`src/engine/project-fs.ts`), so the same rules can run on
-  the server's disk or on files held in memory. A parity test checks that both give the same findings. The dashboard still
-  uploads files to the server; in-browser validation is the next step.
-- Community practice contributions: practice PRs are parsed as data (`src/utils/practice-contribution.ts`), labelled
-  `community-practice`, and merged by a gate (`scripts/community-practice-gate.mjs`) once they have three approvals from
-  eligible reviewers, seven days, passing checks and no objection. Off until `PRACTICE_AUTOMERGE=enabled`. See `CONTRIBUTING.md`.
-- `SPEC.md`: the product and repository specification.
-- `UPLOAD_TMP_DIR` is documented in the README environment table.
-- Server hardening: path confinement to `ALLOWED_PROJECT_ROOTS` (default `/projects` in production), security headers and
-  CSP (`src/middleware/security-headers.ts`), gzip compression, 1 MB body limit (`MAX_BODY_BYTES`), `/metrics*` protected by
-  `METRICS_TOKEN` (404 when neither a token nor `METRICS_PUBLIC=true` is set in production), `TRUST_PROXY`.
-- `/health` and `/openapi.json` report the package version; `/health` also returns `build: {commit, builtAt}` (Docker build args
-  `GIT_SHA`, `BUILD_TIME`). Dashboard System panel shows build info and hides metrics links when metrics are not public.
-- OpenAPI structural test (`tests/unit/openapi-spec.test.ts`).
-- `POST /api/validate-upload` (REST only): validate or detect a project posted as `{ files: [{ path, content }] }` from the browser, with
-  strict path/size validation, a temp directory that is always deleted, at most 2 concurrent uploads (`503 BUSY`) and the limits
-  from `GET /api/config`. Dashboard: "Upload a project" in the Validate and Detect tabs (folder picker, drag and drop).
-- 4 practices (`pkg-structure`, `shiny-structure`, `shinytest-app`, `shinytest-setup`): 70 practices in total.
-- `Practice.enforcement` (`automated` | `guidance`): 59 practices are checked by a validator rule, 11 are advice only.
-- 32 new validator rules (rule registry in `src/engine/rules/`), one per automated practice that previously had none.
-- Every practice now has `details`, `badExample`, `goodExample` and verified `references`.
-- `minSeverity`, `categories`, `maxFindings` for `validate_project` and `validate_file` (MCP and REST), plus a pre-filter `summary`.
-- `minSeverity`, `tags`, `enforcement`, `query`/`q` and `limit` for `list_practices` and `GET /api/practices` (v0 and v1).
-- Dashboard: server-side filters, "X of Y" counts, automated/guidance badges, JSON/Markdown export, ZIP download of templates, System tab.
-- `tests/unit/rule-consistency.test.ts`, `tests/unit/practice-content.test.ts`, `tests/e2e/dashboard.playwright.cjs`.
-- `ValidationResult.warnings` (`validate_project` over MCP, REST v0/v1, CLI): an unrecognised project type now returns a warning that no checks ran
-  instead of an empty "clean" result. The dashboard shows an amber card with a "Choose a workflow" button, "Not checked" in LAST AUDIT, and exports `warnings`.
-- Dashboard: favicon (`/favicon.svg`, `/favicon.ico` redirects to it), `theme-color`, Open Graph and Twitter card tags.
-- E2E: axe-core accessibility check on all five tabs (skipped when it cannot be loaded) and mobile tab-bar checks at 320, 360 and 390 px.
-- Dashboard and `/api-docs` are fully self-hosted (#19): Tailwind is precompiled (`npm run build:css`, wired into `npm run build` and the
-  Dockerfile; output `src/public/dashboard.css` is generated and git-ignored), Geist and JetBrains Mono ship as woff2 under
-  `src/public/fonts/` (OFL), Material Symbols are replaced by an inline SVG sprite (`src/public/icons.svg`, `npm run build:icons`), and
-  Swagger UI 5 is served from the pinned `swagger-ui-dist` package. The CSP is now `'self'` only (no `'unsafe-inline'`, no CDN origins).
-  Playwright asserts no request leaves the origin and 0 CSP violations. Front-end files are exempt from the API rate limit.
+- Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and
+  `neue-datenanalyse`.
+- Practices as MCP resources: `practice://<id>` and an index at `practices://all`.
+- Installation from GitHub: a `prepare` script builds the server on install, so `npm exec --package=github:…` works.
 
-### Changed
-- The request body limit for ordinary routes is 1 MB (`MAX_BODY_BYTES`); earlier documentation said 50 MB. The upload route keeps its own 8 MB limit.
-- The unversioned `/api/*` routes are supported indefinitely, alongside `/api/v1/*`. They are not deprecated.
-- `METRICS_PUBLIC` is for development only; production uses `METRICS_TOKEN`.
-- The README, SPEC and CONTRIBUTING documents describe the current behaviour; the Phase 3 history was removed from the README.
-- Rate limiting identifies clients by `req.ip`; `X-Forwarded-For`/`X-Real-IP` are only honoured when `TRUST_PROXY` is set.
-  `/health` is exempt, the cleanup timer is unref'd and stoppable, `/metrics/rate-limit` shows salted hashes instead of addresses.
-- Default request body limit lowered from 50 MB to 1 MB.
-- Finding ids `blogdown-content` and `blogdown-themes` are now `blogdown-content-structure` and `blogdown-theme` (they match their practices).
-- `PracticeListOptions.severity` is now `minSeverity` (still "at least this severe").
-- `bookdown-config` severity is `important` (a book builds without `_bookdown.yml`).
-- Tool parameters are defined once in `src/tools/schemas.ts` and shared by the MCP server, `/api/tools` and OpenAPI.
-- Logs go to stderr so stdout stays clean for the MCP stdio protocol and CLI output.
+### Removed
+- CLI (`r-practices`), REST API, dashboard, Docker Compose and nginx files, VS Code extension, RStudio add-in, analysis
+  and module code, the community practice gate, the browser engine, and the project documents that described them.
+- The example projects moved to `tests/fixtures/examples` (test data only).
 
-### Fixed
-- Anonymous visitors could probe the server filesystem through `validate-project`/`validate-file` (200 vs 404 for any path).
-- Malformed JSON bodies returned 500; they now return 400 `INVALID_JSON` (oversized bodies 413 `PAYLOAD_TOO_LARGE`).
-- `X-RateLimit-*` headers were missing on the first request of a window, the request that reset it and on 429; `Retry-After` was missing.
-- `/health` reported a hard-coded version `1.0.0`, OpenAPI `0.2.0`; OpenAPI contact pointed at the old repository.
-- Dashboard: at 480 px and below the tab bar is icon-only (names kept as `title` and visually hidden text), so Practices and System were
-  no longer pushed off-screen; the hero is a labelled landmark (axe `region` violation on every tab).
-- CLI `validate` crashed when printing the summary (`result.data.duration` on an unwrapped result).
-- `quarto-labels` flagged correctly labelled chunks (`#| label:`); `pkg-description` required the legacy `Author:`/`Maintainer:` fields;
-  `pkg-license` required a `LICENSE` file for every license; shinytest checks only accepted the legacy `shinytest` layout;
-  `analysis-readme` was reported by the Quarto validator instead of the analysis one; `rscript-globals`, `plumber-validation`
-  and `plumber-error` produced noisy or comment-matched results; `blogdown-config` rejected Hugo's `hugo.toml` and `config/_default/`.
-- `validate_file` returned Node's `path` module instead of the file path.
-- The MCP server declared no `tools` capability and failed on construction.
-- CLI: relative ESM imports lacked `.js` extensions, so `dist/bin/cli.js` could not start.
-- Docker image: wrong `dumb-init` path, missing dashboard assets.
-- Tests: shared timestamp temp directories caused random failures.
-- Rules: two quadratic-time regexes (up to ~24 s on adversarial input), multi-line `tar_target(` calls and `#'` plumber annotations were missed.

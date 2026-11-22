@@ -326,35 +326,19 @@ node --expose-gc node_modules/.bin/jest --forceExit
 - **Code examples**: Look at existing tests and implementations
 - **GitHub Issues**: Search for related discussions
 - **Discussions**: Start a GitHub Discussion for questions
-- **GitHub Setup**: See [GITHUB_SETUP.md](./GITHUB_SETUP.md) for branch protection and CI/CD details
+- **Release**: See [PUBLISH.md](./PUBLISH.md) for the release steps
 
 ## Project Structure Reference
 
 ```
-Phase 1: Workflow Detection ✅
-  - WorkflowDetector class
-  - 9 workflow type detection
-  - Confidence scoring
-
-Phase 2: Validator Engine ✅
-  - Validator class
-  - 9 workflow validators
-  - File-level validation
-  - 52 best practices
-
-Phase 3: Template Generator ✅
-  - TemplateGenerator class
-  - 9 workflow templates
-  - Customizable options
-
-Phase 4: CLI Interface (planned)
-  - Local command-line tool
-  - File watching
-  - Report generation
-
-Phase 5: IDE Integration (planned)
-  - VS Code extension
-  - RStudio addin
+src/index.ts, src/server.ts     MCP server: tools, prompts, resources
+src/tools/schemas.ts            the three tools
+src/prompts.ts                  guided project prompts
+src/resources.ts                practices as resources
+src/create-project.ts           project creation and name rules
+src/engine/                     detector, validator, rules, templates
+src/data/                       knowledge base and the practices
+tests/                          unit, regression and fixture tests
 ```
 
 ## Recognition
