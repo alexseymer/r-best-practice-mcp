@@ -23,17 +23,5 @@
       }
     ],
     "no-console": "off"
-  },
-  "overrides": [
-    {
-      "files": ["src/public/**/*.js"],
-      "env": {
-        "browser": true,
-        "node": false
-      },
-      "parserOptions": {
-        "sourceType": "script"
-      }
-    }
-  ]
+  }
 }
