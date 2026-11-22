@@ -213,7 +213,7 @@ describe('legacy validator rules', () => {
       const f = await only('r-script', 'rscript-globals');
       expect(f).toHaveLength(1);
       expect(f[0].message).toMatch(/^Consider/);
-      expect(f[0].severity).toBe('important');
+      expect(f[0].severity).toBe('recommended');
       expect(f[0].category).toBe('structure');
       expect(f[0].suggestions?.join(' ')).toMatch(/functions/);
       expect(f[0].suggestions?.join(' ')).toMatch(/main\(\)/);
@@ -261,9 +261,9 @@ describe('legacy validator rules', () => {
       const f = await findingsFor(dir, 'plumber');
       const v = f.find((x) => x.id === 'plumber-validation');
       const e = f.find((x) => x.id === 'plumber-error');
-      expect(v?.severity).toBe('critical');
+      expect(v?.severity).toBe('recommended');
       expect(v?.category).toBe('security');
-      expect(e?.severity).toBe('important');
+      expect(e?.severity).toBe('recommended');
       expect(e?.category).toBe('structure');
       expect(e?.suggestions?.length).toBeGreaterThan(0);
     });

@@ -6,7 +6,7 @@ export const shinyPractices: Practice[] = [
     title: 'Separate UI and server logic',
     workflow: 'shiny',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Use ui.R/server.R or modular app.R with clear sections',
     details:
@@ -112,7 +112,7 @@ shinyApp(ui, server)`,
     title: 'Validate user inputs',
     workflow: 'shiny',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Check input validity before processing',
     details:

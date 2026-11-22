@@ -41,7 +41,7 @@ function(id) delete_user(id)`,
     title: 'Validate and sanitize all inputs',
     workflow: 'plumber',
     category: 'security',
-    severity: 'critical',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Never trust user input; validate all parameters',
     details:
@@ -100,7 +100,7 @@ function(x, res) {
     title: 'Use appropriate HTTP status codes',
     workflow: 'plumber',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Return 200 OK, 400 Bad Request, 500 Internal Error, etc.',
     details:
@@ -133,7 +133,7 @@ function(id, res) {
     title: 'Include meaningful error messages',
     workflow: 'plumber',
     category: 'structure',
-    severity: 'important',
+    severity: 'recommended',
     enforcement: 'automated',
     description: 'Provide clear error descriptions for debugging',
     details:

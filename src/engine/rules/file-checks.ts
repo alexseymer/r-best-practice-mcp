@@ -17,7 +17,7 @@ export function checkRFile(filePath: string, lines: string[]): Finding[] {
   if (!hasFunctions && lines.length > 50) {
     findings.push({
       id: 'rscript-functions',
-      severity: 'important',
+      severity: 'recommended',
       category: 'structure',
       file: filePath,
       message: 'Large scripts should contain functions for reusable logic',
