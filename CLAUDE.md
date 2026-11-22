@@ -1,245 +1,54 @@
-# R Best Practices MCP Server - Architecture & Development Guide
+# R Best Practices MCP Server: Development Guide
 
-## Project Overview
+This file is for the people and agents who change the code. For what the product does, read [SPEC.md](SPEC.md).
 
-The **R Best Practices MCP Server** is a comprehensive tool for enforcing best practices across R development workflows. It integrates with Claude via the Model Context Protocol (MCP) to provide:
+## What the server is
 
-1. **Workflow Detection** — Identify R project types automatically
-2. **Project Validation** — Check projects against 73 best practices
-3. **Template Generation** — Create scaffold projects for any workflow
-4. **Knowledge Base** — Access comprehensive practice documentation
+An MCP server over stdio with three tools (`check_project`, `get_practice`, `create_project`), four guided prompts and
+the practices as resources. It has no web interface, no REST API and no command-line tool. Keep it that way unless the
+spec changes first.
 
-### Why This Project?
+## Principles
 
-R developers often work across diverse project types (scripts, packages, Shiny apps, analyses, etc.) with different best practices for each. This MCP server provides a unified tool that Claude can use to help developers follow best practices regardless of their workflow.
+Small, focused, cooperating programs, and open, iterative development.
 
-## Core Principles: the Linux principle
+- **Do one thing well.** The engine checks the structure and practice of R projects. It does not run R, fix projects,
+  or store them. A feature outside detect, check, explain and create needs a strong case in SPEC §7.
+- **Text is the interface.** Tool results are JSON. Practices and rules are plain code and data in the repository.
+- **Small is beautiful.** One rule is one function in `src/engine/rules/<workflow>.ts`. One practice is one data object.
+- **Portable.** Node 18 or newer, no native dependencies, any operating system. Paths go through `ProjectFs`.
+- **No captive interface.** Everything is reachable through tool arguments. Prompts only guide the assistant.
+- **Small pull requests.** One concern each, merged when CI is green. Decisions go into SPEC.md or the issues, not into chat.
 
-Two ideas guide every design and development decision here: the **Unix philosophy** (how the software is built)
-and the **bazaar model** of Linux (how it is developed). When a change conflicts with these, the change needs a
-reason written down in the PR.
+Checklist for every change:
 
-> Small, focused, cooperating programs + open, collaborative and iterative development.
-
-### Design (Unix philosophy)
-
-| Principle | What it means in this project |
-|-----------|-------------------------------|
-| **Do one thing and do it well** | The engine checks the *structure and practice* of R projects. It does not run R, fix projects, replace `lintr`/`styler`, or store uploads (see SPEC §7). A new feature that is not detect, validate, generate or explain needs a strong case. |
-| **Programs work together** | Every surface (MCP, REST, CLI, dashboard, editors) is a thin adapter over the same engine, so all give the same answers. CLI commands compose: `validate` detects the workflow itself when none is given. |
-| **Text is the universal interface** | Results are JSON or plain text. Practices and rules are plain data and code in the repository, with no binary or database formats. |
-| **Every program is a filter** | Results go to **stdout**, status and errors to **stderr**, failure is a non-zero exit code. `r-practices validate . --format json \| jq` must always work. |
-| **Small is beautiful** | One rule is one small function in `src/engine/rules/<workflow>.ts`, one practice is one data object. Split files that grow past what one person can read at a sitting. |
-| **Prototype early** | Ship a heuristic rule with a clear "Consider ..." message and `recommended` severity first, then sharpen it from real findings. |
-| **Portability over efficiency** | Node >= 18, no native dependencies, any operating system, paths handled through `ProjectFs`. |
-| **No captive user interface** | No interactive prompts, no accounts, nothing that traps the user. All behaviour is reachable by flags or arguments. Browser uploads are analysed locally and are never stored. |
-| **Plain text storage** | Configuration and data are readable and diff-able text files. |
-
-### Process (bazaar model)
-
-- **Release early, release often.** Small pull requests, one concern each, merged as soon as CI is green; tagged
-  releases (`vX.Y.Z`) rather than big-bang versions.
-- **Many eyes.** Work happens in the open: issues, pull requests and reviews carry the decisions. Tests are the
-  contract that lets anyone change code safely; every rule has a triggering, a clean and a near-miss fixture.
-- **Users are co-developers.** Report a false positive or propose a practice through an issue or the
-  community-practices workflow; a good bug report with a fixture is worth more than a feature request.
-- **Open communication, clear maintainers.** Decisions and open questions are written in SPEC.md and the issues,
-  not in chat. The maintainer decides in the end; many people contribute to the subsystems.
-
-### Applying it: checklist for every change
-
-1. Does it do one thing, and is it inside the scope in SPEC §1 and §7?
-2. Can another tool consume its output (stdout, JSON, exit code) without parsing decoration?
-3. Is the smallest version that works shipped first, with the next step left as an issue?
-4. Does it work on every supported OS and without extra installs?
-5. Is it covered by a test, and documented where a user will look for it?
-
-`validate -` reads one file from stdin, so the CLI works as a filter in a pipe (`cat a.qmd | r-practices validate - --stdin-filename a.qmd`).
-
-The web server follows the same shape as the engine: `src/web-server.ts` wires middleware and dependencies, and each
-group of endpoints is one small module in `src/routes/` (`detect`, `validate`, `practices`, `templates`, `upload`,
-`ops`) that receives a shared `RouteContext`. The `/api` and `/api/v1` variants of an endpoint share one handler.
+1. Is it inside the scope in SPEC §1 and §7?
+2. Is the smallest working version shipped first, with the next step left as an issue?
+3. Is it covered by a test, and documented where a user will look for it?
 
 ## Architecture
 
-### Core Components
+| Module | Responsibility |
+| --- | --- |
+| `src/index.ts`, `src/server.ts` | Entry point and MCP server: tools, prompts, resources, elicitation. |
+| `src/tools/schemas.ts` | The three tools: names, descriptions, input schemas. |
+| `src/prompts.ts` | The four guided prompts (German). |
+| `src/resources.ts` | Practices as Markdown (`practice://<id>`, `practices://all`). |
+| `src/create-project.ts` | Name rules, questions, call to the template generator. |
+| `src/engine/detector.ts` | Workflow detection with a confidence score. |
+| `src/engine/validator.ts` | Runs the registered rules for a workflow and applies the filters. |
+| `src/engine/rules/` | One rule per automated practice, plus shared helpers and file checks. |
+| `src/engine/templates/` | One generator per project type. `template-generator.ts` dispatches to them. |
+| `src/engine/project-fs*.ts` | File-system access behind an interface, for disk and in-memory projects. |
+| `src/data/knowledge-base.ts`, `src/data/practices/` | The 73 practices. |
+| `src/utils/`, `src/types/`, `src/config/` | Logging, file helpers, parameter parsing, shared types, runtime settings. |
 
-```
-┌─────────────────────────────────────────┐
-│    MCP Server (src/server.ts)           │
-│    - Exposes 6 tools via MCP            │
-│    - Handles tool calls and responses   │
-└──────────────┬──────────────────────────┘
-               │
-        ┌──────┴──────┬──────────┬──────────┐
-        ▼             ▼          ▼          ▼
-   ┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐
-   │Detector│  │Validator │  │Template  │  │Knowledge     │
-   │        │  │          │  │Generator │  │Base          │
-   └────────┘  └──────────┘  └──────────┘  └──────────────┘
-        │             │          │          │
-        └─────────────┴──────────┴──────────┘
-                     │
-        ┌────────────┴──────────────┐
-        ▼                           ▼
-   ┌─────────┐              ┌──────────────┐
-   │FileUtils│              │Logger        │
-   └─────────┘              └──────────────┘
-```
+Logs go to stderr. Stdout is reserved for the MCP protocol.
 
-### Component Responsibilities
+## Adding a best practice
 
-#### 1. **WorkflowDetector** (`src/engine/detector.ts`)
-- Analyzes directory structure
-- Detects presence of workflow-specific files
-- Scores confidence using a point system
-- Returns `DetectionResult` with workflow type, confidence, and indicators
-
-**Key Methods:**
-- `detect(path)` → `DetectionResult`
-- Individual checkers: `checkPackage()`, `checkShiny()`, etc.
-
-#### 2. **Validator** (`src/engine/validator.ts`)
-- Runs the rules registered for the workflow (`src/engine/rules/<workflow>.ts`, one rule per practice)
-- Validates individual files (R, Quarto, R Markdown) with the checks in `src/engine/rules/file-checks.ts`
-- Applies filtering (severity, category, limit)
-- Returns categorized `Finding[]` with severity and suggestions
-
-**Key Methods:**
-- `validateProject(path, workflow, options)` → `ValidationResult`
-- `validateFile(filePath)` → `Finding[]`
-
-#### 3. **TemplateGenerator** (`src/engine/template-generator.ts`, one file per workflow in `src/engine/templates/`)
-- Generates complete project scaffolds
-- Supports 12 workflow types
-- Creates files with realistic content and examples
-- Returns `GeneratedTemplate` with files and directories
-
-**Key Methods:**
-- `generate(workflow, options)` → `GeneratedTemplate`
-- Workflow generators: `generatePackage()` in `templates/package.ts`, `generateShiny()` in `templates/shiny.ts`, etc.
-
-#### 4. **KnowledgeBase** (`src/data/knowledge-base.ts`)
-- Contains 73 best practices across 12 workflows (62 automated, 11 guidance-only)
-- Dual indexing: by ID and by workflow
-- Supports filtering and searching
-- Returns `Practice[]` with detailed information
-
-**Key Methods:**
-- `getPractice(id)` → `Practice | undefined`
-- `listPractices(options)` → `PracticeQueryResult`
-- `searchPractices(query)` → `PracticeQueryResult`
-
-#### 5. **FileUtils** (`src/utils/file.ts`)
-- Async file system operations
-- Pattern-based file listing with recursion
-- Handles edge cases (hidden files, node_modules)
-
-**Key Methods:**
-- `exists(path)`, `isDirectory(path)`, `readFile(path)`, `listFiles(dir, pattern, recursive)`
-
-#### 6. **Logger** (`src/utils/logger.ts`)
-- Simple logging with 4 levels (debug, info, warn, error)
-- Timestamps all output
-- Used throughout for debugging
-
-### Type System
-
-```typescript
-// Workflows - 12 types covering all standard R development approaches
-type Workflow = 'r-script' | 'quarto' | 'shiny' | 'package' | 'rmarkdown' | 'renv' | 'targets' | 'plumber' | 'analysis' | 'bookdown' | 'blogdown' | 'shinytest'
-
-// Severity - Indicates impact of findings
-type Severity = 'critical' | 'important' | 'recommended' | 'info'
-
-// Category - Organizes findings by topic
-type Category = 'structure' | 'naming' | 'documentation' | 'performance' | 'security' | 'testing' | 'dependency' | 'style'
-
-// Finding - Individual validation result
-interface Finding {
-  id: string
-  severity: Severity
-  category: Category
-  message: string
-  suggestions?: string[]
-  file?: string
-  line?: number
-}
-
-// Practice - Best practice documentation
-interface Practice {
-  id: string
-  title: string
-  workflow: Workflow
-  category: Category
-  severity: Severity
-  enforcement: 'automated' | 'guidance'  // automated: a rule with the same id reports violations
-  description: string
-  details?: string       // why it matters and what the check looks at
-  badExample?: string
-  goodExample?: string
-  references?: string[]  // https URLs
-  tags?: string[]
-}
-```
-
-## Key Design Decisions
-
-### 1. **Scoring-Based Detection**
-Rather than binary detection, WorkflowDetector uses a confidence score (0-100%). This provides:
-- Clear indication of certainty
-- Ability to handle edge cases
-- Better user guidance on detection accuracy
-
-### 2. **Workflow-Specific Validators**
-Instead of a single generic validator, each workflow has specialized validators:
-- **Advantage**: Can implement nuanced rules specific to each workflow
-- **Disadvantage**: More code, but maintainable via patterns
-
-### 3. **MCP Tool Abstraction**
-The server layer (`src/server.ts`) translates MCP tool calls to internal methods:
-- Provides clean separation between protocol and logic
-- Makes it easy to add tools or change implementation
-- Consistent error handling across all tools
-
-### 4. **Knowledge Base as First-Class Data**
-The knowledge base is baked into the server (73 practices in `src/data/practices/<workflow>.ts`):
-- No external dependencies for best practices
-- Practices versioned with the code
-- Can be easily extended or customized
-
-### 5. **Template Generation Over CLI Scaffolding**
-Rather than shell commands, templates are generated as data structures:
-- **Advantage**: Can be used programmatically by Claude
-- **Advantage**: Easy to customize and extend
-- **Advantage**: Can return files for writing to user's system
-
-## Best Practices Implemented
-
-### Code Quality
-- **TypeScript with strict mode** — Catches type errors at compile time
-- **Comprehensive testing** — ~1,000 unit, regression and rule tests
-- **Async/await** — Better error handling and readability
-- **Clear naming** — Functions and variables clearly express intent
-
-### Architecture
-- **Separation of concerns** — Each module has single responsibility
-- **Dependency injection** — MCP server instantiates components
-- **Consistent patterns** — Validators and generators follow similar structure
-- **Error handling** — Try/catch blocks, error codes, user-friendly messages
-
-### Testing
-- **Unit tests** — Each component tested independently
-- **Fixtures** — Consistent test data creation
-- **Coverage** — 90%+ coverage in tested components
-- **Fast execution** — Tests run in ~5 seconds
-
-## Adding New Content
-
-### Adding a Best Practice
-
-Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `details`, `badExample`,
-`goodExample` and at least one verified `https` reference (`tests/unit/practice-content.test.ts` enforces this).
+Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `details`, `badExample`, `goodExample` and at
+least one verified `https` reference. `tests/unit/practice-content.test.ts` enforces this.
 
 ```typescript
 {
@@ -258,173 +67,66 @@ Add the object to `src/data/practices/<workflow>.ts`. Every practice needs `deta
 }
 ```
 
-### Adding a Rule (automated check)
+## Adding a rule (automated check)
 
-1. Add the practice (above) with `enforcement: 'automated'`; the rule `id` must equal the practice `id`.
-2. Add a `RuleDef` to `src/engine/rules/<workflow>.ts` (see `package.ts` / `pkg-readme` for the pattern;
-   helpers such as `findFiles`, `readText` are in `src/engine/rules/helpers.ts` and cap file count and size):
+1. Add the practice with `enforcement: 'automated'`. The rule id must equal the practice id.
+2. Add a `RuleDef` to `src/engine/rules/<workflow>.ts`. Helpers such as `findFiles` and `readText` are in
+   `src/engine/rules/helpers.ts`, and they cap file count and size.
 
 ```typescript
 {
   id: 'pkg-example',
   workflows: ['package'],
   async run({ dirPath }) {
-    // return [] when satisfied, otherwise findings whose severity/category match the practice
+    // return [] when satisfied, otherwise findings whose severity and category match the practice
     return [{ id: 'pkg-example', severity: 'important', category: 'documentation',
               message: '...', suggestions: ['...'] }]
   },
 }
 ```
 
-3. Add tests in `tests/unit/rules/<workflow>.test.ts`: a triggering fixture, a clean fixture and, for heuristics,
-   a near-miss that must not trigger. Heuristic (content-based) rules cap severity at `recommended` and say "Consider ...".
-4. `tests/unit/rule-consistency.test.ts` fails if a rule has no practice, an automated practice has no rule,
-   or a guidance practice has one.
+3. Add tests in `tests/unit/rules/<workflow>.test.ts`: a triggering fixture, a clean fixture and, for heuristics, a
+   near-miss that must not trigger. Content-based rules cap severity at `recommended` and say "Consider ...".
+4. `tests/unit/rule-consistency.test.ts` fails if a rule has no practice, an automated practice has no rule, or a
+   guidance practice has one.
 
-All rules live in the registry; `src/engine/validator.ts` only runs them and applies the filters.
-Checks that look at a single file (used by both `validateFile` and the project rules) are in `src/engine/rules/file-checks.ts`.
+## Adding a project template
 
-### Adding a Template
+Add `src/engine/templates/<workflow>.ts` with a generator that returns `{ files, directories }`, and call it from the
+switch in `src/engine/template-generator.ts`. The generator may use only `projectName`, `authorName` and `authorEmail`.
+If the project type should be creatable by `create_project`, also add it to `PROJECT_TYPES` in `src/tools/schemas.ts`
+and to the prompts in `src/prompts.ts`.
 
-Add `src/engine/templates/<workflow>.ts` exporting a generator function, and call it from the `switch` in
-`src/engine/template-generator.ts`:
+`tests/unit/template-consistency.test.ts` requires every template to be detected as its own workflow and to pass the
+project's own rules.
 
-```typescript
-export function generateNewWorkflow(options: TemplateGeneratorOptions): {
-  files: TemplateFile[];
-  directories: string[];
-} {
-  return {
-    files: [
-      { path: 'file1.txt', content: '...' },
-      { path: 'file2.txt', content: '...' },
-    ],
-    directories: ['dir1', 'dir2'],
-  };
-}
-```
-
-`tests/unit/template-consistency.test.ts` requires every template to be detected as its own workflow and to pass
-the project's own rules.
-
-## Testing Strategy
-
-### Test Structure
-- **Unit tests** — Each component tested independently
-- **Fixtures** — Realistic test data (empty projects, complete projects, edge cases)
-- **Edge cases** — Non-existent paths, empty directories, malformed files
-- **Coverage** — Target 90%+ for all components
-
-### Running Tests
+## Testing
 
 ```bash
-# All tests with coverage
-npm test
-
-# Specific test file
-npm test -- detector.test.ts
-
-# Watch mode
-npm run test:watch
-
-# Coverage summary
-npm test -- --coverage
+npm test                              # all tests with coverage
+npm test -- mcp-surface               # one file, by name
+npm run lint
+npx tsc --noEmit
 ```
 
-## Performance Considerations
+Fixtures for detection and regression tests are in `tests/fixtures/`, including example projects under
+`tests/fixtures/examples/`. The tests import the TypeScript sources directly. Run `npm run build` before you start the
+server by hand.
 
-### Current Performance
-- **Detection**: ~50-100ms (iterates through directory, checks files)
-- **Validation**: ~100-500ms (depends on project size and number of findings)
-- **Template generation**: <10ms (pure computation, no I/O)
-- **Knowledge base queries**: <5ms (in-memory lookup)
+## Build, install and release
 
-### Optimization Opportunities
-1. **Caching** — Cache detection results for repeated calls
-2. **Parallel validation** — Run validators in parallel for different file types
-3. **Lazy loading** — Load knowledge base practices on demand
-4. **Compiled regex** — Pre-compile patterns used in validation
+- `npm run build` compiles to `dist/`. The `prepare` script runs it on install, so installing from GitHub works.
+- The Docker image is built from the repository. Its stages skip install scripts and run the build explicitly.
+- A version tag (`v*.*.*`) starts `publish.yml`, which publishes to npm and Docker Hub. Do not push such a tag until the
+  release is decided. See [PUBLISH.md](PUBLISH.md).
 
-## Deployment
+## Commit and pull request conventions
 
-### MCP Server Communication
-The server uses `StdioServerTransport`:
-- Reads MCP requests from stdin
-- Writes responses to stdout
-- Allows integration with any MCP client (Claude, etc.)
-
-### Configuration
-No configuration required — server starts with default settings. Can be extended to support:
-- Custom rules files
-- Severity level adjustments
-- Workflow-specific settings
-
-## Future Enhancements
-
-### Phase 4: CLI Interface
-- Local command-line tool for developers
-- File watching for continuous validation
-- HTML report generation
-
-### Phase 5: IDE Integration
-- VS Code extension for real-time validation
-- RStudio addin for package validation
-- Inline suggestions in editor
-
-### Phase 6: Advanced Features
-- Custom rule creation and configuration
-- Performance profiling and optimization
-- Dependency analysis and update checking
-- Complexity metrics and code quality scores
-
-## Development Workflow
-
-1. **Make changes** to TypeScript files
-2. **Run tests** — `npm test` (should pass with high coverage)
-3. **Build** — `npm run build` (compiles to JavaScript)
-4. **Commit** — Create clear commit message with phase and description
-5. **Push** — Push to development branch for review
-
-### Code Style Guidelines
-- Use TypeScript strict mode
-- Async/await over promises
-- Descriptive function and variable names
-- Comments only for non-obvious logic
-- Keep functions focused on single responsibility
-
-### Commit Message Format
-```
-Phase N: Brief description
-
-- Detailed bullet points of changes
-- List new files/components
-- Mention test additions
-
-Co-Authored-By: Name <email>   (only when someone else co-wrote the change)
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Tests failing with "Cannot find module"**
-- Run `npm run build` to compile TypeScript
-- Check module resolution in `jest.config.js`
-
-**Server not responding to tool calls**
-- Verify stdin/stdout transport is connected
-- Check tool names match exactly in handler
-- Review error logs from stderr
-
-**Validation not detecting issues**
-- Check if validator for that workflow is implemented
-- Review Finding IDs in knowledge base match validator IDs
-- Test with fixture projects to verify behavior
+- Subject in the imperative, describing the change. Body explains the why.
+- One concern per pull request. Merge when CI is green.
 
 ## References
 
-- [MCP Documentation](https://modelcontextprotocol.io/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
-- [R Best Practices](https://style.tidyverse.org/)
-- [Shiny Best Practices](https://shiny.rstudio.com/articles/basics.html)
+- [MCP specification](https://modelcontextprotocol.io/)
+- [R Packages (Wickham and Bryan)](https://r-pkgs.org/)
+- [tidyverse style guide](https://style.tidyverse.org/)
