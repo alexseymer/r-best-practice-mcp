@@ -185,6 +185,39 @@ describe('rules without a named test: violation and clean project', () => {
     expect(found[0].suggestions?.length ?? 0).toBeGreaterThan(0);
   });
 
+  describe('pkg-description content', () => {
+    const withField = (field: string, value: string) =>
+      DESCRIPTION_OK.replace(new RegExp(`^${field}:.*$`, 'm'), `${field}: ${value}`);
+
+    it.each([
+      ['a trailing full stop in Title', withField('Title', 'Tools for Demo.')],
+      ['a Title longer than 65 characters', withField('Title', 'Tools for ' + 'very '.repeat(12) + 'demo')],
+      ['a Title that starts with "A package"', withField('Title', 'A package for demo data')],
+      ['a Description without a full stop', withField('Description', 'Demo package for tests')],
+    ])('reports %s', async (_label, desc) => {
+      write({ DESCRIPTION: desc });
+      const found = (await findingsFor(dir, 'package')).filter((f) => f.id === 'pkg-description');
+      expect(found).toHaveLength(1);
+      expect(found[0].severity).toBe('recommended');
+      expect(found[0].message).toMatch(/^Consider/);
+    });
+
+    it('is silent on a well-formed DESCRIPTION', async () => {
+      write({ DESCRIPTION: DESCRIPTION_OK });
+      expect(await idsFor(dir, 'package')).not.toContain('pkg-description');
+    });
+
+    it('reads a multi-line Description and accepts it when it ends with a full stop', async () => {
+      write({
+        DESCRIPTION: DESCRIPTION_OK.replace(
+          /^Description:.*$/m,
+          'Description: Demo package for tests,\n    with a second line that ends the paragraph.'
+        ),
+      });
+      expect(await idsFor(dir, 'package')).not.toContain('pkg-description');
+    });
+  });
+
   it('pkg-tests needs tests/testthat, not only some tests/ folder', async () => {
     write({ DESCRIPTION: DESCRIPTION_OK, 'R/demo.R': 'f <- function() 1\n', 'tests/manual/check.R': '1\n' });
     expect(await idsFor(dir, 'package')).toContain('pkg-tests');
