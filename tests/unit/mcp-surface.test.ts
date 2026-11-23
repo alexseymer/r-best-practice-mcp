@@ -106,7 +106,7 @@ describe('MCP surface: tools, prompts, resources', () => {
       expect(res.data.workflow).toBe('package');
       const description = res.data.files.find((f: any) => f.path === 'DESCRIPTION');
       expect(description.content).toContain('Package: mypkg');
-      expect(description.content).toContain('Title: Tools for mypkg');
+      expect(description.content).toContain('Title: Utility Functions');
       expect(description.content).not.toContain('Brief Title');
     });
 
