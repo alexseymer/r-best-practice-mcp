@@ -22,8 +22,15 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
 - `pkg-tests` looks for `tests/testthat/` (the R Packages layout), not just any `tests/` folder.
 - `rscript-naming` accepts lowercase words joined by `_` or `-`, as the tidyverse style guide does (`data-cleaning.R` is
   no longer reported).
+- Node.js 20 or newer is required (it was 18). The MCP SDK's HTTP transport needs it, and Node 18 is out of support. CI tests
+  Node 20 and 22, and the Docker image uses Node 22.
 
 ### Added
+- A hosted HTTP server (`node dist/http.js`): MCP over Streamable HTTP at `POST /mcp` and `GET /health`. In this mode the
+  server offers `check_files`, which validates files sent as text, instead of `check_project`, and it never reads its own
+  disk for a client. It limits requests per client, body size and concurrency, checks the `Origin` header, and does not log
+  request bodies.
+- The server logs only the tool name and the argument names, no argument values.
 - Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and
   `neue-datenanalyse`.
 - Practices as MCP resources: `practice://<id>` and an index at `practices://all`.

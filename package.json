@@ -25,6 +25,7 @@
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
     "dev": "npm run build && npm start",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
@@ -61,6 +62,6 @@
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

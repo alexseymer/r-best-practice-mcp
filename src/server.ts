@@ -2,6 +2,7 @@ import { isAbsolute } from 'path';
 import { getRuntimeConfig } from './config/runtime.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
@@ -14,6 +15,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { WorkflowDetector } from './engine/detector.js';
 import { Validator } from './engine/validator.js';
+import type { FindingFilterOptions } from './engine/finding-filters.js';
 import { TemplateGenerator } from './engine/template-generator.js';
 import { kb } from './data/knowledge-base.js';
 import { logger } from './utils/logger.js';
@@ -21,7 +23,9 @@ import { FileUtils } from './utils/file.js';
 import { VALID_WORKFLOWS } from './utils/security.js';
 import { parseFindingFilters } from './utils/query-params.js';
 import { nodeProjectFs } from './engine/project-fs-node.js';
-import { TOOLS, PROJECT_TYPES } from './tools/schemas.js';
+import { createMemoryProjectFs } from './engine/project-fs.js';
+import { toolsFor, PROJECT_TYPES, type ServerMode } from './tools/schemas.js';
+import { sanitizeFiles } from './check-files.js';
 import { PROMPTS, getPrompt } from './prompts.js';
 import { listResources, readResource } from './resources.js';
 import { createProject, PROJECT_QUESTIONS, type ProjectAnswers, type ProjectType } from './create-project.js';
@@ -34,13 +38,30 @@ function stringArg(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
+/** Findings of an in-memory project carry "/"-rooted paths; clients expect project-relative ones. */
+function stripRoot(result: unknown): unknown {
+  const value = result as { data?: { findings?: Array<{ file?: string }>; filePath?: string } };
+  for (const finding of value.data?.findings ?? []) {
+    if (finding.file?.startsWith('/')) finding.file = finding.file.slice(1);
+  }
+  if (value.data) delete value.data.filePath;
+  return result;
+}
+
+export interface ServerOptions {
+  /** `local` (default): stdio on the user's machine. `remote`: hosted over HTTP, never reads the server's disk. */
+  mode?: ServerMode;
+}
+
 export class RPracticesMCPServer {
   private server: Server;
+  private mode: ServerMode;
   private detector: WorkflowDetector;
   private validator: Validator;
   private templateGenerator: TemplateGenerator;
 
-  constructor() {
+  constructor(options: ServerOptions = {}) {
+    this.mode = options.mode ?? 'local';
     this.server = new Server(
       {
         name: 'r-best-practices-mcp',
@@ -84,7 +105,7 @@ export class RPracticesMCPServer {
   }
 
   private handleListTools(): { tools: Tool[] } {
-    return { tools: TOOLS };
+    return { tools: toolsFor(this.mode) };
   }
 
   private async handleCallTool(request: {
@@ -92,14 +113,21 @@ export class RPracticesMCPServer {
     params: { name: string; arguments?: Record<string, unknown> };
   }): Promise<{ content: TextContent[] }> {
     const { name, arguments: args = {} } = request.params;
-    logger.info(`Tool called: ${name}`, args);
+    // Only names are logged: arguments can hold a user's file contents.
+    logger.info(`Tool called: ${name} (${Object.keys(args).join(', ')})`);
 
     try {
       let result: unknown;
 
-      switch (name) {
+      // A tool that this mode does not offer cannot be called by guessing its name.
+      const offered = toolsFor(this.mode).some((tool) => tool.name === name);
+
+      switch (offered ? name : '') {
         case 'check_project':
           result = await this.checkProject(args);
+          break;
+        case 'check_files':
+          result = await this.checkFiles(args);
           break;
         case 'get_practice':
           result = this.getPractice(args);
@@ -172,9 +200,43 @@ export class RPracticesMCPServer {
       };
     }
 
-    const detection = await this.detector.detect(path);
+    return this.detectAndValidate(this.detector, this.validator, path, workflowArg, filters.value);
+  }
+
+  /** Validate files that arrive as text. Everything stays in memory; the server's disk is never read. */
+  private async checkFiles(args: Record<string, unknown>): Promise<unknown> {
+    const sanitized = sanitizeFiles(args.files);
+    if (!sanitized.ok) return invalidParameter(sanitized.message);
+
+    const filters = parseFindingFilters(args);
+    if (!filters.ok) return invalidParameter(filters.message);
+
+    const workflowArg = stringArg(args.workflow);
+    if (workflowArg && !(VALID_WORKFLOWS as readonly string[]).includes(workflowArg)) {
+      return invalidParameter(`Unknown project type: ${workflowArg}`);
+    }
+
+    const fsys = createMemoryProjectFs(sanitized.files);
+    const result = await this.detectAndValidate(
+      new WorkflowDetector(fsys),
+      new Validator(fsys),
+      '/',
+      workflowArg,
+      filters.value
+    );
+    return stripRoot(result);
+  }
+
+  private async detectAndValidate(
+    detector: WorkflowDetector,
+    validator: Validator,
+    dir: string,
+    workflowArg: string | undefined,
+    filters: FindingFilterOptions
+  ): Promise<unknown> {
+    const detection = await detector.detect(dir);
     const workflow = (workflowArg ?? detection.workflow) as Parameters<Validator['validateProject']>[1];
-    const validation = await this.validator.validateProject(path, workflow, filters.value);
+    const validation = await validator.validateProject(dir, workflow, filters);
 
     return {
       error: false,
@@ -266,13 +328,22 @@ export class RPracticesMCPServer {
   }
 
   private clientSupportsElicitation(): boolean {
-    return this.server.getClientCapabilities()?.elicitation !== undefined;
+    // Hosted requests are stateless, so the server cannot ask the user a follow-up question.
+    return this.mode === 'local' && this.server.getClientCapabilities()?.elicitation !== undefined;
+  }
+
+  /** Serve one transport: stdio for the local server, one HTTP request at a time for the hosted one. */
+  async connect(transport: Transport): Promise<void> {
+    await this.server.connect(transport);
+  }
+
+  async close(): Promise<void> {
+    await this.server.close();
   }
 
   async start(): Promise<void> {
     logger.info('Starting R Best Practices MCP Server');
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+    await this.connect(new StdioServerTransport());
     logger.info('Server connected and running');
   }
 }

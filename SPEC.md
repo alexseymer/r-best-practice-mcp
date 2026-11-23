@@ -60,6 +60,41 @@ Four guided prompts. Each tells the assistant which questions to ask and how to 
 | `practice://<id>` | One practice as Markdown. |
 | `practices://all` | Index of all practices, grouped by project type. |
 
+### 3.4 Hosted HTTP server
+
+`node dist/http.js` serves the same MCP server over Streamable HTTP, for clients that take a URL instead of a command.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /mcp` | MCP requests. Stateless: every request gets its own short-lived server, and answers are plain JSON. `GET` and `DELETE` return 405. |
+| `GET /health` | `status`, `version`, `mode`, `build` (`commit`, `builtAt`) and `uptimeSeconds`. |
+
+The hosted server is a different mode from the local one, because it must not read its own disk for a client:
+
+- The tools are `check_files`, `get_practice` and `create_project`. `check_project` is not offered, and calling it by name
+  returns `UNKNOWN_TOOL`.
+- `check_files` takes `files` (`path` relative to the project, `content` as text) and the same filters as
+  `check_project`. The files are checked in memory. Limits: 300 files, 200 000 bytes per file, 1 000 000 bytes in
+  total, paths of at most 260 characters. A path that is absolute, has a drive letter, a backslash, a NUL byte or a `..`
+  segment is refused with `INVALID_PARAMETER`.
+- Elicitation is off. A missing project name returns `NEEDS_INPUT`, and the assistant asks in the chat.
+- Request bodies and file contents are never logged; the log keeps the tool name and the argument names.
+
+Protection for a free public server:
+
+| Guard | Behaviour |
+| --- | --- |
+| Rate limit | 60 requests per minute and client on `/mcp` (`RATE_LIMIT_PER_MINUTE`, 0 = off). Answer `429` with `Retry-After`. `/health` is exempt. |
+| Client address | The socket peer. `X-Forwarded-For` is read only when `TRUST_PROXY` names the number of trusted proxies; then the entry the nearest proxy added counts. |
+| Body size | 2 MB, answer `413`. |
+| Concurrency | 8 requests at the same time, then `503` with `Retry-After`. |
+| Origin | A request that carries an `Origin` header must come from the server's own origin or one in `ALLOWED_ORIGINS`, otherwise `403`. |
+| Timeouts | Headers 15 s, whole request 30 s. |
+| Headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a Content-Security-Policy. |
+
+Settings come from environment variables: `PORT` (3000), `HOST` (0.0.0.0), `RATE_LIMIT_PER_MINUTE`, `TRUST_PROXY`,
+`ALLOWED_ORIGINS` (comma separated), and `GIT_SHA` and `BUILD_TIME` for the build information in `/health`.
+
 ## 4. Functional requirements
 
 ### 4.1 Project types

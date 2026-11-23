@@ -73,7 +73,7 @@ The server never writes files itself. `create_project` only returns the file lis
 
 ## Development
 
-Requires Node.js 18 or newer.
+Requires Node.js 20 or newer.
 
 ```bash
 npm install      # also builds the server (prepare script)
