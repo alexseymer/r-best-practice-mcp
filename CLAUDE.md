@@ -16,7 +16,7 @@ Small, focused, cooperating programs, and open, iterative development.
   or store them. A feature outside detect, check, explain and create needs a strong case in SPEC §7.
 - **Text is the interface.** Tool results are JSON. Practices and rules are plain code and data in the repository.
 - **Small is beautiful.** One rule is one function in `src/engine/rules/<workflow>.ts`. One practice is one data object.
-- **Portable.** Node 18 or newer, no native dependencies, any operating system. Paths go through `ProjectFs`.
+- **Portable.** Node 20 or newer, no native dependencies, any operating system. Paths go through `ProjectFs`.
 - **No captive interface.** Everything is reachable through tool arguments. Prompts only guide the assistant.
 - **Small pull requests.** One concern each, merged when CI is green. Decisions go into SPEC.md or the issues, not into chat.
 

@@ -2,7 +2,7 @@
 # Use it with `docker run -i --rm <image>`; the MCP client writes requests to stdin.
 
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY tsconfig.json ./
 RUN npm run build && test -s dist/index.js
 
 # Runtime stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 

@@ -17,7 +17,7 @@ and build the Docker image from the repository URL.
 
 `.github/workflows/publish.yml` runs on a tag that matches `v*.*.*`. It:
 
-1. runs the tests and the build on Node 18 and 20,
+1. runs the tests and the build on Node 20 and 22,
 2. publishes the npm package with `npm publish --access public` (needs the `NPM_TOKEN` secret),
 3. builds and pushes the Docker image to Docker Hub (needs `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`).
 
