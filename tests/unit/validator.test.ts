@@ -56,7 +56,8 @@ describe('Validator', () => {
 
       expect(result.findings).toBeDefined();
       expect(result.workflow).toBe('package');
-      expect(result.duration).toBeGreaterThan(0);
+      // Whole milliseconds: a fast validation can legitimately take 0 ms.
+      expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
     it('should detect missing DESCRIPTION in package', async () => {
