@@ -45,7 +45,7 @@ function(id) delete_user(id)`,
     enforcement: 'automated',
     description: 'Never trust user input; validate all parameters',
     details:
-      "Query and body parameters arrive as untrusted strings and must be checked for type, range and length before use. Reject bad input with a 400 response instead of passing it to code that touches files, databases or system calls. The automated check is a coarse keyword heuristic. It only looks at .R files directly in the project root that contain a plumber endpoint annotation (#* or #' followed by @get, @post, ...), ignores lines that are entirely a comment, and reports a file in which none of the text validate, check or if ( (with optional spaces before the parenthesis) appears; any substring match counts, for example in a variable name. It cannot tell whether the validation covers every parameter.",
+      "Query and body parameters arrive as untrusted strings and must be checked for type, range and length before use. Reject bad input with a 400 response instead of passing it to code that touches files, databases or system calls. The automated check is a coarse heuristic. It looks at .R files that contain a plumber endpoint annotation (#* or #' followed by @get, @post, ...), ignores comments and the text inside strings, and reports a file in which no call to validate...(), check...(), stopifnot() or req() appears and no guard of the form if (...) stop(...), abort(...) or return(...). A plain if that only computes a value does not count. It cannot tell whether the validation covers every parameter.",
     badExample: `#* @get /square
 function(n) {
   as.numeric(n)^2
