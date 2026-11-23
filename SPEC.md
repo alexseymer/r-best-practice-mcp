@@ -32,12 +32,15 @@ capabilities.
 
 | Tool | Parameters | Result |
 | --- | --- | --- |
-| `check_project` | `path` (required), `workflow`, `minSeverity`, `categories`, `maxFindings` | `detection` (workflow, confidence, indicators) and the validation result: findings, summary, warnings. |
+| `check_project` | `path` (required, absolute), `workflow`, `minSeverity`, `categories`, `maxFindings` | `detection` (workflow, confidence, indicators) and the validation result: findings, summary, warnings. |
 | `get_practice` | `id` (required) | The practice: title, description, details, examples, references. |
 | `create_project` | `type` (required: `package`, `shiny`, `quarto`, `rmarkdown`, `analysis`), `projectName`, `authorName`, `authorEmail` | `files` and `directories` to create, plus the workflow. |
 
 Errors are JSON objects with `error: true`, a `code` and a `message`. Codes used: `INVALID_PARAMETER`,
-`PATH_NOT_FOUND`, `NOT_FOUND`, `NEEDS_INPUT`, `CANCELLED`, `TOOL_ERROR`.
+`PATH_NOT_FOUND`, `NOT_A_FOLDER` (a file was given), `NOT_FOUND`, `NEEDS_INPUT`, `CANCELLED`, `TOOL_ERROR`.
+
+`check_project` requires an absolute path. The server resolves a relative path against its own working directory,
+not against the project, so it refuses one instead of guessing.
 
 ### 3.2 Prompts
 
@@ -82,6 +85,9 @@ severity, enforcement, description, details, good and bad examples, tags and ref
 - **Severity:** `critical`, `important`, `recommended`, `info`.
 - **Rules:** each automated practice has one rule with the same id in `src/engine/rules/`. Tests fail if a rule has no
   practice or an automated practice has no rule.
+- **Heuristics:** a check that looks for patterns in the text, rather than a fact about the project, is at most
+  `recommended` and its message starts with "Consider". Facts such as a missing file or field can be `important` or
+  `critical`.
 - **Content:** every practice needs details, distinct good and bad examples and at least one HTTPS reference.
 
 ### 4.4 Validation output
