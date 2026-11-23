@@ -34,6 +34,9 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
   references), System (status, version, build, uptime, counts, limits, tools) and Setup (configuration for Claude Code,
   Claude Desktop, Cursor and VS Code, hosted and local). It is read-only, needs no external files, and works with a
   Content-Security-Policy of `'self'`. Read-only JSON for it at `/api/practices` and `/api/system`.
+- `docker-compose.yml` and [HOSTING.md](HOSTING.md) for running the hosted server: loopback port for a reverse proxy,
+  non-root user, read-only file system, no capabilities, memory limit, health check, rotated logs, and `GIT_SHA` and
+  `BUILD_TIME` build arguments shown on `/health`. CI starts the image in HTTP mode and the compose stack.
 - The server logs only the tool name and the argument names, no argument values.
 - Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and
   `neue-datenanalyse`.

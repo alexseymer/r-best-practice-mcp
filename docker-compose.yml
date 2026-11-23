@@ -1,0 +1,54 @@
+# Hosted MCP server over HTTP, with the information page. Start it with:
+#
+#   GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+#
+# The container listens on 127.0.0.1:3000 of the host. Put a reverse proxy with TLS in front of it (see HOSTING.md);
+# MCP clients and Claude Desktop need an HTTPS URL.
+services:
+  mcp:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-}
+        BUILD_TIME: ${BUILD_TIME:-}
+    image: r-best-practices-mcp:hosted
+    container_name: r-practices-mcp
+    command: ["node", "dist/http.js"]
+    ports:
+      # Loopback only: the reverse proxy is the public entry. Publishing on all interfaces would let a client skip it.
+      - "127.0.0.1:${PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      # Requests per minute and client on /mcp (0 = off)
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+      # One reverse proxy in front that sets X-Forwarded-For itself. Use 0 when clients reach the container directly.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+      # Extra browser origins allowed to call /mcp, comma separated (the server's own origin is always allowed)
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # npm install spec shown on the Setup tab for running the server locally
+      LOCAL_PACKAGE: ${LOCAL_PACKAGE:-github:alexseymer/r-best-practice-mcp}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

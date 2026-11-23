@@ -179,8 +179,11 @@ The file system is reached through the `ProjectFs` interface. The server uses th
 
 - **Source:** the GitHub repository. Installing from it runs the build (`prepare` script), so `npm exec` and
   `npm install` work without a published package.
-- **Docker:** a stdio image built from the repository. The container runs `dumb-init` and the server, and reads
-  requests on stdin.
+- **Docker:** one image built from the repository, with two ways to run it. By default the container runs the stdio
+  server and reads requests on stdin. With `node dist/http.js` it runs the hosted server on port 3000.
+  `docker-compose.yml` runs the hosted server as a non-root user with a read-only file system, no capabilities, a
+  memory limit, a health check and rotated logs, bound to `127.0.0.1` for a reverse proxy. `GIT_SHA` and `BUILD_TIME`
+  build arguments show up on `/health`. See [HOSTING.md](HOSTING.md).
 - **npm and Docker Hub:** not published yet. The publish workflow runs on version tags (`v*.*.*`) and needs the
   `NPM_TOKEN` and Docker Hub secrets. See [PUBLISH.md](PUBLISH.md).
 
