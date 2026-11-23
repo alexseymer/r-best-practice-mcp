@@ -30,6 +30,10 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
   server offers `check_files`, which validates files sent as text, instead of `check_project`, and it never reads its own
   disk for a client. It limits requests per client, body size and concurrency, checks the `Origin` header, and does not log
   request bodies.
+- An information page on the hosted server (`GET /`) with three sections: Practices (search, filter, details, examples and
+  references), System (status, version, build, uptime, counts, limits, tools) and Setup (configuration for Claude Code,
+  Claude Desktop, Cursor and VS Code, hosted and local). It is read-only, needs no external files, and works with a
+  Content-Security-Policy of `'self'`. Read-only JSON for it at `/api/practices` and `/api/system`.
 - The server logs only the tool name and the argument names, no argument values.
 - Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and
   `neue-datenanalyse`.

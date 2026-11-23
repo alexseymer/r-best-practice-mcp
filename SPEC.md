@@ -12,8 +12,9 @@ Each kind has its own good practice. The server gives an MCP-capable assistant f
 2. **Explain** a practice, with examples and references.
 3. **Create** a standard project of one of the supported kinds, with the user's answers.
 
-**Out of scope:** running R code, fixing projects automatically, storing user projects, accounts, a web interface,
-a REST API and a command-line tool. Writing files is done by the client, never by the server.
+**Out of scope:** running R code, fixing projects automatically, storing user projects, accounts, a REST API for the
+tools, and a command-line tool. Writing files is done by the client, never by the server. The hosted server has one
+read-only information page (§3.4) and nothing else on the web.
 
 ## 2. Users
 
@@ -68,6 +69,12 @@ Four guided prompts. Each tells the assistant which questions to ask and how to 
 | --- | --- |
 | `POST /mcp` | MCP requests. Stateless: every request gets its own short-lived server, and answers are plain JSON. `GET` and `DELETE` return 405. |
 | `GET /health` | `status`, `version`, `mode`, `build` (`commit`, `builtAt`) and `uptimeSeconds`. |
+| `GET /` | The information page with three sections: **Practices** (search and filter the 73 practices, open one for its details, examples and references, deep links such as `/#practices/pkg-readme`), **System** (status, version, build, uptime, counts, limits, tools, endpoints) and **Setup** (copyable configuration for Claude Code, Claude Desktop, Cursor and VS Code, for the hosted server and for a local install). `/dashboard` redirects to `/`. |
+| `GET /api/practices`, `GET /api/system` | Read-only JSON for the page. `/api/system` shows no host details, paths or secrets. |
+| `GET /app.css`, `/app.js`, `/favicon.svg` | The page's assets. Served with gzip and an ETag. |
+
+The page needs no external files: scripts, styles and the icon come from the server itself, so the
+Content-Security-Policy stays at `'self'`. It sets text only (never HTML from data) and has no write actions.
 
 The hosted server is a different mode from the local one, because it must not read its own disk for a client:
 
@@ -159,6 +166,9 @@ it replaces an existing file.
 | `src/prompts.ts` | The four guided prompts. |
 | `src/resources.ts` | Practices as Markdown resources. |
 | `src/create-project.ts` | Name rules, questions and the call to the template generator. |
+| `src/check-files.ts` | Limits and input checks for `check_files`. |
+| `src/http.ts`, `src/http-server.ts`, `src/http-config.ts`, `src/rate-limit.ts` | The hosted HTTP server: entry point, routes and guards, settings, rate limiter. |
+| `src/web/` | The information page: HTML, CSS and JavaScript as strings, and the routes that serve them. |
 | `src/engine/` | Detector, validator, rule registry (`rules/`), template generator (`templates/`), file-system adapter. |
 | `src/data/` | Knowledge base and the 73 practices. |
 | `src/utils/`, `src/types/` | Logging, file helpers, parameter parsing, shared types. |
@@ -178,7 +188,7 @@ The file system is reached through the `ProjectFs` interface. The server uses th
 
 - Running R or any R package.
 - Changing a project on the user's behalf.
-- Storing, uploading or analysing projects on a server.
+- Storing projects. The hosted server checks the files of one request in memory and keeps nothing.
 - Interactive prompts outside MCP elicitation; anything else is reachable through tool arguments.
 
 ## 8. Open questions

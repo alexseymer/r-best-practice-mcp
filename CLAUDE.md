@@ -4,9 +4,11 @@ This file is for the people and agents who change the code. For what the product
 
 ## What the server is
 
-An MCP server over stdio with three tools (`check_project`, `get_practice`, `create_project`), four guided prompts and
-the practices as resources. It has no web interface, no REST API and no command-line tool. Keep it that way unless the
-spec changes first.
+An MCP server with three tools, four guided prompts and the practices as resources. Locally it runs over stdio
+(`check_project`, `get_practice`, `create_project`). Hosted, it runs over HTTP (`node dist/http.js`) with `check_files`
+instead of `check_project`, because a hosted server must never read its own disk for a client. The hosted server also
+serves one read-only information page (practices, system, setup). There is no REST API for the tools and no
+command-line tool. Keep it that way unless the spec changes first.
 
 ## Principles
 

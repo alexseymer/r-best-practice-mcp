@@ -8,6 +8,8 @@ export interface HttpConfig {
   trustProxyHops: number;
   /** Extra origins allowed to call /mcp from a browser. The server's own origin is always allowed. */
   allowedOrigins: string[];
+  /** npm install spec shown on the setup page for running the server locally. */
+  localPackage: string;
   build: { commit?: string; builtAt?: string };
 }
 
@@ -27,6 +29,7 @@ export function readHttpConfig(env: NodeJS.ProcessEnv = process.env): HttpConfig
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    localPackage: env.LOCAL_PACKAGE?.trim() || 'github:alexseymer/r-best-practice-mcp',
     build: {
       commit: env.GIT_SHA?.trim() || undefined,
       builtAt: env.BUILD_TIME?.trim() || undefined,

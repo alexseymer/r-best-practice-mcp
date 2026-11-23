@@ -3,7 +3,8 @@
 An [MCP](https://modelcontextprotocol.io) server for R projects. Your AI assistant can use it to check a project against
 R best practices, explain each practice, and create a standard project with you, step by step.
 
-It works with Claude Code, Cursor and other MCP clients over stdio. It has no web interface, no REST API and no
+It works with Claude Code, Cursor and other MCP clients over stdio, or as a hosted server over HTTP. A small web page
+shows the practices, the system status and the setup for each client. There is no REST API for the tools and no
 command-line tool: the server and the assistant are the whole product.
 
 ## What it gives your assistant
