@@ -209,6 +209,11 @@ export function createHttpServer(options: HttpServerOptions): Server {
         if (!res.headersSent) sendJson(res, error.status, jsonRpcError(-32000, error.message), { Connection: 'close' });
         return;
       }
+      // A client that hangs up in the middle of its request is not a server error, and nobody is left to answer.
+      if ((error as NodeJS.ErrnoException).code === 'ECONNRESET' || req.destroyed) {
+        logger.info('Client closed the connection before the request was complete');
+        return;
+      }
       logger.error('Request failed', error);
       if (!res.headersSent) sendJson(res, 500, jsonRpcError(-32603, 'Internal error'));
       else res.end();

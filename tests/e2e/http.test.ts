@@ -361,7 +361,18 @@ describe('hosted HTTP server: limits and guards', () => {
       const busy = await app.post({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
       expect(busy.status).toBe(503);
       expect(busy.headers.get('retry-after')).toBe('1');
-      slow.destroy();
+
+      // The first client hangs up mid-request. That is not a server error and must not be logged as one.
+      const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        slow.destroy();
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const logged = spy.mock.calls.map((call) => JSON.stringify(call)).join('\n');
+        expect(logged).not.toContain('[ERROR]');
+        expect(logged).toContain('Client closed the connection');
+      } finally {
+        spy.mockRestore();
+      }
     } finally {
       await app.close();
     }
