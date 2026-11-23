@@ -8,6 +8,7 @@ describe('readHttpConfig', () => {
       rateLimitPerMinute: 60,
       trustProxyHops: 0,
       allowedOrigins: [],
+      localPackage: 'github:alexseymer/r-best-practice-mcp',
       build: { commit: undefined, builtAt: undefined },
     });
   });
@@ -19,6 +20,7 @@ describe('readHttpConfig', () => {
       RATE_LIMIT_PER_MINUTE: '10',
       TRUST_PROXY: '1',
       ALLOWED_ORIGINS: 'https://a.example, https://b.example',
+      LOCAL_PACKAGE: 'r-best-practices-mcp@0.9.0',
       GIT_SHA: 'abc123',
       BUILD_TIME: '2026-11-23T10:00:00Z',
     });
@@ -28,6 +30,7 @@ describe('readHttpConfig', () => {
       rateLimitPerMinute: 10,
       trustProxyHops: 1,
       allowedOrigins: ['https://a.example', 'https://b.example'],
+      localPackage: 'r-best-practices-mcp@0.9.0',
       build: { commit: 'abc123', builtAt: '2026-11-23T10:00:00Z' },
     });
   });

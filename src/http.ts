@@ -2,16 +2,29 @@
 /** Entry point of the hosted server: `node dist/http.js`. Settings come from environment variables (see http-config.ts). */
 import { createHttpServer } from './http-server.js';
 import { readHttpConfig } from './http-config.js';
+import { createWebRoutes } from './web/routes.js';
 import { getRuntimeConfig } from './config/runtime.js';
 import { logger } from './utils/logger.js';
 
 const config = readHttpConfig();
+const version = getRuntimeConfig().version;
+const maxBodyBytes = 2_000_000;
 const server = createHttpServer({
-  version: getRuntimeConfig().version,
+  version,
   build: config.build,
   rateLimitPerMinute: config.rateLimitPerMinute,
   trustProxyHops: config.trustProxyHops,
   allowedOrigins: config.allowedOrigins,
+  maxBodyBytes,
+  routes: [
+    createWebRoutes({
+      version,
+      build: config.build,
+      rateLimitPerMinute: config.rateLimitPerMinute,
+      maxBodyBytes,
+      localPackage: config.localPackage,
+    }),
+  ],
 });
 
 server.listen(config.port, config.host, () => {
