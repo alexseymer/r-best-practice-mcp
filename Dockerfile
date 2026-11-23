@@ -1,5 +1,6 @@
-# The image runs the MCP server over stdio. It has no port and no web interface.
-# Use it with `docker run -i --rm <image>`; the MCP client writes requests to stdin.
+# One image, two ways to run it:
+#   stdio (default):  docker run -i --rm <image>               the MCP client writes requests to stdin
+#   hosted over HTTP: docker run -p 3000:3000 <image> node dist/http.js   (see docker-compose.yml and HOSTING.md)
 
 # Build stage
 FROM node:22-alpine AS builder
@@ -34,9 +35,17 @@ RUN addgroup -g 1001 -S nodejs && \
 
 USER nodejs
 
-ENV NODE_ENV=production
+# Build information shown on /health and on the page's System tab (optional)
+ARG GIT_SHA=""
+ARG BUILD_TIME=""
+ENV NODE_ENV=production \
+    GIT_SHA=${GIT_SHA} \
+    BUILD_TIME=${BUILD_TIME}
+
+# Only used by the HTTP mode (node dist/http.js)
+EXPOSE 3000
 
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the MCP server on stdin/stdout
+# Default: the MCP server on stdin/stdout. The hosted server overrides this with `node dist/http.js`.
 CMD ["node", "dist/index.js"]

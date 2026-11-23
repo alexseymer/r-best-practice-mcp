@@ -63,6 +63,11 @@ Then use `docker run -i --rm r-practices` as the command in your client's MCP co
 `npm exec` caches the package. To get a newer version, pin a commit (`github:alexseymer/r-best-practice-mcp#<sha>`) or
 clear the npm cache.
 
+## Host it yourself
+
+The same image can run as a hosted server over HTTP, with an information page (practices, system status, setup for each
+client). Clients then connect with a URL instead of starting the server themselves. See [HOSTING.md](HOSTING.md).
+
 ## Using it
 
 - Ask "check this project" with the absolute path of the project folder. The assistant calls `check_project`.

@@ -53,6 +53,28 @@ jobs:
             exit 1
           fi
 
+      - name: Test Docker image (hosted HTTP mode)
+        run: |
+          docker run -d --rm --name test-http -p 127.0.0.1:3000:3000 r-best-practices-mcp:latest node dist/http.js
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:3000/health > /dev/null && break; sleep 1; done
+          curl -fs http://127.0.0.1:3000/health
+
+          TOOLS=$(curl -fs -X POST http://127.0.0.1:3000/mcp \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+          echo "$TOOLS"
+          echo "$TOOLS" | grep -q '"check_files"' || { echo "✗ check_files is missing"; exit 1; }
+          if echo "$TOOLS" | grep -q '"check_project"'; then
+            echo "✗ the hosted server must not offer check_project"
+            exit 1
+          fi
+          curl -fs http://127.0.0.1:3000/ | grep -q "<title>R Best Practices MCP</title>" || { echo "✗ page is missing"; exit 1; }
+          echo "✓ hosted HTTP mode works"
+
+      - name: Stop the HTTP test container
+        if: always()
+        run: docker stop test-http || true
+
       - name: Verify image layers
         run: |
           docker history r-best-practices-mcp:latest
@@ -97,3 +119,34 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
+
+  compose-test:
+    name: Docker Compose Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate the compose file
+        run: docker compose config -q
+
+      - name: Start the hosted server with docker compose
+        run: |
+          GIT_SHA=${{ github.sha }} BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+
+          for i in $(seq 1 30); do
+            STATUS=$(docker inspect -f '{{.State.Health.Status}}' r-practices-mcp 2>/dev/null || echo starting)
+            [ "$STATUS" = "healthy" ] && break
+            sleep 2
+          done
+          echo "container health: $STATUS"
+          [ "$STATUS" = "healthy" ] || { docker compose logs; exit 1; }
+
+          curl -fs http://127.0.0.1:3000/health | grep -q '"status":"ok"'
+          curl -fs http://127.0.0.1:3000/health | grep -q "${{ github.sha }}"
+          echo "✓ compose stack is healthy and reports its build"
+
+      - name: Clean up
+        if: always()
+        run: docker compose down -v
