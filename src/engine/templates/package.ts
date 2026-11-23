@@ -14,7 +14,7 @@ export function generatePackage(options: TemplateGeneratorOptions): {
         path: 'DESCRIPTION',
         content: `Package: ${projectName}
 Version: 0.1.0
-Title: Tools for ${projectName}
+Title: Utility Functions
 Description: A longer description of what your package does.
     It can span multiple lines.
 Authors@R:

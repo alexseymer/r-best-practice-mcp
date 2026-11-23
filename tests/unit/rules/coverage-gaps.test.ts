@@ -191,8 +191,8 @@ describe('rules without a named test: violation and clean project', () => {
 
     it.each([
       ['a trailing full stop in Title', withField('Title', 'Tools for Demo.')],
-      ['a Title longer than 65 characters', withField('Title', 'Tools for ' + 'very '.repeat(12) + 'demo')],
-      ['a Title that starts with "A package"', withField('Title', 'A package for demo data')],
+      ['a Title longer than 65 characters', withField('Title', 'Tools for ' + 'Very '.repeat(12) + 'Demo')],
+      ['a Title that starts with "A package"', withField('Title', 'A Package for Demo Data')],
       ['a Description without a full stop', withField('Description', 'Demo package for tests')],
     ])('reports %s', async (_label, desc) => {
       write({ DESCRIPTION: desc });
@@ -200,6 +200,25 @@ describe('rules without a named test: violation and clean project', () => {
       expect(found).toHaveLength(1);
       expect(found[0].severity).toBe('recommended');
       expect(found[0].message).toMatch(/^Consider/);
+    });
+
+    it('reports lowercase main words and names them', async () => {
+      write({ DESCRIPTION: withField('Title', 'Tools for demo data') });
+      const found = (await findingsFor(dir, 'package')).filter((f) => f.id === 'pkg-description');
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain('demo, data');
+    });
+
+    it.each([
+      'Tools for Demo Data',
+      'Tools for the Analysis of Data',
+      "Tools for 'dplyr' Users",
+      'Tools for ggplot2 Themes',
+      'Simple Tools to Make Plots',
+      'Tools for R Users',
+    ])('accepts the title "%s"', async (title) => {
+      write({ DESCRIPTION: withField('Title', title) });
+      expect(await idsFor(dir, 'package')).not.toContain('pkg-description');
     });
 
     it('is silent on a well-formed DESCRIPTION', async () => {
@@ -226,5 +245,26 @@ describe('rules without a named test: violation and clean project', () => {
   it.each(cases)('$id is silent on a clean project', async ({ id, workflow, clean }) => {
     write(clean);
     expect(await idsFor(dir, workflow)).not.toContain(id);
+  });
+});
+
+describe('lowercaseTitleWords', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { lowercaseTitleWords } = require('../../../src/engine/rules/package');
+
+  it('always wants a capital on the first word, even a small one', () => {
+    expect(lowercaseTitleWords('an Introduction to Tidy Data')).toEqual(['an']);
+  });
+
+  it('keeps small words lowercase in the middle', () => {
+    expect(lowercaseTitleWords('Tools for the Analysis of Data')).toEqual([]);
+  });
+
+  it('skips quoted names and code-like words', () => {
+    expect(lowercaseTitleWords("Wrappers for 'tidyverse' and rlang2 Helpers")).toEqual([]);
+  });
+
+  it('ignores trailing punctuation when judging a word', () => {
+    expect(lowercaseTitleWords('Tools for Data (experimental)')).toEqual(['experimental']);
   });
 });

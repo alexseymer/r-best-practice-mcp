@@ -35,9 +35,33 @@ function fieldValue(desc: string, field: string): string | undefined {
 
 const TITLE_MAX_LENGTH = 65;
 
+/** Words that stay lowercase inside a title, unless they are the first word. */
+const SMALL_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'nor', 'of', 'on', 'or',
+  'per', 'than', 'the', 'to', 'via', 'vs', 'with', 'without',
+]);
+
+/**
+ * Words of a title that start with a lowercase letter although title case wants a capital. Quoted
+ * software names ('dplyr') and code-like words (digits, dots, underscores, inner capitals) are skipped.
+ */
+export function lowercaseTitleWords(title: string): string[] {
+  const words = title.split(/\s+/).filter(Boolean);
+  const offenders: string[] = [];
+  words.forEach((raw, index) => {
+    if (/^['"`]/.test(raw)) return;
+    const word = raw.replace(/^[("]+|[)",.:;!?]+$/g, '');
+    if (!/^[a-z]/.test(word)) return;
+    if (/[0-9._]|[A-Z]/.test(word)) return;
+    if (index > 0 && SMALL_WORDS.has(word)) return;
+    offenders.push(word);
+  });
+  return offenders;
+}
+
 /**
  * Content checks from R Packages (description.html): the Title is a short plain title without a full
- * stop, and the Description ends as a sentence. Title case is not checked. Reported under the same id
+ * stop, and the Description ends as a sentence. Title case is checked with a word list, so it is a heuristic. Reported under the same id
  * at recommended severity, because a missing or wrong wording does not break the package.
  */
 function descriptionStyleFindings(desc: string): Finding[] {
@@ -61,6 +85,13 @@ function descriptionStyleFindings(desc: string): Finding[] {
       add(
         `Consider shortening Title to ${TITLE_MAX_LENGTH} characters or fewer (${title.length} now)`,
         'Listings such as CRAN truncate longer titles',
+      );
+    }
+    const lowercase = lowercaseTitleWords(title);
+    if (lowercase.length > 0) {
+      add(
+        `Consider title case for Title: capitalise ${lowercase.slice(0, 5).join(', ')}${lowercase.length > 5 ? ', ...' : ''}`,
+        'Capitalise the main words, keep small words such as "for" and "of" lowercase, and put software names in single quotes',
       );
     }
     if (/^(a|an|the|this)\s+package\b/i.test(title)) {
