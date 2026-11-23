@@ -93,6 +93,11 @@ async function endpointFiles(
   return out;
 }
 
+/** A validation helper, stopifnot() or req(): a call that checks an input. */
+const VALIDATION_CALL = /\b(validate\w*|check\w*|stopifnot|req)\s*\(/;
+/** A guard such as `if (is.null(x)) stop(...)`: a conditional whose branch stops or returns. */
+const GUARD = /\bif\s*\([^\n]*\)\s*\{?\s*(stop|abort|return)\s*\(/;
+
 export const plumberRules: RuleDef[] = [
   {
     id: 'plumber-validation',
@@ -100,8 +105,8 @@ export const plumberRules: RuleDef[] = [
     async run({ dirPath, fsys }) {
       const out: Finding[] = [];
       for (const { file, content } of await endpointFiles(fsys, dirPath)) {
-        // A validation/check helper call, stopifnot(), req(), or a conditional
-        if (/\b(validate\w*|check\w*|stopifnot|req)\s*\(|\bif\s*\(/.test(content)) continue;
+        // A validation helper, or a guard whose branch stops or returns; a plain if does not count
+        if (VALIDATION_CALL.test(content) || GUARD.test(content)) continue;
         out.push({
           id: 'plumber-validation',
           severity: 'recommended',

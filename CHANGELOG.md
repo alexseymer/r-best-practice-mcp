@@ -15,6 +15,7 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
 - Heuristic checks (content-based, not a fact about the project) are at most `recommended` and say "Consider ...":
   `rscript-functions`, `rscript-errors`, `rscript-cleanup`, `rscript-globals`, `quarto-text`, `shiny-separation`,
   `shiny-validation`, `plumber-status`, `plumber-validation` and `plumber-error` were `important` or `critical`.
+- `plumber-validation` no longer treats any `if (` as validation. A validation helper, `stopifnot()`, `req()`, or a guard such as `if (is.null(x)) stop(...)` counts; a plain `if` does not.
 - `check_project` requires an absolute `path` (`INVALID_PARAMETER`) and reports a file given in place of a folder as
   `NOT_A_FOLDER`.
 - `pkg-description` checks the content of Title (no trailing full stop, at most 65 characters, no "A package ..." start) and that Description ends with a full stop. These findings are recommended and say "Consider".

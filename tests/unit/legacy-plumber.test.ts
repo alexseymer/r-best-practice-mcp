@@ -20,11 +20,21 @@ describe('plumber-validation / plumber-error (original rules)', () => {
     'checkmate::check_number(x)',
     'stopifnot(is.numeric(x))',
     'req(x)',
-    'if (x > 1) 1',
+    'if (is.null(x)) stop("x is required")',
+    'if (x < 0) {\n  stop("x must be positive")\n}',
+    'if (!is.numeric(x)) return(list(error = "x must be numeric"))',
   ])('accepts %s as validation', async (call) => {
     createFile(dir, 'api.R', `${ENDPOINT}${call}\n`);
     expect(await idsFor(dir, 'plumber')).not.toContain('plumber-validation');
   });
+
+  it.each(['if (x > 1) 1', 'if (x) y <- 2 else y <- 3', 'ifelse(x > 1, 1, 2)'])(
+    'does not accept %s as validation',
+    async (code) => {
+      createFile(dir, 'api.R', `${ENDPOINT}${code}\n`);
+      expect(await idsFor(dir, 'plumber')).toContain('plumber-validation');
+    }
+  );
 
   it('ignores validation and error handling that only appears in a string', async () => {
     createFile(dir, 'api.R', `${ENDPOINT}msg <- "if (x) stop(y) validate(z) tryCatch(w)"\n`);
