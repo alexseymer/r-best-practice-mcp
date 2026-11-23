@@ -64,7 +64,7 @@ clear the npm cache.
 
 ## Using it
 
-- Ask "check this project" with the path of the project folder. The assistant calls `check_project`.
+- Ask "check this project" with the absolute path of the project folder. The assistant calls `check_project`.
 - Ask "explain `pkg-readme`". The assistant calls `get_practice`, or reads `practice://pkg-readme`.
 - Run a prompt, for example `/mcp__r-practices__neues-r-paket` in Claude Code. The assistant asks for the project
   name, the author and an optional e-mail address, then writes the files into the folder you name.
