@@ -25,11 +25,12 @@ and build the Docker image from the repository URL.
 
 ## Before the first public release
 
-1. Decide the version. The tool surface has changed since 0.8.5, so 0.9.0 is proposed.
-2. Update `package.json` and `CHANGELOG.md` in the same pull request.
-3. Make sure the repository has the `NPM_TOKEN`, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets. Without them the
+1. The version in `package.json` is 0.9.0 (the tool surface changed since 0.8.5, and the package is before 1.0). The
+   changelog section is headed "0.9.0 (not released yet)"; when the release is decided, change the heading to the release
+   date in the same pull request.
+2. Make sure the repository has the `NPM_TOKEN`, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` secrets. Without them the
    publish job fails.
-4. Tag the merged commit with `vX.Y.Z` only when the release is decided.
+3. Tag the merged commit with `vX.Y.Z` only when the release is decided.
 
 To publish without the workflow, run `npm publish` from a clean checkout of the tag after `npm run build`. Check the package
 contents first with `npm pack --dry-run`: npm only lets you unpublish freely for a short time after a release.
