@@ -15,7 +15,7 @@ and build the Docker image from the repository URL.
 
 ## What a release does
 
-`.github/workflows/publish.yml` runs on a tag that matches `v*.*.*`. It:
+`.github/workflows/publish.yml` runs on a tag of digits only, such as `v1.2.3`. A tag like `v0.8.5-legacy` does not start it. It:
 
 1. runs the tests and the build on Node 20 and 22,
 2. publishes the npm package with `npm publish --access public` (needs the `NPM_TOKEN` secret),
