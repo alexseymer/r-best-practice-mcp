@@ -198,4 +198,4 @@ The file system is reached through the `ProjectFs` interface. The server uses th
 
 1. Which of the twelve project types should `create_project` add next?
 2. Should the practice list be filterable by severity or category as a tool, or is the resource index enough?
-3. How should the version be set for the first public release (0.9.0 is proposed, because the tool surface changed)?
+3. When is 0.9.0 released? The version is set in `package.json`; no tag exists until the release is decided.

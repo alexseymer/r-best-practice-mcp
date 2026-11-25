@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (not released yet)
 
 The server is now an MCP server only. The web interface, the REST API, the command-line tool and the editor add-ins
 are removed. The last version with them is tagged `v0.8.5-legacy`.
