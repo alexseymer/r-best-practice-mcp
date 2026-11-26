@@ -39,6 +39,9 @@ are removed. The last version with them is tagged `v0.8.5-legacy`.
 - `docker-compose.yml` and [HOSTING.md](HOSTING.md) for running the hosted server: loopback port for a reverse proxy,
   non-root user, read-only file system, no capabilities, memory limit, health check, rotated logs, and `GIT_SHA` and
   `BUILD_TIME` build arguments shown on `/health`. CI starts the image in HTTP mode and the compose stack.
+- HOSTING.md explains the upgrade from the old dashboard version: the old `r-practices-api` container is not part of the
+  new compose file, so `docker compose down` leaves it running on port 3000 and the new container cannot start. Use
+  `docker compose up -d --build --remove-orphans`.
 - The server logs only the tool name and the argument names, no argument values.
 - Four guided prompts: `neues-r-paket`, `neue-shiny-app`, `neues-quarto-projekt` (with a `format` argument) and
   `neue-datenanalyse`.

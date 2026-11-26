@@ -16,8 +16,11 @@ client, keeps no data, and does not log request bodies. See [SPEC.md](SPEC.md#34
 ```bash
 git clone https://github.com/alexseymer/r-best-practice-mcp.git
 cd r-best-practice-mcp
-GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build --remove-orphans
 ```
+
+`--remove-orphans` removes containers of this project that the compose file no longer defines. It does nothing on a fresh
+server, and it is what makes an upgrade from the old dashboard version work (see below).
 
 `GIT_SHA` and `BUILD_TIME` are optional. They show up on `/health` and on the System tab, so you can tell which version
 is running. Without them the page says "not recorded".
@@ -92,10 +95,37 @@ The second call lists `check_files`, `get_practice` and `create_project`. `check
 
 ```bash
 git pull
-GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build --remove-orphans
 ```
 
 The System tab shows the commit that is running.
+
+## Upgrading from the old dashboard version
+
+Versions before 0.9.0 ran a REST API and a dashboard in a service called `api` (container `r-practices-api`, and
+optionally `r-practices-nginx`). The current compose file does not define them. If you only run `git pull` and
+`docker compose down`, **the old container keeps running**: `down` does not know it any more. It still holds
+`127.0.0.1:3000`, so the new container cannot start (`port is already allocated`), and port 3000 keeps answering with the
+old dashboard. It looks as if nothing changed.
+
+Remove the old containers once, then start the new stack:
+
+```bash
+docker compose up -d --build --remove-orphans
+```
+
+If the old stack was started from a folder with a different name, Compose does not see it as part of this project. Remove
+it by name:
+
+```bash
+docker rm -f r-practices-api r-practices-nginx
+docker compose up -d --build
+```
+
+If your reverse proxy pointed at the Docker service name `api` (for example `proxy_pass http://api:3000`), change it to
+`http://127.0.0.1:3000`. The new service is called `mcp` and is published on the loopback port only.
+
+Check the result: `curl -s http://127.0.0.1:3000/health` must show `"version"` 0.9.0 and `"mode":"remote"`.
 
 ## What this setup does not do
 

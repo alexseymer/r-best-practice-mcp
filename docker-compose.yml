@@ -1,6 +1,9 @@
 # Hosted MCP server over HTTP, with the information page. Start it with:
 #
-#   GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build
+#   GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) docker compose up -d --build --remove-orphans
+#
+# --remove-orphans matters when you upgrade from the old dashboard version: its container (r-practices-api) is no longer
+# in this file, so `docker compose down` leaves it running on port 3000. See "Upgrading" in HOSTING.md.
 #
 # The container listens on 127.0.0.1:3000 of the host. Put a reverse proxy with TLS in front of it (see HOSTING.md);
 # MCP clients and Claude Desktop need an HTTPS URL.
