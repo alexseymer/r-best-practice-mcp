@@ -128,8 +128,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate the compose file
-        run: docker compose config -q
+      - name: Validate the compose files
+        run: |
+          docker compose config -q
+          MCP_HOST=mcp.example.org docker compose -f compose.yaml -f compose.traefik.yaml config -q
 
       - name: Start the hosted server with docker compose
         run: |
