@@ -1,6 +1,6 @@
 # One image, two ways to run it:
 #   stdio (default):  docker run -i --rm <image>               the MCP client writes requests to stdin
-#   hosted over HTTP: docker run -p 3000:3000 <image> node dist/http.js   (see docker-compose.yml and HOSTING.md)
+#   hosted over HTTP: docker run -p 3000:3000 <image> node dist/http.js   (see compose.yaml and HOSTING.md)
 
 # Build stage
 FROM node:22-alpine AS builder

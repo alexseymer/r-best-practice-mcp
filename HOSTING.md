@@ -33,7 +33,7 @@ The compose file runs the container as a non-root user with a read-only file sys
 
 ## Settings
 
-Set them in the shell or in a `.env` file next to `docker-compose.yml`.
+Set them in the shell or in a `.env` file next to `compose.yaml`.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -90,6 +90,20 @@ curl -s -X POST https://mcp.example.org/mcp \
 
 The second call lists `check_files`, `get_practice` and `create_project`. `check_project` must not be there. Then open
 `https://mcp.example.org/` and look at the System tab.
+
+## Which compose file is used
+
+The file in the repository is `compose.yaml`. When a folder holds several compose files, Docker Compose silently uses the
+first one in this order: `compose.yaml`, `compose.yml`, `docker-compose.yml`, `docker-compose.yaml`. A leftover file with
+an earlier name would hide the repository's file. Check which services Compose sees:
+
+```bash
+ls -1 compose.y*ml docker-compose.y*ml 2>/dev/null
+docker compose config --services      # must print: mcp
+```
+
+If it prints something else, remove the stray file or name the right one: `docker compose -f compose.yaml up -d --build
+--remove-orphans`.
 
 ## Update
 
