@@ -119,7 +119,7 @@ server by hand.
 
 - `npm run build` compiles to `dist/`. The `prepare` script runs it on install, so installing from GitHub works.
 - The Docker image is built from the repository. Its stages skip install scripts and run the build explicitly. The same
-  image runs the stdio server (default command) or the hosted server (`node dist/http.js`, see `docker-compose.yml`
+  image runs the stdio server (default command) or the hosted server (`node dist/http.js`, see `compose.yaml`
   and [HOSTING.md](HOSTING.md)). CI tests both modes and the compose stack.
 - A version tag such as `v1.2.3` (digits only; `v0.8.5-legacy` does not match) starts `publish.yml`, which publishes to npm and Docker Hub. Do not push such a tag until the
   release is decided. See [PUBLISH.md](PUBLISH.md).
