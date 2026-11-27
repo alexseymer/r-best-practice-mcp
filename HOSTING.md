@@ -79,6 +79,38 @@ Two details matter:
 Any proxy that terminates TLS and sets `X-Forwarded-For` itself works. If it does not set the header, run with
 `TRUST_PROXY=0`; every client then shares the proxy's address in the rate limit.
 
+## Reverse proxy with Traefik
+
+If Traefik is your proxy, use the second compose file. Traefik reaches the container over a shared Docker network and finds
+it by labels, so the loopback port is not needed.
+
+```bash
+MCP_HOST=mcp.example.org \
+GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+docker compose -f compose.yaml -f compose.traefik.yaml up -d --build --remove-orphans
+```
+
+Set these to the names in your own Traefik setup (in the shell or in `.env`):
+
+| Variable | Default | What to put there |
+| --- | --- | --- |
+| `MCP_HOST` | none, required | The public host name, for example `mcp.example.org`. |
+| `TRAEFIK_NETWORK` | `traefik` | The Docker network Traefik is attached to. `docker network ls` and `docker inspect <traefik container>` show it. |
+| `TRAEFIK_ENTRYPOINT` | `websecure` | The HTTPS entrypoint in Traefik's static configuration. |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt` | The certificate resolver in Traefik's static configuration. If the name does not exist, Traefik disables the router and answers 404. |
+
+What the file sets: the router rule `Host(...)`, TLS with the resolver, the service port `3000`, and
+`traefik.docker.network`, which is needed because the container is on two networks (its own and Traefik's).
+`TRUST_PROXY=1` from `compose.yaml` stays right: Traefik ignores a `X-Forwarded-For` header that a client sends and writes
+the client address itself, so the rate limit cannot be dodged with a forged header (tested with Traefik 3.1).
+
+Reading the answers when something is wrong:
+
+- **404 `page not found` as plain text:** Traefik has no router for this host. The container is not running or not on
+  Traefik's network, the `MCP_HOST` or the labels do not match, or the certificate resolver name is wrong.
+- **502 `Bad Gateway`:** Traefik has a router but cannot reach the container. Check `docker compose ps`, that the
+  container is on the network named in `TRAEFIK_NETWORK`, and that the port is `3000`.
+
 ## Check that it works
 
 ```bash

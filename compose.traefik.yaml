@@ -1,0 +1,32 @@
+# Traefik routing for the hosted MCP server. Use it together with compose.yaml:
+#
+#   MCP_HOST=mcp.example.org \
+#   GIT_SHA=$(git rev-parse HEAD) BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+#   docker compose -f compose.yaml -f compose.traefik.yaml up -d --build --remove-orphans
+#
+# Traefik reaches the container over a shared Docker network, so the loopback port of compose.yaml is not used. Set these
+# to the names in YOUR Traefik setup (see HOSTING.md):
+#
+#   MCP_HOST             the public host name (required)
+#   TRAEFIK_NETWORK      the Docker network Traefik is attached to   (default: traefik)
+#   TRAEFIK_ENTRYPOINT   the HTTPS entrypoint                        (default: websecure)
+#   TRAEFIK_CERTRESOLVER the certificate resolver                    (default: letsencrypt)
+services:
+  mcp:
+    networks:
+      - default
+      - traefik
+    labels:
+      traefik.enable: "true"
+      # Traefik must use this network to reach the container; the container is on two networks
+      traefik.docker.network: ${TRAEFIK_NETWORK:-traefik}
+      traefik.http.routers.r-practices-mcp.rule: Host(`${MCP_HOST:?Set MCP_HOST to the public host name}`)
+      traefik.http.routers.r-practices-mcp.entrypoints: ${TRAEFIK_ENTRYPOINT:-websecure}
+      traefik.http.routers.r-practices-mcp.tls: "true"
+      traefik.http.routers.r-practices-mcp.tls.certresolver: ${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      traefik.http.services.r-practices-mcp.loadbalancer.server.port: "3000"
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
