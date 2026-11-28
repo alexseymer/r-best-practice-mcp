@@ -81,6 +81,36 @@ Any proxy that terminates TLS and sets `X-Forwarded-For` itself works. If it doe
 
 ## Reverse proxy with Traefik
 
+### Setup with a `.env` file (recommended)
+
+Put the values in a `.env` file next to `compose.yaml`. It is git-ignored, so your host name and network stay out of the
+repository. Then one command is enough, with no `-f` flags:
+
+```env
+# .env
+COMPOSE_FILE=compose.yaml:compose.traefik.yaml
+MCP_HOST=r-best-practice-mcp.seymer.at
+TRAEFIK_NETWORK=<dein Traefik-Netzwerk>
+TRAEFIK_ENTRYPOINT=<dein HTTPS-Entrypoint>
+TRAEFIK_CERTRESOLVER=<dein Resolver>
+```
+
+```bash
+docker compose up -d --build --remove-orphans
+```
+
+`COMPOSE_FILE` uses a colon on Linux and macOS and a semicolon on Windows. Check the resolved labels before you start:
+
+```bash
+docker compose config | grep traefik
+```
+
+`.env` supplies values for the variables in `compose.traefik.yaml`. It cannot add other labels. For those, edit the
+compose file.
+
+### Setup with command-line flags
+
+
 If Traefik is your proxy, use the second compose file. Traefik reaches the container over a shared Docker network and finds
 it by labels, so the loopback port is not needed.
 
